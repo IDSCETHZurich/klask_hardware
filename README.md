@@ -6,4 +6,5 @@ Complete KLASK robotic hardware stack, including ROS2 nodes, CAD files, and asse
 
 ```bash
 git config commit.template .gitmessage.txt
+xhost +local:root
 ```
