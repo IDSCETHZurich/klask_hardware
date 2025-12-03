@@ -89,7 +89,7 @@ cmd_connect() {
     fi
 
     echo -e "${GREEN}Connecting to SDK container...${NC}"
-    docker exec -it "${CONTAINER_NAME}" bash
+    docker exec -it -w /root/ros2_ws "${CONTAINER_NAME}" bash
 }
 
 cmd_stop() {
