@@ -71,7 +71,7 @@ cmd_run() {
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-        --volume="$SCRIPT_DIR/../src:/root/ros2_ws/src:rw" \
+        --volume="$SCRIPT_DIR/..:/root/ros2_ws:rw" \
         --name="${CONTAINER_NAME}" \
         "${IMAGE_NAME}:${TAG}"
 
