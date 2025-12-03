@@ -72,7 +72,11 @@ cmd_run() {
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-        --volume="$SCRIPT_DIR/..:/root/ros2_ws:rw" \
+        --volume="$SCRIPT_DIR/../src:/root/ros2_ws/src:rw" \
+        --volume="$SCRIPT_DIR/../.vscode:/root/ros2_ws/.vscode:rw" \
+        --volume="${CONTAINER_NAME}_build:/root/ros2_ws/build:rw" \
+        --volume="${CONTAINER_NAME}_install:/root/ros2_ws/install:rw" \
+        --volume="${CONTAINER_NAME}_log:/root/ros2_ws/log:rw" \
         --device="$VIDEO_DEVICE:/dev/video0" \
         --name="${CONTAINER_NAME}" \
         "${IMAGE_NAME}:${TAG}"
