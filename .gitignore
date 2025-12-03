@@ -1,7 +1,10 @@
 # Ignore IDE configuration files
 # The stuff stored here is user-specific and should not be committed
-.vscode/
+/.vscode/*
+/ros/.vscode/*
 .idea/
+# The only exception are the launch configurations
+!/ros/.vscode/launch.json
 
 # Ignore ROS stuff
 devel/
