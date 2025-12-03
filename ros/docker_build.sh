@@ -1,1 +1,0 @@
-docker build -t klask_ros:latest .
