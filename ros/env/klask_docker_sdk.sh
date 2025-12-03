@@ -3,6 +3,24 @@
 # Unified SDK Docker management script
 # Usage: ./klask_docker_sdk.sh [build|run|connect|stop|status]
 
+# To enable tab completion, add this to your ~/.bashrc 
+# or execute it in your shell for to have it for the current session:
+#     source /path/to/klask_docker_sdk.sh --completion
+
+# Bash completion support
+if [[ "$1" == "--completion" ]]; then
+    _klask_sdk_completions() {
+        local commands="build run connect stop status logs"
+        COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[1]}"))
+    }
+    # Register for various ways the script might be called
+    complete -F _klask_sdk_completions klask_docker_sdk.sh
+    complete -F _klask_sdk_completions ./klask_docker_sdk.sh
+    complete -F _klask_sdk_completions ./ros/env/klask_docker_sdk.sh
+    complete -F _klask_sdk_completions ros/env/klask_docker_sdk.sh
+    return 0 2>/dev/null || exit 0
+fi
+
 set -e
 
 # Get the directory of this script
