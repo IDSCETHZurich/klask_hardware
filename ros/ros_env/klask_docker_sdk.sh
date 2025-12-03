@@ -30,6 +30,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE_NAME="klask_ros_sdk"
 TAG="latest"
 CONTAINER_NAME="${IMAGE_NAME}_container_${TAG}"
+VIDEO_DEVICE="/dev/video0"
 
 # Colors for output
 RED='\033[0;31m'
@@ -52,7 +53,7 @@ print_usage() {
 cmd_build() {
     echo -e "${GREEN}Building SDK Docker image...${NC}"
 
-    docker build -t "${IMAGE_NAME}:${TAG}" -f "$SCRIPT_DIR/SDK.Dockerfile" .
+    docker build -t "${IMAGE_NAME}:${TAG}" -f "$SCRIPT_DIR/SDK.Dockerfile" "$SCRIPT_DIR"
 
     echo -e "${GREEN}Build complete!${NC}"
 }
@@ -72,6 +73,7 @@ cmd_run() {
         --env="QT_X11_NO_MITSHM=1" \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
         --volume="$SCRIPT_DIR/..:/root/ros2_ws:rw" \
+        --device="$VIDEO_DEVICE:/dev/video0" \
         --name="${CONTAINER_NAME}" \
         "${IMAGE_NAME}:${TAG}"
 

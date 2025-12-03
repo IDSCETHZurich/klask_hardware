@@ -3,8 +3,14 @@ FROM ros:humble-ros-base
 # install ros package
 RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-rqt \
-    ros-${ROS_DISTRO}-rqt-common-plugins && \
+    ros-${ROS_DISTRO}-rqt-common-plugins \
+    python3-pip && \
     rm -rf /var/lib/apt/lists/*
+
+# install python packages
+RUN pip install --upgrade pip
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt
 
 # setup colcon extensions
 RUN echo "source /usr/share/colcon_cd/function/colcon_cd.sh" >> ~/.bashrc
