@@ -7,11 +7,15 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(odrive_can REQUIRED)
+find_package(klask_interfaces REQUIRED)
 
 add_executable(motor_commander src/motor_commander.cpp)
+
+ament_target_dependencies(motor_commander rclcpp std_msgs odrive_can klask_interfaces)
+
 target_include_directories(motor_commander PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -19,6 +23,10 @@ target_compile_features(motor_commander PUBLIC c_std_99 cxx_std_17)  # Require C
 
 install(TARGETS motor_commander
   DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

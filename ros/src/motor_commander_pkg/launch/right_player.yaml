@@ -1,0 +1,33 @@
+launch:
+
+- node:
+    pkg: "odrive_can"
+    exec: "odrive_can_node"
+    name: "can_node_2"
+    namespace: "odrive_axis2"
+    param:
+    -
+      name: "node_id"
+      value: 2
+    -
+      name: "interface"
+      value: "can0"
+    -
+      name: "axis_idle_on_shutdown"
+      value: true
+
+- node:
+    pkg: "odrive_can"
+    exec: "odrive_can_node"
+    name: "can_node_3"
+    namespace: "odrive_axis3"
+    param:
+    -
+      name: "node_id"
+      value: 3
+    -
+      name: "interface"
+      value: "can0"
+    -
+      name: "axis_idle_on_shutdown"
+      value: true
