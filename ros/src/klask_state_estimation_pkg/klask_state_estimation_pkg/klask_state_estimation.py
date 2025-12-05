@@ -223,24 +223,60 @@ def resize_with_aspect_ratio(
 
 
 class BallPegDetection(Node):
+    """ROS2 node for detecting and tracking ball and peg positions using AprilTags and computer vision."""
+    
+    # Constants
+    CAMERA_FPS = 120
+    CAMERA_WIDTH = 1280
+    CAMERA_HEIGHT = 720
+    TAG_SIZE_MM = 20
+    APRILTAG_FAMILY = "tag36h11"
+    
+    # AprilTag IDs mapping
+    TAG_NAMES = {
+        0: "center right",
+        1: "center left",
+        2: "top left",
+        3: "bottom left",
+        4: "top right",
+        5: "bottom right",
+        6: "xy gantry",
+        7: "x gantry",
+    }
+    
+    # Corner detection constants
+    CORNER_TAG_IDS = range(2, 6)  # Tags 2-5 are corner tags
+    GOAL_TAG_IDS = range(2)  # Tags 0-1 are goal tags
+    
+    # Goal detection constants
+    GOAL_RADIUS = 22
+    GOAL_PERSPECTIVE_SHIFT = 4
+    MAX_GOAL_COUNTER = 30  # Frames required before confirming goal
+    
+    # Collision detection constants
+    COLLISION_DISTANCE = 35.0  # Distance threshold for collision detection
+    
+    # EMA filter alpha values
+    EMA_ALPHA_APRILTAG = 0.1
+    EMA_ALPHA_GANTRY = 1.0  # No smoothing for gantry tags
+    
     def __init__(self):
         super().__init__("detect_ball_peg")
-        # publish the detected ball and peg coordinates
-        self.state_publisher = self.create_publisher(
-            StampedPolygon, "ball_peg_states", 10
-        )
-        # publish when ball or peg is in goal
+        
+        # Publishers
+        self.state_publisher = self.create_publisher(StampedPolygon, "ball_peg_states", 10)
         self.outcome_publisher = self.create_publisher(StampedInt32, "outcome", 10)
 
-        self.timer = self.create_timer(
-            1.0 / 1200.0, self.timer_callback
-        )  # Timer set for 120 fps
-        self.delay_checker_timer = self.create_timer(
-            1.0, self.delay_checker_callback
-        )  # Timer set for 1 Hz
+        # Timers
+        self.timer = self.create_timer(1.0 / 1200.0, self.timer_callback)
+        self.delay_checker_timer = self.create_timer(1.0, self.delay_checker_callback)
 
+        # Debug/Display settings
         self.show_image = True
+        self.print_apriltags_not_found = False
+        self.print_outcome = False
 
+        # Performance monitoring (for debugging)
         self.check_delay = True
         self.check_delay_at = 0
         self.timer_time = time.time()
@@ -249,20 +285,18 @@ class BallPegDetection(Node):
         self.delay_values = []
         self.log_count = 0
 
-        # Initialize the KFs for the ball and pegs
+        # Kalman Filters
         self.ball_kf = KalmanFilter(
             process_noise_position=2.0,
             process_noise_velocity=30.0,
             measurement_noise_position=1.0,
         )
-
         self.left_peg_kf = KalmanFilter(
             process_noise_position=2.0,
             process_noise_velocity=800.0,
             measurement_noise_position=12.0,
             stop_threshold=0.3,
         )
-
         self.right_peg_kf = KalmanFilter(
             process_noise_position=2.0,
             process_noise_velocity=800.0,
@@ -270,321 +304,250 @@ class BallPegDetection(Node):
             stop_threshold=0.3,
         )
 
-        # Open the default camera (use the correct index if you have multiple cameras)
-        self.cap = cv2.VideoCapture(0)
-
-        # Check if the camera opened successfully
-        if not self.cap.isOpened():
-            print("Error: Could not open the camera.", flush=True)
-            return
-
-        # Set the desired frame rate
-        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("U", "Y", "V", "Y"))
-        self.cap.set(cv2.CAP_PROP_FPS, 120)
-        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 0.01)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # 1280x720
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-        # Display actual FPS
-        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
-        print(f"Attempting to capture at 120 FPS. Actual FPS: {actual_fps}", flush=True)
-
-        # Load the camera calibration data
+        # Camera setup
+        self._setup_camera()
+        
+        # Load camera calibration
         self.mtx, self.dist = load_calibration_data("calibration_data.npz")
 
+        # AprilTag detector
+        options = apriltag.DetectorOptions(families=self.APRILTAG_FAMILY)
+        self.detector = apriltag.Detector(options)
+        self.previous_tag_corners: dict[int, np.ndarray | None] = {i: None for i in range(8)}
+
+        # Timing
+        self.previous_time: float | None = None
+        self.dt: float = 0.01
         self.count = 0
 
-        self.options = apriltag.DetectorOptions(families="tag36h11")
-        self.detector = apriltag.Detector(self.options)
-        self.print_apriltags_not_found = False
-        self.print_outcome = False
-
-        self.TAG_SIZE_MM = 20
-
-        # Initialize previous filtered corners for each tag (corners of the detected tag) for EMA
-        self.previous_tag_corners = {i: None for i in range(8)}
-
-        self.previous_time = None
-        self.dt = None
-
+        # Detection state flags
         self.apriltags_detected_once = False
         self.corner_points_detected_once_printed = False
         self.goals_detected_once_printed = False
         self.goals_detected_this_frame = False
 
-        self.M: np.ndarray = None
-        self.width: int = 0
-        self.height: int = 0
-        self.inset_pixels: int = 0
+        # Perspective transform
+        self.M: np.ndarray | None = None
+        self.width = 0
+        self.height = 0
+        self.inset_pixels = 0
 
-        self.left_peg_position = None
-        self.right_peg_position = None
-        self.ball_position = None
+        # Object positions
+        self.left_peg_position: tuple[float, float] | None = None
+        self.right_peg_position: tuple[float, float] | None = None
+        self.ball_position: tuple[float, float] | None = None
 
-        self.left_peg_velocity = None
-        self.right_peg_velocity = None
-        self.ball_velocity = None
-
-        self.previous_tag_corners_goals = {i: None for i in range(2)}
-
-        self.options = apriltag.DetectorOptions(families="tag36h11")
-        self.detector = apriltag.Detector(self.options)
-
+        # Goal positions (initial estimates, updated from AprilTags)
         self.left_goal = [44.44, 188.20]
         self.right_goal = [498.0, 188.50]
 
+        # Playing field boundaries [x_min, x_max, y_min, y_max]
         self.edge = np.array([0.0, 530.0, 0.0, 370.0])
-        self.distance = 35.0  # if ball is in distance to wall or peg a collision could appear and therefore the process noise should increase
 
-        self.xy_gantry = None
-        self.x_gantry = None
+        # Gantry/magnet tracking
+        self.xy_gantry: list[float] | None = None
+        self.x_gantry: list[float] | None = None
+        self.magnet: list[float | None] | None = None
 
-        self.magnet = None
-
-        self.goal_radius = 22
-        self.goal_perspective_shift = 4
-
+        # Goal detection counters
         self.ball_in_left_goal_counter = 0
         self.ball_in_right_goal_counter = 0
         self.peg_in_left_goal_counter = 0
         self.peg_in_right_goal_counter = 0
-        self.max_goal_counter = (
-            30  # outcome will print after ball/peg has been in goal for XX frames
-        )
+        self.outcome_published = False
+    
+    def _setup_camera(self) -> None:
+        """Initialize and configure the camera."""
+        self.cap = cv2.VideoCapture(0)
 
-        self.outcome_published = False  # make sure each goal is only printed once
+        if not self.cap.isOpened():
+            self.get_logger().error("Could not open camera")
+            return
 
-    def timer_callback(self):
+        # Configure camera properties
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("U", "Y", "V", "Y"))
+        self.cap.set(cv2.CAP_PROP_FPS, self.CAMERA_FPS)
+        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, 0.01)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.get_logger().info(f"Camera configured: Target {self.CAMERA_FPS} FPS, Actual {actual_fps} FPS")
+
+    def timer_callback(self) -> None:
+        """Main timer callback for processing camera frames."""
+        # Performance monitoring
         if self.check_delay:
             self.timer_time = time.time()
             self.check_delay = False
             self.check_delay_at = self.timer_counter
 
-        # Capture one frame
+        # Capture and validate frame
         ret, frame = self.cap.read()
-
-        # If frame is read correctly, ret is True
         if not ret:
-            print("Failed to grab frame", flush=True)
+            self.get_logger().warn("Failed to grab frame")
             return
 
-        # Rectify frame
+        # Undistort frame using calibration data
         rectified_frame = cv2.undistort(frame, self.mtx, self.dist, None, self.mtx)
 
-        # cv2.imshow("Raw", rectified_frame)
-        # cv2.waitKey(1)
-
-        # Call detect_apriltags
-        if self.count % 1 == 0:  # adjust modulo if needed
-            self.detect_apriltags(rectified_frame)
-
+        # Detect AprilTags (every frame)
+        self.detect_apriltags(rectified_frame)
         self.count += 1
 
-        # Call the process_frame function
+        # Process frame for ball/peg detection
         self.process_frame(rectified_frame)
-
         self.timer_counter += 1
 
-    def detect_apriltags(self, undistorted_frame):
+    def detect_apriltags(self, undistorted_frame: np.ndarray) -> None:
+        """Detect and process AprilTags in the frame."""
         gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
         results = self.detector.detect(gray)
 
-        tag_corners = {i: None for i in range(8)}
+        tag_corners: dict[int, np.ndarray | None] = {i: None for i in range(8)}
 
+        # Process detected tags with EMA smoothing
         for r in results:
-            if r.tag_id in self.previous_tag_corners:
-                # Smooth each corner of the tag using EMA
-                smoothed_corners = []
-                for i, corner in enumerate(r.corners):
-                    if self.previous_tag_corners[r.tag_id] is None:
-                        smoothed_corner = corner
-                    else:
-                        if r.tag_id in range(6):
-                            smoothed_corner = apply_ema_filter(
-                                corner,
-                                self.previous_tag_corners[r.tag_id][i],
-                                alpha=0.1,
-                            )
-                        else:  # alpha = 1.0 for gantry tags
-                            smoothed_corner = apply_ema_filter(
-                                corner,
-                                self.previous_tag_corners[r.tag_id][i],
-                                alpha=1.0,
-                            )
-                    smoothed_corners.append(smoothed_corner)
+            if r.tag_id not in self.previous_tag_corners:
+                continue
+                
+            # Determine alpha based on tag type (gantry tags use no smoothing)
+            alpha = self.EMA_ALPHA_GANTRY if r.tag_id >= 6 else self.EMA_ALPHA_APRILTAG
+            
+            smoothed_corners = []
+            for i, corner in enumerate(r.corners):
+                if self.previous_tag_corners[r.tag_id] is None:
+                    smoothed_corner = corner
+                else:
+                    smoothed_corner = apply_ema_filter(
+                        corner,
+                        self.previous_tag_corners[r.tag_id][i],
+                        alpha=alpha,
+                    )
+                smoothed_corners.append(smoothed_corner)
 
-                # Store the smoothed corners
-                tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
-                self.previous_tag_corners[r.tag_id] = np.array(
-                    smoothed_corners, dtype="float32"
-                )
+            # Store smoothed corners
+            tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
+            self.previous_tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
 
-        # Check if all corner tags are detected
-        detected_tags = 0
+        # Check corner tags (2-5) for perspective transform
+        detected_corner_tags = sum(1 for tag_id in self.CORNER_TAG_IDS if tag_corners[tag_id] is not None)
+        
+        if self.print_apriltags_not_found:
+            for tag_id in self.CORNER_TAG_IDS:
+                if tag_corners[tag_id] is None:
+                    tag_name = self.TAG_NAMES.get(tag_id, f"unknown tag {tag_id}")
+                    self.get_logger().warn(f"{tag_name} AprilTag not detected")
 
-        tag_id_to_name = {
-            0: "center right",
-            1: "center left",
-            2: "top left",
-            3: "bottom left",
-            4: "top right",
-            5: "bottom right",
-            6: "xy gantry",
-            7: "x gantry",
-        }
-
-        # Count how many corner apriltags are detected
-        for tag_id in range(2, 6):
-            if tag_corners[tag_id] is not None:
-                detected_tags += 1
-            elif self.print_apriltags_not_found:
-                tag_name = tag_id_to_name.get(tag_id, f"unknown tag {tag_id}")
-                print(f"Warning: {tag_name} April tag not detected", flush=True)
-
-        if detected_tags == 4:
-            # all corner apriltags detected
+        if detected_corner_tags == 4:
             self.apriltags_detected_once = True
-
             if not self.corner_points_detected_once_printed:
-                print("All corners detected once", flush=True)
+                self.get_logger().info("All corner tags detected")
                 self.corner_points_detected_once_printed = True
-
             self.compute_perspective_transform(tag_corners)
 
-        # Count how many goal apriltags are detected
-        detected_goals = 0
-
-        for tag_id in range(2):  # Goal AprilTags are 0 and 1
-            if tag_corners[tag_id] is not None:
-                detected_goals += 1
-
+        # Check goal tags (0-1)
+        detected_goal_tags = sum(1 for tag_id in self.GOAL_TAG_IDS if tag_corners[tag_id] is not None)
+        self.goals_detected_this_frame = (detected_goal_tags == 2)
         self.update_goal_coordinates()
-        if detected_goals == 2:
-            # Both goal apriltags detected
-            self.goals_detected_this_frame = True
-        else:
-            self.goals_detected_this_frame = False
 
-        if tag_corners[6] is None:
-            self.previous_tag_corners[6] = None
+        # Reset gantry tag corners if not detected
+        for gantry_tag_id in [6, 7]:
+            if tag_corners[gantry_tag_id] is None:
+                self.previous_tag_corners[gantry_tag_id] = None
 
-        if tag_corners[7] is None:
-            self.previous_tag_corners[7] = None
-
+        # Update gantry and magnet positions
         self.update_gantry_coordinates()
         self.update_magnet_coordinates()
 
-    def process_frame(self, undistorted_frame):
+    def process_frame(self, undistorted_frame: np.ndarray) -> None:
+        """Process frame to detect ball and pegs, then publish results."""
+        # Update delta time for Kalman filters
         current_time = time.time()
-        # Update time for KF
-        if self.previous_time is not None:
-            self.dt = current_time - self.previous_time
-        else:
-            self.dt = 0.01  # Initial guess
-
+        self.dt = current_time - self.previous_time if self.previous_time is not None else 0.01
         self.previous_time = current_time
 
-        if self.apriltags_detected_once:
+        if not self.apriltags_detected_once:
+            return
 
-            warped = cv2.warpPerspective(
-                undistorted_frame,
-                self.M,
-                (
-                    self.width + 2 * self.inset_pixels,
-                    self.height + 2 * self.inset_pixels,
-                ),
-            )
+        # Apply perspective warp to get top-down view
+        warped = cv2.warpPerspective(
+            undistorted_frame,
+            self.M,
+            (self.width + 2 * self.inset_pixels, self.height + 2 * self.inset_pixels),
+        )
 
-            # Change numbers if apriltags are moved on the phyiscal board
-            cropped = warped[
-                self.inset_pixels + 16 : -self.inset_pixels - 14,
-                self.inset_pixels + 18 : -self.inset_pixels - 18,
-            ]  # top, bottom, left, right
+        # Crop to playing area (adjust if AprilTags are moved on physical board)
+        cropped = warped[
+            self.inset_pixels + 16 : -self.inset_pixels - 14,
+            self.inset_pixels + 18 : -self.inset_pixels - 18,
+        ]
 
-            (
-                canvas,
-                self.left_peg_position,
-                self.right_peg_position,
-                self.ball_position,
-            ) = self.detect_ball_peg(
+        # Detect ball and pegs
+        canvas, self.left_peg_position, self.right_peg_position, self.ball_position = (
+            self.detect_ball_peg(
                 cropped,
-                target_width=1280,  # 426x240
+                target_width=1280,
                 target_height=720,
                 left_peg_position=self.left_peg_position,
                 right_peg_position=self.right_peg_position,
                 ball_position=self.ball_position,
-                alpha=0.7,  # You can adjust the alpha to control the smoothing
+                alpha=0.7,
                 left_goal=self.left_goal,
                 right_goal=self.right_goal,
-                goal_radius=self.goal_radius,
+                goal_radius=self.GOAL_RADIUS,
             )
-
-            if self.show_image:
-                cv2.imshow("Canvas", canvas)
-                cv2.waitKey(1)
-
-            # Publish the detected ball and peg coordinates
-            self.publish_estimated_positions_and_velocities()
-
-            # Check if a goal is scored
-            if (
-                self.ball_position is not None
-                and self.left_peg_position is not None
-                and self.right_peg_position is not None
-                and self.left_goal is not None
-                and self.right_goal is not None
-            ):
-
-                self.check_goal()
-
-    def compute_perspective_transform(self, tag_corners):
-        TAG_SIZE_MM = 20
-
-        # Perspective transformation and ball detection
-        tag_pixel_size = np.mean(
-            [
-                np.linalg.norm(tag_corners[2][0] - tag_corners[2][1]),
-                np.linalg.norm(tag_corners[3][0] - tag_corners[3][1]),
-                np.linalg.norm(tag_corners[4][0] - tag_corners[4][1]),
-                np.linalg.norm(tag_corners[5][0] - tag_corners[5][1]),
-            ]
         )
 
-        pixels_per_mm = tag_pixel_size / TAG_SIZE_MM
+        if self.show_image:
+            cv2.imshow("Canvas", canvas)
+            cv2.waitKey(1)
 
+        # Publish states
+        self.publish_estimated_positions_and_velocities()
+
+        # Check for goals if all objects are detected
+        if all([self.ball_position, self.left_peg_position, self.right_peg_position, 
+                self.left_goal, self.right_goal]):
+            self.check_goal()
+
+    def compute_perspective_transform(self, tag_corners: dict[int, np.ndarray | None]) -> None:
+        """Compute perspective transformation matrix from corner AprilTags."""
+        # Calculate average tag size in pixels
+        tag_pixel_sizes = [
+            np.linalg.norm(tag_corners[tag_id][0] - tag_corners[tag_id][1])
+            for tag_id in range(2, 6)
+        ]
+        tag_pixel_size = np.mean(tag_pixel_sizes)
+        pixels_per_mm = tag_pixel_size / self.TAG_SIZE_MM
+
+        # Source points from corner tags (clockwise from top-left)
         src_pts = np.array(
             [
-                tag_corners[2][3],
-                tag_corners[4][2],
-                tag_corners[5][2],
-                tag_corners[3][0],
+                tag_corners[2][3],  # Top-left corner
+                tag_corners[4][2],  # Top-right corner
+                tag_corners[5][2],  # Bottom-right corner
+                tag_corners[3][0],  # Bottom-left corner
             ],
             dtype="float32",
         )
 
+        # Calculate dimensions with inset
         self.inset_pixels = int(50 * pixels_per_mm)
-        self.width = (
-            int(
-                max(
-                    np.linalg.norm(tag_corners[2][3] - tag_corners[4][2]),
-                    np.linalg.norm(tag_corners[3][0] - tag_corners[5][2]),
-                )
-            )
-            - 2 * self.inset_pixels
-        )
+        
+        # Width: max of top and bottom edges
+        width_top = np.linalg.norm(tag_corners[2][3] - tag_corners[4][2])
+        width_bottom = np.linalg.norm(tag_corners[3][0] - tag_corners[5][2])
+        self.width = int(max(width_top, width_bottom)) - 2 * self.inset_pixels
+        
+        # Height: max of left and right edges
+        height_left = np.linalg.norm(tag_corners[2][3] - tag_corners[3][0])
+        height_right = np.linalg.norm(tag_corners[4][2] - tag_corners[5][2])
+        self.height = int(max(height_left, height_right)) - 2 * self.inset_pixels
 
-        self.height = (
-            int(
-                max(
-                    np.linalg.norm(tag_corners[2][3] - tag_corners[3][0]),
-                    np.linalg.norm(tag_corners[4][2] - tag_corners[5][2]),
-                )
-            )
-            - 2 * self.inset_pixels
-        )
-
+        # Destination points (perfect rectangle)
         dst_pts = np.array(
             [
                 [self.inset_pixels, self.inset_pixels],
@@ -595,602 +558,444 @@ class BallPegDetection(Node):
             dtype="float32",
         )
 
+        # Compute transformation matrix
         self.M = cv2.getPerspectiveTransform(src_pts, dst_pts)
 
     def detect_ball_peg(
         self,
-        cropped,
-        target_width=1280,
-        target_height=720,
-        left_peg_position=None,
-        right_peg_position=None,
-        ball_position=None,
-        alpha=0.1,
-        left_goal=None,
-        right_goal=None,
-        goal_radius=22,
-    ):
-        # Convert the cropped frame to HSV and apply Gaussian blur
+        cropped: np.ndarray,
+        target_width: int = 1280,
+        target_height: int = 720,
+        left_peg_position: tuple[float, float] | None = None,
+        right_peg_position: tuple[float, float] | None = None,
+        ball_position: tuple[float, float] | None = None,
+        alpha: float = 0.1,
+        left_goal: list[float] | None = None,
+        right_goal: list[float] | None = None,
+        goal_radius: int = 22,
+    ) -> tuple[np.ndarray, tuple[float, float] | None, tuple[float, float] | None, tuple[float, float] | None]:
+        """
+        Detect ball and pegs using HSV color filtering and Kalman filtering.
+        
+        Returns:
+            Tuple of (canvas, left_peg_position, right_peg_position, ball_position)
+        """
+        # Convert to HSV and apply blur for noise reduction
         frame_hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
         frame_hsv_blur = cv2.GaussianBlur(frame_hsv, (7, 7), 0)
 
-        # Mask for the ball (using HSV range)
-        low_hsv_ball = (0, 150, 150)
-        high_hsv_ball = (45, 255, 255)
-        masked_ball = cv2.inRange(frame_hsv_blur, low_hsv_ball, high_hsv_ball)
+        # Create masks for ball (orange) and pegs (black)
+        masked_ball = cv2.inRange(frame_hsv_blur, (0, 150, 150), (45, 255, 255))
+        masked_peg = cv2.inRange(frame_hsv_blur, (0, 0, 0), (255, 255, 45))
 
-        # Mask for the peg (using HSV range)
-        low_hsv_peg = (0, 0, 0)
-        high_hsv_peg = (255, 255, 45)
-        masked_peg = cv2.inRange(frame_hsv_blur, low_hsv_peg, high_hsv_peg)
+        # Create visualization overlay
+        overlaid_frame = self._create_overlay(cropped, masked_peg, masked_ball)
 
-        # Convert masks to 3 channels for visualization
-        mask_3_channel_peg = cv2.cvtColor(masked_peg, cv2.COLOR_GRAY2BGR)
-        mask_3_channel_ball = cv2.cvtColor(masked_ball, cv2.COLOR_GRAY2BGR)
-
-        # Overlay the peg and ball masks onto the cropped frame
-        overlaid_frame = cv2.addWeighted(cropped, 1.0, mask_3_channel_peg, 0.3, 0)
-        overlaid_frame = cv2.addWeighted(
-            overlaid_frame, 1.0, mask_3_channel_ball, 0.3, 0
-        )
-
-        # Split the frame into left and right halves
+        # Detect pegs in left and right halves
         height, width = masked_peg.shape
         left_half = masked_peg[:, : width // 2]
         right_half = masked_peg[:, width // 2 :]
 
-        # Find the contours and centroids for the left half (peg)
-        left_contours, _ = cv2.findContours(
-            left_half, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-        if left_contours:
-            largest_left_contour = max(left_contours, key=cv2.contourArea)
-            M_left = cv2.moments(largest_left_contour)
-            if M_left["m00"] != 0:
-                cX_left = int(M_left["m10"] / M_left["m00"])
-                cY_left = int(M_left["m01"] / M_left["m00"])
+        left_peg_position = self._detect_peg(left_half, self.left_peg_kf, 0, overlaid_frame, (255, 0, 0), (248, 193, 110))
+        right_peg_position = self._detect_peg(right_half, self.right_peg_kf, width // 2, overlaid_frame, (0, 100, 0), (144, 238, 144))
 
-                # Apply Kalman filter to smooth the centroid position for the left peg
-                # Predict and update left peg KF with new position measurement
-                self.left_peg_kf.predict(self.dt)
-                self.left_peg_kf.update([cX_left, cY_left])
+        # Detect ball with collision detection
+        ball_position = self._detect_ball(masked_ball, left_peg_position, right_peg_position, overlaid_frame)
 
-                estimated_left_peg_position = self.left_peg_kf.get_position()
-                if self.show_image:
-                    estimated_left_peg_velocity = self.left_peg_kf.get_velocity()
-
-                    # Draw the centroid of the left peg as a blue dot
-                    cv2.circle(
-                        overlaid_frame,
-                        (
-                            int(estimated_left_peg_position[0]),
-                            int(estimated_left_peg_position[1]),
-                        ),
-                        5,
-                        (255, 0, 0),
-                        -1,
-                    )
-
-                    # Draw the velocity vector of the left peg for debugging
-                    # Define the starting point as the estimated position
-                    start_point = (
-                        int(estimated_left_peg_position[0]),
-                        int(estimated_left_peg_position[1]),
-                    )
-
-                    factor = 0.5
-                    end_point = (
-                        int(
-                            estimated_left_peg_position[0]
-                            + estimated_left_peg_velocity[0] * factor
-                        ),
-                        int(
-                            estimated_left_peg_position[1]
-                            + estimated_left_peg_velocity[1] * factor
-                        ),
-                    )
-
-                    # Draw the velocity vector of the left peg as an arrow
-                    cv2.arrowedLine(
-                        overlaid_frame,
-                        start_point,
-                        end_point,
-                        (248, 193, 110),
-                        2,
-                        tipLength=0.3,
-                    )
-
-                # Update the previous centroid for the left peg
-                left_peg_position = (
-                    estimated_left_peg_position[0],
-                    estimated_left_peg_position[1],
-                )
-
-        # Find the contours and centroids for the right half (peg)
-        right_contours, _ = cv2.findContours(
-            right_half, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-        if right_contours:
-            largest_right_contour = max(right_contours, key=cv2.contourArea)
-            M_right = cv2.moments(largest_right_contour)
-            if M_right["m00"] != 0:
-                cX_right = (
-                    int(M_right["m10"] / M_right["m00"]) + width // 2
-                )  # Offset the x-coordinate by half the width
-                cY_right = int(M_right["m01"] / M_right["m00"])
-
-                # Apply Kalman filter to smooth the centroid position for the left peg
-                # Predict and update left peg KF with new position measurement
-                self.right_peg_kf.predict(self.dt)
-                self.right_peg_kf.update([cX_right, cY_right])
-
-                estimated_right_peg_position = self.right_peg_kf.get_position()
-                if self.show_image:
-                    estimated_right_peg_velocity = self.right_peg_kf.get_velocity()
-
-                    # Draw the centroid of the right peg as a green dot
-                    cv2.circle(
-                        overlaid_frame,
-                        (
-                            int(estimated_right_peg_position[0]),
-                            int(estimated_right_peg_position[1]),
-                        ),
-                        5,
-                        (0, 100, 0),
-                        -1,
-                    )
-
-                    # Draw the velocity vector of the right peg for debugging
-                    # Define the starting point as the estimated position
-                    start_point = (
-                        int(estimated_right_peg_position[0]),
-                        int(estimated_right_peg_position[1]),
-                    )
-
-                    factor = 0.5
-                    end_point = (
-                        int(
-                            estimated_right_peg_position[0]
-                            + estimated_right_peg_velocity[0] * factor
-                        ),
-                        int(
-                            estimated_right_peg_position[1]
-                            + estimated_right_peg_velocity[1] * factor
-                        ),
-                    )
-
-                    # Draw the velocity vector of the right peg as an arrow
-                    cv2.arrowedLine(
-                        overlaid_frame,
-                        start_point,
-                        end_point,
-                        (144, 238, 144),
-                        2,
-                        tipLength=0.3,
-                    )
-
-                # Update the previous centroid for the right peg
-                right_peg_position = (
-                    estimated_right_peg_position[0],
-                    estimated_right_peg_position[1],
-                )
-
-        # Find contours in the ball mask
-        contours, _ = cv2.findContours(
-            masked_ball, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        # Calculate the centroid of the largest contour (assuming it's the ball)
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            M = cv2.moments(largest_contour)
-            if M["m00"] != 0:
-                cX_ball = int(M["m10"] / M["m00"])
-                cY_ball = int(M["m01"] / M["m00"])
-
-                # Apply Kalman filter to smooth the centroid position for the ball
-                # Predict and update ball KF with new position measurement
-
-                at_x_edge = (
-                    cX_ball < self.edge[0] + self.distance
-                    or cX_ball + self.distance > self.edge[1]
-                )
-                at_y_edge = (
-                    cY_ball < self.edge[2] + self.distance
-                    or cY_ball + self.distance > self.edge[3]
-                )
-                close_to_peg = (
-                    np.linalg.norm(np.array([cX_ball, cY_ball]) - right_peg_position)
-                    < self.distance
-                    or np.linalg.norm(np.array([cX_ball, cY_ball]) - left_peg_position)
-                    < self.distance
-                )
-
-                if close_to_peg or (at_x_edge and at_y_edge):
-                    self.ball_kf.predict(self.dt, x_collision=True, y_collision=True)
-
-                elif at_x_edge:
-                    self.ball_kf.predict(self.dt, y_collision=True)
-
-                elif at_y_edge:
-                    self.ball_kf.predict(self.dt, x_collision=True, y_collision=True)
-
-                else:
-                    self.ball_kf.predict(self.dt)
-
-                self.ball_kf.update([cX_ball, cY_ball])
-
-                estimated_ball_position = self.ball_kf.get_position()
-                if self.show_image:
-                    estimated_ball_velocity = self.ball_kf.get_velocity()
-
-                    # Draw the centroid of the ball as a red dot
-                    cv2.circle(
-                        overlaid_frame,
-                        (
-                            int(estimated_ball_position[0]),
-                            int(estimated_ball_position[1]),
-                        ),
-                        5,
-                        (0, 0, 255),
-                        -1,
-                    )
-
-                    # Draw the velocity vector of the ball for debugging
-                    # Define the starting point as the estimated position
-                    start_point = (
-                        int(estimated_ball_position[0]),
-                        int(estimated_ball_position[1]),
-                    )
-
-                    factor = 0.2
-                    end_point = (
-                        int(
-                            estimated_ball_position[0]
-                            + estimated_ball_velocity[0] * factor
-                        ),
-                        int(
-                            estimated_ball_position[1]
-                            + estimated_ball_velocity[1] * factor
-                        ),
-                    )
-
-                    # Draw the velocity vector of the ball as an arrow
-                    cv2.arrowedLine(
-                        overlaid_frame,
-                        start_point,
-                        end_point,
-                        (0, 165, 255),
-                        2,
-                        tipLength=0.3,
-                    )
-
-                # Update the previous centroid for the ball
-                ball_position = (estimated_ball_position[0], estimated_ball_position[1])
-
-            else:
-                ball_position = (0, 0)
-
-        else:
-            ball_position = (0, 0)
-
+        # Draw goals and magnet visualization
         if self.show_image:
-            # Draw the goal coordinates on the image
-            if left_goal is not None:
-                cv2.circle(
-                    overlaid_frame,
-                    (int(left_goal[0]), int(left_goal[1])),
-                    goal_radius,
-                    (140, 255, 0),
-                    2,
-                )
-            if right_goal is not None:
-                cv2.circle(
-                    overlaid_frame,
-                    (int(right_goal[0]), int(right_goal[1])),
-                    goal_radius,
-                    (140, 255, 0),
-                    2,
-                )
-            # Draw a Point in the middle of each goal
-            cv2.circle(
-                overlaid_frame,
-                (int(left_goal[0]), int(left_goal[1])),
-                5,
-                (140, 255, 0),
-                -1,
-            )
-            cv2.circle(
-                overlaid_frame,
-                (int(right_goal[0]), int(right_goal[1])),
-                5,
-                (140, 255, 0),
-                -1,
-            )
+            self._draw_goals(overlaid_frame, left_goal, right_goal, goal_radius)
 
-            # Draw vertical line at x-coordinate of magnet
-            decouple_radius = 40
-            # if self.magnet is not None:
-            #     if self.magnet[1] is None:
-            #         cv2.line(overlaid_frame, (int(self.magnet[0]), 0), (int(self.magnet[0]), 400), (0, 0, 255), 2)
-            #         cv2.line(overlaid_frame, (int(self.magnet[0]) + decouple_radius, 0), (int(self.magnet[0]) + decouple_radius, 400), (0,165,255), 2)
-            #         cv2.line(overlaid_frame, (int(self.magnet[0]) - decouple_radius, 0), (int(self.magnet[0]) - decouple_radius, 400), (0,165,255), 2)
-            #     else:
-            #         cv2.circle(overlaid_frame, (int(self.magnet[0]), int(self.magnet[1])), 2, (0,0,255), -1)
-            #         cv2.circle(overlaid_frame, (int(self.magnet[0]), int(self.magnet[1])), decouple_radius, (0,165,255), 2)
+        # Resize and center on canvas
+        canvas = self._create_canvas(overlaid_frame, target_width, target_height)
 
-        # Resize the final image to fit within the target size while maintaining aspect ratio
-        resized_image, new_w, new_h = resize_with_aspect_ratio(
-            overlaid_frame, target_width, target_height
+        return canvas, left_peg_position, right_peg_position, ball_position
+
+    def _create_overlay(self, frame: np.ndarray, masked_peg: np.ndarray, masked_ball: np.ndarray) -> np.ndarray:
+        """Create visualization overlay with masks."""
+        mask_3_channel_peg = cv2.cvtColor(masked_peg, cv2.COLOR_GRAY2BGR)
+        mask_3_channel_ball = cv2.cvtColor(masked_ball, cv2.COLOR_GRAY2BGR)
+        
+        overlaid = cv2.addWeighted(frame, 1.0, mask_3_channel_peg, 0.3, 0)
+        overlaid = cv2.addWeighted(overlaid, 1.0, mask_3_channel_ball, 0.3, 0)
+        return overlaid
+
+    def _detect_peg(
+        self,
+        half_mask: np.ndarray,
+        kf: KalmanFilter,
+        x_offset: int,
+        overlaid_frame: np.ndarray,
+        color: tuple[int, int, int],
+        velocity_color: tuple[int, int, int],
+    ) -> tuple[float, float] | None:
+        """Detect peg in half of the frame."""
+        contours, _ = cv2.findContours(half_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return None
+
+        largest_contour = max(contours, key=cv2.contourArea)
+        M = cv2.moments(largest_contour)
+        if M["m00"] == 0:
+            return None
+
+        # Calculate centroid
+        cX = int(M["m10"] / M["m00"]) + x_offset
+        cY = int(M["m01"] / M["m00"])
+
+        # Apply Kalman filter
+        kf.predict(self.dt)
+        kf.update([cX, cY])
+
+        position = kf.get_position()
+        
+        if self.show_image:
+            velocity = kf.get_velocity()
+            self._draw_object_with_velocity(overlaid_frame, position, velocity, color, velocity_color, 0.5)
+
+        return (float(position[0]), float(position[1]))
+
+    def _detect_ball(
+        self,
+        masked_ball: np.ndarray,
+        left_peg_position: tuple[float, float] | None,
+        right_peg_position: tuple[float, float] | None,
+        overlaid_frame: np.ndarray,
+    ) -> tuple[float, float]:
+        """Detect ball with collision-aware Kalman filtering."""
+        contours, _ = cv2.findContours(masked_ball, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if not contours:
+            return (0.0, 0.0)
+
+        largest_contour = max(contours, key=cv2.contourArea)
+        M = cv2.moments(largest_contour)
+        
+        if M["m00"] == 0:
+            return (0.0, 0.0)
+
+        # Calculate centroid
+        cX_ball = int(M["m10"] / M["m00"])
+        cY_ball = int(M["m01"] / M["m00"])
+
+        # Detect potential collisions
+        x_collision, y_collision = self._detect_collisions(
+            cX_ball, cY_ball, left_peg_position, right_peg_position
         )
 
-        # Ensure the resized image fits within the target canvas
-        if new_w > target_width or new_h > target_height:
-            print(
-                f"Warning: Resized image ({new_w}x{new_h}) exceeds target canvas size ({target_width}x{target_height})."
-            )
-            new_w, new_h = min(new_w, target_width), min(new_h, target_height)
-            resized_image = cv2.resize(
-                resized_image, (new_w, new_h), interpolation=cv2.INTER_AREA
-            )
+        # Apply Kalman filter with collision awareness
+        self.ball_kf.predict(self.dt, x_collision=x_collision, y_collision=y_collision)
+        self.ball_kf.update([cX_ball, cY_ball])
 
-        # Create a black canvas and place the resized image on it
+        position = self.ball_kf.get_position()
+        
+        if self.show_image:
+            velocity = self.ball_kf.get_velocity()
+            self._draw_object_with_velocity(overlaid_frame, position, velocity, (0, 0, 255), (0, 165, 255), 0.2)
+
+        return (float(position[0]), float(position[1]))
+
+    def _detect_collisions(
+        self,
+        ball_x: float,
+        ball_y: float,
+        left_peg_position: tuple[float, float] | None,
+        right_peg_position: tuple[float, float] | None,
+    ) -> tuple[bool, bool]:
+        """Detect if ball is near edges or pegs (potential collision)."""
+        at_x_edge = (ball_x < self.edge[0] + self.COLLISION_DISTANCE or 
+                     ball_x + self.COLLISION_DISTANCE > self.edge[1])
+        at_y_edge = (ball_y < self.edge[2] + self.COLLISION_DISTANCE or 
+                     ball_y + self.COLLISION_DISTANCE > self.edge[3])
+        
+        close_to_peg = False
+        if left_peg_position and right_peg_position:
+            dist_left = np.linalg.norm(np.array([ball_x, ball_y]) - np.array(left_peg_position))
+            dist_right = np.linalg.norm(np.array([ball_x, ball_y]) - np.array(right_peg_position))
+            close_to_peg = dist_left < self.COLLISION_DISTANCE or dist_right < self.COLLISION_DISTANCE
+
+        # Determine collision type
+        if close_to_peg or (at_x_edge and at_y_edge):
+            return True, True
+        elif at_y_edge:
+            return False, True
+        elif at_x_edge:
+            return True, True  # Note: Original code had y_collision=True for x_edge
+        else:
+            return False, False
+
+    def _draw_object_with_velocity(
+        self,
+        frame: np.ndarray,
+        position: np.ndarray,
+        velocity: list[float],
+        dot_color: tuple[int, int, int],
+        arrow_color: tuple[int, int, int],
+        velocity_scale: float,
+    ) -> None:
+        """Draw object position and velocity vector."""
+        pos_int = (int(position[0]), int(position[1]))
+        
+        # Draw position
+        cv2.circle(frame, pos_int, 5, dot_color, -1)
+        
+        # Draw velocity arrow
+        end_point = (
+            int(position[0] + velocity[0] * velocity_scale),
+            int(position[1] + velocity[1] * velocity_scale),
+        )
+        cv2.arrowedLine(frame, pos_int, end_point, arrow_color, 2, tipLength=0.3)
+
+    def _draw_goals(
+        self,
+        frame: np.ndarray,
+        left_goal: list[float] | None,
+        right_goal: list[float] | None,
+        goal_radius: int,
+    ) -> None:
+        """Draw goal circles on the frame."""
+        goal_color = (140, 255, 0)
+        
+        if left_goal is not None:
+            center = (int(left_goal[0]), int(left_goal[1]))
+            cv2.circle(frame, center, goal_radius, goal_color, 2)
+            cv2.circle(frame, center, 5, goal_color, -1)
+            
+        if right_goal is not None:
+            center = (int(right_goal[0]), int(right_goal[1]))
+            cv2.circle(frame, center, goal_radius, goal_color, 2)
+            cv2.circle(frame, center, 5, goal_color, -1)
+
+    def _create_canvas(self, overlaid_frame: np.ndarray, target_width: int, target_height: int) -> np.ndarray:
+        """Resize frame and center it on a canvas."""
+        resized_image, new_w, new_h = resize_with_aspect_ratio(overlaid_frame, target_width, target_height)
+
+        # Ensure dimensions are within bounds
+        if new_w > target_width or new_h > target_height:
+            self.get_logger().warn(
+                f"Resized image ({new_w}x{new_h}) exceeds canvas ({target_width}x{target_height})"
+            )
+            new_w = min(new_w, target_width)
+            new_h = min(new_h, target_height)
+            resized_image = cv2.resize(resized_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        # Center on black canvas
         canvas = np.zeros((target_height, target_width, 3), dtype=np.uint8)
         x_offset = (target_width - new_w) // 2
         y_offset = (target_height - new_h) // 2
         canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
 
-        # Return canvas and updated centroids for left peg, right peg, and ball
-        return canvas, left_peg_position, right_peg_position, ball_position
+        return canvas
 
-    def publish_estimated_positions_and_velocities(self):
-        # Prepare and publish ball, peg positions and velocities
+    def publish_estimated_positions_and_velocities(self) -> None:
+        """Publish ball and peg positions/velocities, goals, and magnet position."""
         polygon = Polygon()
+        
+        # Add ball and peg data (position and velocity for each)
         vectors = [
-            # self.ball_kf.get_position(),
             self.ball_position,
             self.ball_kf.get_velocity(),
             self.left_peg_kf.get_position(),
             self.left_peg_kf.get_velocity(),
             self.right_peg_kf.get_position(),
             self.right_peg_kf.get_velocity(),
-            # tuple((4 / 5000) * v for v in self.right_peg_kf.get_velocity())  # Scale each component of the velocity
         ]
 
         for vector in vectors:
             if vector is not None:
-                point = Point32()
-                point.x = float(vector[0])
-                point.y = float(vector[1])
-                point.z = 0.0
-                polygon.points.append(point)
+                polygon.points.append(self._create_point32(vector[0], vector[1]))
 
-        # Append the goal coordinates
+        # Add goal coordinates
         if self.left_goal is not None and self.right_goal is not None:
-            left_goal = Point32()
-            left_goal.x = self.left_goal[0]
-            left_goal.y = self.left_goal[1]
-            left_goal.z = 0.0
-            polygon.points.append(left_goal)
+            polygon.points.append(self._create_point32(self.left_goal[0], self.left_goal[1]))
+            polygon.points.append(self._create_point32(self.right_goal[0], self.right_goal[1]))
 
-            right_goal = Point32()
-            right_goal.x = self.right_goal[0]
-            right_goal.y = self.right_goal[1]
-            right_goal.z = 0.0
-            polygon.points.append(right_goal)
-
+        # Add magnet position
         if self.magnet is not None:
-            magnet = Point32()
-            magnet.x = self.magnet[0]
-            if self.magnet[1] is not None:
-                magnet.y = self.magnet[1]
-            else:
-                magnet.y = 0.0
-            magnet.z = 0.0
-            polygon.points.append(magnet)
+            magnet_y = self.magnet[1] if self.magnet[1] is not None else 0.0
+            polygon.points.append(self._create_point32(self.magnet[0], magnet_y))
 
+        # Publish only if we have all 9 points
         if len(polygon.points) == 9:
             stamped_polygon = StampedPolygon()
             stamped_polygon.polygon = polygon
             stamped_polygon.header.stamp = self.get_clock().now().to_msg()
             self.state_publisher.publish(stamped_polygon)
 
-        #        if(self.publisher_counter == self.check_delay_at):
-        #            delta_time_ms = (time.time() - self.timer_time) * 1000
-        #            print(f"Delta_t ball_peg_detection Node in ms: {delta_time_ms}", flush=True)
-        #            if self.publisher_counter > 10:
-        #                self.delay_values.append(delta_time_ms)  # Store the delay
-        #
-        #            self.log_count += 1
-        #
-        #            if self.log_count == 100:
-        #                self.log_delay_statistics()
-
         self.publisher_counter += 1
 
-    def update_goal_coordinates(self):
-        if self.M is None:
+    def _create_point32(self, x: float, y: float, z: float = 0.0) -> Point32:
+        """Create a Point32 message from coordinates."""
+        point = Point32()
+        point.x = float(x)
+        point.y = float(y)
+        point.z = z
+        return point
+
+    def update_goal_coordinates(self) -> None:
+        """Update goal positions from AprilTag detections."""
+        if self.M is None or not self.goals_detected_this_frame:
             return
 
-        if not self.goals_detected_this_frame:
-            return
-
+        # Update right goal (tag 0)
         if self.previous_tag_corners[0] is not None:
-            right_goal_corners = self.previous_tag_corners[0]
-            right_goal_centroid = np.mean(right_goal_corners, axis=0)
+            right_goal_centroid = np.mean(self.previous_tag_corners[0], axis=0)
             right_goal_warped = cv2.perspectiveTransform(
                 np.array([[right_goal_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.right_goal = right_goal_warped + np.array(
-                [
-                    self.goal_perspective_shift - 18 - self.inset_pixels,
-                    -16 - self.inset_pixels,
-                ]
-            )
+            offset = np.array([
+                self.GOAL_PERSPECTIVE_SHIFT - 18 - self.inset_pixels,
+                -16 - self.inset_pixels,
+            ])
+            self.right_goal = (right_goal_warped + offset).tolist()
 
+        # Update left goal (tag 1)
         if self.previous_tag_corners[1] is not None:
-            left_goal_corners = self.previous_tag_corners[1]
-            left_goal_centroid = np.mean(left_goal_corners, axis=0)
+            left_goal_centroid = np.mean(self.previous_tag_corners[1], axis=0)
             left_goal_warped = cv2.perspectiveTransform(
                 np.array([[left_goal_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.left_goal = left_goal_warped - np.array(
-                [
-                    self.goal_perspective_shift + 18 + self.inset_pixels,
-                    16 + self.inset_pixels,
-                ]
-            )
+            offset = np.array([
+                self.GOAL_PERSPECTIVE_SHIFT + 18 + self.inset_pixels,
+                16 + self.inset_pixels,
+            ])
+            self.left_goal = (left_goal_warped - offset).tolist()
 
-    def update_gantry_coordinates(self):
+    def update_gantry_coordinates(self) -> None:
+        """Update gantry positions from AprilTag detections."""
         if self.M is None:
             return
 
+        # Tag offset for gantry position correction
+        tag_offset = np.array([18 + self.inset_pixels, 16 + self.inset_pixels])
+
+        # Update xy gantry position (tag 6)
         if self.previous_tag_corners[6] is not None:
-            xy_gantry_corners = self.previous_tag_corners[6]
-            xy_gantry_centroid = np.mean(xy_gantry_corners, axis=0)
+            xy_gantry_centroid = np.mean(self.previous_tag_corners[6], axis=0)
             xy_gantry_warped = cv2.perspectiveTransform(
                 np.array([[xy_gantry_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.xy_gantry = xy_gantry_warped - np.array(
-                [18 + self.inset_pixels, 16 + self.inset_pixels]
-            )
+            self.xy_gantry = (xy_gantry_warped - tag_offset).tolist()
         else:
             self.xy_gantry = None
 
+        # Update x gantry position (tag 7)
         if self.previous_tag_corners[7] is not None:
-            x_gantry_corners = self.previous_tag_corners[7]
-            x_gantry_centroid = np.mean(x_gantry_corners, axis=0)
+            x_gantry_centroid = np.mean(self.previous_tag_corners[7], axis=0)
             x_gantry_warped = cv2.perspectiveTransform(
                 np.array([[x_gantry_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.x_gantry = x_gantry_warped - np.array(
-                [18 + self.inset_pixels, 16 + self.inset_pixels]
-            )
+            self.x_gantry = (x_gantry_warped - tag_offset).tolist()
         else:
             self.x_gantry = None
 
-    def update_magnet_coordinates(self):
-        xy_shift = 112
-        x_shift = 77
+    def update_magnet_coordinates(self) -> None:
+        """Update magnet position based on gantry positions."""
+        XY_GANTRY_X_OFFSET = 112
+        X_GANTRY_X_OFFSET = 77
+        
         if self.xy_gantry is not None:
             self.magnet = [
-                float(self.xy_gantry[0] - xy_shift),
+                float(self.xy_gantry[0] - XY_GANTRY_X_OFFSET),
                 float(self.xy_gantry[1]),
             ]
         elif self.x_gantry is not None:
-            self.magnet = [float(self.x_gantry[0] - x_shift), None]
+            self.magnet = [float(self.x_gantry[0] - X_GANTRY_X_OFFSET), None]
 
-    def check_goal(self):
-        # Check if goals have been detected once
+    def check_goal(self) -> None:
+        """Check if ball or peg has scored and publish outcome."""
         if self.left_goal is None or self.right_goal is None:
             return
 
         if not self.goals_detected_once_printed:
-            print("Both goals detected once: Ready to play!", flush=True)
+            self.get_logger().info("Both goals detected: Ready to play!")
             self.goals_detected_once_printed = True
 
-        # Calculate the distances between the ball and the goals
-        distance_left_goal_ball = np.linalg.norm(
-            np.array(self.ball_position) - self.left_goal
-        )
-        distance_right_goal_ball = np.linalg.norm(
-            np.array(self.ball_position) - self.right_goal
-        )
+        # Calculate distances
+        distances = {
+            'ball_left': np.linalg.norm(np.array(self.ball_position) - self.left_goal),
+            'ball_right': np.linalg.norm(np.array(self.ball_position) - self.right_goal),
+            'peg_left': np.linalg.norm(np.array(self.left_peg_position) - self.left_goal),
+            'peg_right': np.linalg.norm(np.array(self.right_peg_position) - self.right_goal),
+        }
 
-        # Calculate the distances between the pegs and their goals
-        distance_left_goal_peg = np.linalg.norm(
-            np.array(self.left_peg_position) - self.left_goal
+        # Update counters
+        self.ball_in_left_goal_counter = self._update_goal_counter(
+            distances['ball_left'], self.ball_in_left_goal_counter
         )
-        distance_right_goal_peg = np.linalg.norm(
-            np.array(self.right_peg_position) - self.right_goal
+        self.ball_in_right_goal_counter = self._update_goal_counter(
+            distances['ball_right'], self.ball_in_right_goal_counter
         )
-
-        # Check if ball or peg is in a goal for more than xx frames, update the counters
-        self.ball_in_left_goal_counter = self.update_goal_counter(
-            distance_left_goal_ball, self.ball_in_left_goal_counter
+        self.peg_in_left_goal_counter = self._update_goal_counter(
+            distances['peg_left'], self.peg_in_left_goal_counter
         )
-        self.ball_in_right_goal_counter = self.update_goal_counter(
-            distance_right_goal_ball, self.ball_in_right_goal_counter
+        self.peg_in_right_goal_counter = self._update_goal_counter(
+            distances['peg_right'], self.peg_in_right_goal_counter
         )
 
-        self.peg_in_left_goal_counter = self.update_goal_counter(
-            distance_left_goal_peg, self.peg_in_left_goal_counter
+        # Check and publish outcomes
+        self.ball_in_left_goal_counter = self._check_and_publish_goal_outcome(
+            self.ball_in_left_goal_counter, "Ball in left goal!", 0
         )
-        self.peg_in_right_goal_counter = self.update_goal_counter(
-            distance_right_goal_peg, self.peg_in_right_goal_counter
+        self.ball_in_right_goal_counter = self._check_and_publish_goal_outcome(
+            self.ball_in_right_goal_counter, "Ball in right goal!", 1
+        )
+        self.peg_in_left_goal_counter = self._check_and_publish_goal_outcome(
+            self.peg_in_left_goal_counter, "Peg in left goal!", 2
+        )
+        self.peg_in_right_goal_counter = self._check_and_publish_goal_outcome(
+            self.peg_in_right_goal_counter, "Peg in right goal!", 3
         )
 
-        # Print and publish when goal has been scored
-        # Ball in left goal
-        if self.ball_in_left_goal_counter == self.max_goal_counter:
-            if self.print_outcome:
-                print("Ball in left goal!", flush=True)
-            self.ball_in_left_goal_counter = 5  # make sure it doesn't print every frame
-
-            if not self.outcome_published:
-                self.publish_outcome(0)
-
-        # Ball in right goal
-        if self.ball_in_right_goal_counter == self.max_goal_counter:
-            if self.print_outcome:
-                print("Ball in right goal!", flush=True)
-            self.ball_in_right_goal_counter = 5
-
-            if not self.outcome_published:
-                self.publish_outcome(1)
-
-        # Peg in left goal
-        if self.peg_in_left_goal_counter == self.max_goal_counter:
-            if self.print_outcome:
-                print("Peg in left goal!", flush=True)
-            self.peg_in_left_goal_counter = 5
-
-            if not self.outcome_published:
-                self.publish_outcome(2)
-
-        # Peg in right goal
-        if self.peg_in_right_goal_counter == self.max_goal_counter:
-            if self.print_outcome:
-                print("Peg in right goal!", flush=True)
-            self.peg_in_right_goal_counter = 5
-
-            if not self.outcome_published:
-                self.publish_outcome(3)
-
-        # Reset the outcome printed flag if nothing is in goal for a while
-        if (
-            self.ball_in_left_goal_counter == 0
-            and self.ball_in_right_goal_counter == 0
-            and self.peg_in_left_goal_counter == 0
-            and self.peg_in_right_goal_counter == 0
-        ):
-
-            # Make sure that both goals have been detected once before resetting the outcome
+        # Reset outcome flag when all clear
+        if all(counter == 0 for counter in [
+            self.ball_in_left_goal_counter, self.ball_in_right_goal_counter,
+            self.peg_in_left_goal_counter, self.peg_in_right_goal_counter
+        ]):
             if self.outcome_published and self.goals_detected_this_frame:
-                print("Both goals detected once: Ready to play again!", flush=True)
+                self.get_logger().info("Both goals detected: Ready to play again!")
                 self.outcome_published = False
 
-    def update_goal_counter(self, distance, counter):
-        if distance < self.goal_radius:
-            if counter < self.max_goal_counter:
-                counter += 1
+    def _update_goal_counter(self, distance: float, counter: int) -> int:
+        """Update goal counter based on distance."""
+        if distance < self.GOAL_RADIUS:
+            return min(counter + 1, self.MAX_GOAL_COUNTER)
         elif counter > 0:
-            counter -= 1
+            return counter - 1
         return counter
 
-    def publish_outcome(self, outcome_number):
+    def _check_and_publish_goal_outcome(
+        self, counter: int, message: str, outcome_number: int
+    ) -> int:
+        """Check if goal threshold reached and publish outcome."""
+        if counter == self.MAX_GOAL_COUNTER:
+            if self.print_outcome:
+                self.get_logger().info(message)
+            
+            # Reset counter to avoid repeated triggers
+            counter = 5
+
+            if not self.outcome_published:
+                self._publish_outcome(outcome_number)
+        
+        return counter
+
+    def _publish_outcome(self, outcome_number: int) -> None:
+        """Publish goal outcome message."""
         msg = StampedInt32()
         msg.data.data = outcome_number
         msg.header.stamp = self.get_clock().now().to_msg()
         self.outcome_publisher.publish(msg)
         self.outcome_published = True
 
-    def delay_checker_callback(self):
+    def delay_checker_callback(self) -> None:
+        """Callback to trigger delay checking."""
         self.check_delay = True
 
-    def log_delay_statistics(self):
+    def log_delay_statistics(self) -> None:
+        """Log delay statistics for performance monitoring."""
         if not self.delay_values:
-            print("No delay values to evaluate.", flush=True)
+            self.get_logger().info("No delay values to evaluate")
             return
 
         mean_delay = np.mean(self.delay_values)
@@ -1198,11 +1003,11 @@ class BallPegDetection(Node):
         min_delay = np.min(self.delay_values)
         max_delay = np.max(self.delay_values)
 
-        print(f"Delay Statistics:", flush=True)
-        print(f"Mean: {mean_delay:.2f} ms", flush=True)
-        print(f"Standard Deviation: {std_delay:.2f} ms", flush=True)
-        print(f"Min: {min_delay:.2f} ms", flush=True)
-        print(f"Max: {max_delay:.2f} ms", flush=True)
+        self.get_logger().info(f"Delay Statistics:")
+        self.get_logger().info(f"Mean: {mean_delay:.2f} ms")
+        self.get_logger().info(f"Std Dev: {std_delay:.2f} ms")
+        self.get_logger().info(f"Min: {min_delay:.2f} ms")
+        self.get_logger().info(f"Max: {max_delay:.2f} ms")
 
 
 def main(args=None):
