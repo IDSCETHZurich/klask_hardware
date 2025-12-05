@@ -1,0 +1,28 @@
+{
+    "name": "KLASK SDK",
+    "image": "klask_ros_sdk:latest",
+    "workspaceFolder": "/root/ros2_ws",
+    "workspaceMount": "source=${localWorkspaceFolder}/ros,target=/root/ros2_ws,type=bind",
+    "runArgs": [
+        "--rm",
+        "--env=DISPLAY",
+        "--env=QT_X11_NO_MITSHM=1",
+        "--device=/dev/video0:/dev/video0",
+        "--name=klask_ros_sdk_container_latest"
+    ],
+    "mounts": [
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+
+        "source=klask_build,target=/root/ros2_ws/build,type=volume",
+        "source=klask_install,target=/root/ros2_ws/install,type=volume",
+        "source=klask_log,target=/root/ros2_ws/log,type=volume"
+
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python"
+            ]
+        }
+    }
+}
