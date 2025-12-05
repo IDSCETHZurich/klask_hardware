@@ -11,18 +11,18 @@ def launch_setup(context, *args, **kwargs):
     nodes_to_launch = []
 
     # CAN interface setup (commented out by default)
-    # nodes_to_launch.append(ExecuteProcess(
-    #     cmd=['sudo', 'ip', 'link', 'set', 'can0', 'down'],
-    #     output='screen'
-    # ))
+    nodes_to_launch.append(ExecuteProcess(
+        cmd=['ip', 'link', 'set', 'can0', 'down'],
+        output='screen'
+    ))
     
-    # nodes_to_launch.append(ExecuteProcess(
-    #     cmd=['sudo', 'ip', 'link', 'set', 'can0', 'up', 'type', 'can', 'bitrate', '250000'],
-    #     output='screen'
-    # ))
+    nodes_to_launch.append(ExecuteProcess(
+        cmd=['ip', 'link', 'set', 'can0', 'up', 'type', 'can', 'bitrate', '250000'],
+        output='screen'
+    ))
     
-    # Left player ODrive nodes (axis 0 and 1)
-    if player in ['left', 'both']:
+    # Right player ODrive nodes (axis 0 and 1)
+    if player in ['right', 'both']:
         nodes_to_launch.append(Node(
             package='odrive_can',
             executable='odrive_can_node',
@@ -49,8 +49,8 @@ def launch_setup(context, *args, **kwargs):
             output='screen'
         ))
     
-    # Right player ODrive nodes (axis 2 and 3)
-    if player in ['right', 'both']:
+    # Left player ODrive nodes (axis 2 and 3)
+    if player in ['left', 'both']:
         nodes_to_launch.append(Node(
             package='odrive_can',
             executable='odrive_can_node',

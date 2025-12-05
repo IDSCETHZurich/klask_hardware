@@ -9,6 +9,8 @@
         "--env=QT_X11_NO_MITSHM=1",
         "--device=/dev/video0:/dev/video0",
         "--network=host",
+        "--cap-add=NET_ADMIN",
+        "--cap-add=NET_RAW", 
         "--name=klask_ros_sdk_container_latest"
     ],
     "mounts": [

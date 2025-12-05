@@ -79,6 +79,8 @@ cmd_run() {
         --volume="${CONTAINER_NAME}_log:/root/ros2_ws/log:rw" \
         --device="$VIDEO_DEVICE:/dev/video0" \
         --network=host \
+        --cap-add=NET_ADMIN \
+        --cap-add=NET_RAW \
         --name="${CONTAINER_NAME}" \
         "${IMAGE_NAME}:${TAG}"
 
