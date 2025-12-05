@@ -4,6 +4,13 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 
+# Launch both players (default)
+# ros2 launch motor_commander_pkg motors_launch.py
+# Launch only left player
+# ros2 launch motor_commander_pkg motors_launch.py player:=left
+# Launch only right player
+# ros2 launch motor_commander_pkg motors_launch.py player:=right
+
 
 def generate_launch_description():
     # Declare launch arguments
