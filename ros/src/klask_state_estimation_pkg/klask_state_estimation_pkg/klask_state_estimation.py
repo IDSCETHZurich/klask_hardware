@@ -273,6 +273,7 @@ class BallPegDetection(Node):
 
         # Debug/Display settings
         self.show_image = True
+        self.show_fps = True
         self.print_apriltags_not_found = False
         self.print_outcome = False
 
@@ -319,6 +320,12 @@ class BallPegDetection(Node):
         self.previous_time: float | None = None
         self.dt: float = 0.01
         self.count = 0
+        
+        # FPS tracking
+        self.fps_update_interval = 1.0  # Update FPS display every second
+        self.fps_last_update_time = time.time()
+        self.fps_frame_count = 0
+        self.current_fps = 0.0
 
         # Detection state flags
         self.apriltags_detected_once = False
@@ -399,7 +406,22 @@ class BallPegDetection(Node):
 
         # Process frame for ball/peg detection
         self.process_frame(rectified_frame)
+        
+        # Update FPS counter
+        self._update_fps()
+        
         self.timer_counter += 1
+
+    def _update_fps(self) -> None:
+        """Update FPS calculation."""
+        self.fps_frame_count += 1
+        current_time = time.time()
+        elapsed = current_time - self.fps_last_update_time
+        
+        if elapsed >= self.fps_update_interval:
+            self.current_fps = self.fps_frame_count / elapsed
+            self.fps_frame_count = 0
+            self.fps_last_update_time = current_time
 
     def detect_apriltags(self, undistorted_frame: np.ndarray) -> None:
         """Detect and process AprilTags in the frame."""
@@ -784,6 +806,20 @@ class BallPegDetection(Node):
         x_offset = (target_width - new_w) // 2
         y_offset = (target_height - new_h) // 2
         canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
+        
+        # Draw FPS counter on canvas
+        if self.show_fps and self.current_fps > 0:
+            fps_text = f"FPS: {self.current_fps:.1f}"
+            cv2.putText(
+                canvas,
+                fps_text,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
         return canvas
 
