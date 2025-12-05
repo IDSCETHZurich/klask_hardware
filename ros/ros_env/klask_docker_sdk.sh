@@ -78,6 +78,7 @@ cmd_run() {
         --volume="${CONTAINER_NAME}_install:/root/ros2_ws/install:rw" \
         --volume="${CONTAINER_NAME}_log:/root/ros2_ws/log:rw" \
         --device="$VIDEO_DEVICE:/dev/video0" \
+        --network=host \
         --name="${CONTAINER_NAME}" \
         "${IMAGE_NAME}:${TAG}"
 

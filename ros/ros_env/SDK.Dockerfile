@@ -4,7 +4,9 @@ FROM ros:humble-ros-base
 RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-rqt \
     ros-${ROS_DISTRO}-rqt-common-plugins \
-    python3-pip && \
+    python3-pip \
+    iproute2 \
+    can-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # install python packages
