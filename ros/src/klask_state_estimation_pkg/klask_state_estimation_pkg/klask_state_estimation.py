@@ -260,6 +260,16 @@ class BallPegDetection(Node):
     EMA_ALPHA_APRILTAG = 0.1
     EMA_ALPHA_GANTRY = 1.0  # No smoothing for gantry tags
     
+    # HSV color range constants for object detection
+    BALL_HSV_LOWER = (0, 150, 150)  # Orange ball lower bound
+    BALL_HSV_UPPER = (45, 255, 255)  # Orange ball upper bound
+    PEG_HSV_LOWER = (0, 0, 0)  # Black peg lower bound
+    PEG_HSV_UPPER = (255, 255, 45)  # Black peg upper bound
+    
+    # Visualization canvas size
+    CANVAS_WIDTH = 1280
+    CANVAS_HEIGHT = 720
+    
     def __init__(self):
         super().__init__("detect_ball_peg")
         
@@ -269,22 +279,12 @@ class BallPegDetection(Node):
 
         # Timers
         self.timer = self.create_timer(1.0 / 1200.0, self.timer_callback)
-        self.delay_checker_timer = self.create_timer(1.0, self.delay_checker_callback)
 
         # Debug/Display settings
         self.show_image = True
         self.show_fps = True
         self.print_apriltags_not_found = False
         self.print_outcome = False
-
-        # Performance monitoring (for debugging)
-        self.check_delay = True
-        self.check_delay_at = 0
-        self.timer_time = time.time()
-        self.timer_counter = 0
-        self.publisher_counter = 0
-        self.delay_values = []
-        self.log_count = 0
 
         # Kalman Filters
         self.ball_kf = KalmanFilter(
@@ -319,7 +319,6 @@ class BallPegDetection(Node):
         # Timing
         self.previous_time: float | None = None
         self.dt: float = 0.01
-        self.count = 0
         
         # FPS tracking
         self.fps_update_interval = 1.0  # Update FPS display every second
@@ -385,12 +384,6 @@ class BallPegDetection(Node):
 
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
-        # Performance monitoring
-        if self.check_delay:
-            self.timer_time = time.time()
-            self.check_delay = False
-            self.check_delay_at = self.timer_counter
-
         # Capture and validate frame
         ret, frame = self.cap.read()
         if not ret:
@@ -402,15 +395,12 @@ class BallPegDetection(Node):
 
         # Detect AprilTags (every frame)
         self.detect_apriltags(rectified_frame)
-        self.count += 1
 
         # Process frame for ball/peg detection
         self.process_frame(rectified_frame)
         
         # Update FPS counter
         self._update_fps()
-        
-        self.timer_counter += 1
 
     def _update_fps(self) -> None:
         """Update FPS calculation."""
@@ -511,15 +501,8 @@ class BallPegDetection(Node):
         canvas, self.left_peg_position, self.right_peg_position, self.ball_position = (
             self.detect_ball_peg(
                 cropped,
-                target_width=1280,
-                target_height=720,
-                left_peg_position=self.left_peg_position,
-                right_peg_position=self.right_peg_position,
-                ball_position=self.ball_position,
-                alpha=0.7,
                 left_goal=self.left_goal,
                 right_goal=self.right_goal,
-                goal_radius=self.GOAL_RADIUS,
             )
         )
 
@@ -586,15 +569,8 @@ class BallPegDetection(Node):
     def detect_ball_peg(
         self,
         cropped: np.ndarray,
-        target_width: int = 1280,
-        target_height: int = 720,
-        left_peg_position: tuple[float, float] | None = None,
-        right_peg_position: tuple[float, float] | None = None,
-        ball_position: tuple[float, float] | None = None,
-        alpha: float = 0.1,
         left_goal: list[float] | None = None,
         right_goal: list[float] | None = None,
-        goal_radius: int = 22,
     ) -> tuple[np.ndarray, tuple[float, float] | None, tuple[float, float] | None, tuple[float, float] | None]:
         """
         Detect ball and pegs using HSV color filtering and Kalman filtering.
@@ -607,8 +583,8 @@ class BallPegDetection(Node):
         frame_hsv_blur = cv2.GaussianBlur(frame_hsv, (7, 7), 0)
 
         # Create masks for ball (orange) and pegs (black)
-        masked_ball = cv2.inRange(frame_hsv_blur, (0, 150, 150), (45, 255, 255))
-        masked_peg = cv2.inRange(frame_hsv_blur, (0, 0, 0), (255, 255, 45))
+        masked_ball = cv2.inRange(frame_hsv_blur, self.BALL_HSV_LOWER, self.BALL_HSV_UPPER)
+        masked_peg = cv2.inRange(frame_hsv_blur, self.PEG_HSV_LOWER, self.PEG_HSV_UPPER)
 
         # Create visualization overlay
         overlaid_frame = self._create_overlay(cropped, masked_peg, masked_ball)
@@ -626,10 +602,10 @@ class BallPegDetection(Node):
 
         # Draw goals and magnet visualization
         if self.show_image:
-            self._draw_goals(overlaid_frame, left_goal, right_goal, goal_radius)
+            self._draw_goals(overlaid_frame, left_goal, right_goal)
 
         # Resize and center on canvas
-        canvas = self._create_canvas(overlaid_frame, target_width, target_height)
+        canvas = self._create_canvas(overlaid_frame)
 
         return canvas, left_peg_position, right_peg_position, ball_position
 
@@ -683,18 +659,18 @@ class BallPegDetection(Node):
         left_peg_position: tuple[float, float] | None,
         right_peg_position: tuple[float, float] | None,
         overlaid_frame: np.ndarray,
-    ) -> tuple[float, float]:
+    ) -> tuple[float, float] | None:
         """Detect ball with collision-aware Kalman filtering."""
         contours, _ = cv2.findContours(masked_ball, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         if not contours:
-            return (0.0, 0.0)
+            return None
 
         largest_contour = max(contours, key=cv2.contourArea)
         M = cv2.moments(largest_contour)
         
         if M["m00"] == 0:
-            return (0.0, 0.0)
+            return None
 
         # Calculate centroid
         cX_ball = int(M["m10"] / M["m00"])
@@ -773,38 +749,39 @@ class BallPegDetection(Node):
         frame: np.ndarray,
         left_goal: list[float] | None,
         right_goal: list[float] | None,
-        goal_radius: int,
     ) -> None:
         """Draw goal circles on the frame."""
         goal_color = (140, 255, 0)
         
         if left_goal is not None:
             center = (int(left_goal[0]), int(left_goal[1]))
-            cv2.circle(frame, center, goal_radius, goal_color, 2)
+            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
             cv2.circle(frame, center, 5, goal_color, -1)
             
         if right_goal is not None:
             center = (int(right_goal[0]), int(right_goal[1]))
-            cv2.circle(frame, center, goal_radius, goal_color, 2)
+            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
             cv2.circle(frame, center, 5, goal_color, -1)
 
-    def _create_canvas(self, overlaid_frame: np.ndarray, target_width: int, target_height: int) -> np.ndarray:
+    def _create_canvas(self, overlaid_frame: np.ndarray) -> np.ndarray:
         """Resize frame and center it on a canvas."""
-        resized_image, new_w, new_h = resize_with_aspect_ratio(overlaid_frame, target_width, target_height)
+        resized_image, new_w, new_h = resize_with_aspect_ratio(
+            overlaid_frame, self.CANVAS_WIDTH, self.CANVAS_HEIGHT
+        )
 
         # Ensure dimensions are within bounds
-        if new_w > target_width or new_h > target_height:
+        if new_w > self.CANVAS_WIDTH or new_h > self.CANVAS_HEIGHT:
             self.get_logger().warn(
-                f"Resized image ({new_w}x{new_h}) exceeds canvas ({target_width}x{target_height})"
+                f"Resized image ({new_w}x{new_h}) exceeds canvas ({self.CANVAS_WIDTH}x{self.CANVAS_HEIGHT})"
             )
-            new_w = min(new_w, target_width)
-            new_h = min(new_h, target_height)
+            new_w = min(new_w, self.CANVAS_WIDTH)
+            new_h = min(new_h, self.CANVAS_HEIGHT)
             resized_image = cv2.resize(resized_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
         # Center on black canvas
-        canvas = np.zeros((target_height, target_width, 3), dtype=np.uint8)
-        x_offset = (target_width - new_w) // 2
-        y_offset = (target_height - new_h) // 2
+        canvas = np.zeros((self.CANVAS_HEIGHT, self.CANVAS_WIDTH, 3), dtype=np.uint8)
+        x_offset = (self.CANVAS_WIDTH - new_w) // 2
+        y_offset = (self.CANVAS_HEIGHT - new_h) // 2
         canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
         
         # Draw FPS counter on canvas
@@ -857,8 +834,6 @@ class BallPegDetection(Node):
             stamped_polygon.polygon = polygon
             stamped_polygon.header.stamp = self.get_clock().now().to_msg()
             self.state_publisher.publish(stamped_polygon)
-
-        self.publisher_counter += 1
 
     def _create_point32(self, x: float, y: float, z: float = 0.0) -> Point32:
         """Create a Point32 message from coordinates."""
@@ -1023,27 +998,6 @@ class BallPegDetection(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         self.outcome_publisher.publish(msg)
         self.outcome_published = True
-
-    def delay_checker_callback(self) -> None:
-        """Callback to trigger delay checking."""
-        self.check_delay = True
-
-    def log_delay_statistics(self) -> None:
-        """Log delay statistics for performance monitoring."""
-        if not self.delay_values:
-            self.get_logger().info("No delay values to evaluate")
-            return
-
-        mean_delay = np.mean(self.delay_values)
-        std_delay = np.std(self.delay_values)
-        min_delay = np.min(self.delay_values)
-        max_delay = np.max(self.delay_values)
-
-        self.get_logger().info(f"Delay Statistics:")
-        self.get_logger().info(f"Mean: {mean_delay:.2f} ms")
-        self.get_logger().info(f"Std Dev: {std_delay:.2f} ms")
-        self.get_logger().info(f"Min: {min_delay:.2f} ms")
-        self.get_logger().info(f"Max: {max_delay:.2f} ms")
 
 
 def main(args=None):
