@@ -4,6 +4,7 @@ FROM ros:humble-ros-base
 RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-rqt \
     ros-${ROS_DISTRO}-rqt-common-plugins \
+    ros-${ROS_DISTRO}-foxglove-bridge \
     python3-pip \
     iproute2 \
     can-utils && \

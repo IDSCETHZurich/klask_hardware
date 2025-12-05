@@ -26,7 +26,8 @@
         "vscode": {
             "extensions": [
                 "ms-python.python",
-                "ms-vscode.cpptools-extension-pack"
+                "ms-vscode.cpptools-extension-pack",
+                "ms-python.black-formatter"
             ]
         }
     }
