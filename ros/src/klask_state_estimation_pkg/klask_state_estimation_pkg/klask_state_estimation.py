@@ -10,141 +10,214 @@ from klask_interfaces.msg import StampedPolygon, StampedInt32
 from rclpy.node import Node
 
 
-# Kalman Filter Class
 class KalmanFilter:
+    """Kalman Filter for tracking position and velocity in 2D space."""
+    
+    # Collision noise constants
+    COLLISION_POSITION_NOISE = 4.0
+    COLLISION_VELOCITY_NOISE = 10000.0
+    DEFAULT_VELOCITY_THRESHOLD = 1.0
+    
     def __init__(
         self,
-        process_noise_position=1.0,
-        process_noise_velocity=1.0,
-        measurement_noise_position=1.0,
-        stop_threshold=-1.0,
+        process_noise_position: float = 1.0,
+        process_noise_velocity: float = 1.0,
+        measurement_noise_position: float = 1.0,
+        stop_threshold: float = -1.0,
+        velocity_threshold: float = DEFAULT_VELOCITY_THRESHOLD,
     ):
-        self.state = np.zeros(4)  # State vector [pos_x, pos_y, vel_x, vel_y]
+        """
+        Initialize Kalman Filter.
+        
+        Args:
+            process_noise_position: Process noise for position
+            process_noise_velocity: Process noise for velocity
+            measurement_noise_position: Measurement noise for position
+            stop_threshold: Threshold for detecting stopped motion (-1 to disable)
+            velocity_threshold: Minimum velocity magnitude to consider non-zero
+        """
+        # State vector: [pos_x, pos_y, vel_x, vel_y]
+        self.state = np.zeros(4)
         self.stop_threshold = stop_threshold
+        self.velocity_threshold = velocity_threshold
         self.previous_position = None
 
-        # Process and measurement noise covariances
-        self.Q = np.array(
-            [
-                [process_noise_position, 0, 0, 0],
-                [0, process_noise_position, 0, 0],
-                [0, 0, process_noise_velocity, 0],
-                [0, 0, 0, process_noise_velocity],
-            ]
-        )
+        # Process noise covariance matrix
+        self.Q = np.diag([
+            process_noise_position,
+            process_noise_position,
+            process_noise_velocity,
+            process_noise_velocity,
+        ])
+        
+        # Measurement noise covariance matrix
         self.R = measurement_noise_position * np.eye(2)
 
-        # Measurement matrix (we observe positions only)
+        # Measurement matrix (observe positions only)
         self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
 
         # Initial estimation error covariance
         self.P = np.eye(4)
+        
+        # State transition matrix (will be updated with dt)
+        self.F = np.eye(4)
 
-    def predict(self, dt, x_collision=None, y_collision=None):
-        # Update the state transition matrix based on dt
-        self.F = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]])
+    def predict(self, dt: float, x_collision: bool = False, y_collision: bool = False) -> None:
+        """
+        Predict the next state based on the motion model.
+        
+        Args:
+            dt: Time step since last prediction
+            x_collision: Whether collision occurred in x-direction
+            y_collision: Whether collision occurred in y-direction
+        """
+        # Update state transition matrix with time step
+        self.F = np.array([
+            [1, 0, dt, 0],
+            [0, 1, 0, dt],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
 
-        # Predict the next state
-        Q = self.Q
-        if x_collision == True:
-            Q = Q + np.diag([4.0, 0.0, 10000.0, 0.0])
-        if y_collision == True:
-            Q = Q + np.diag([0.0, 4.0, 0.0, 10000.0])
+        # Adjust process noise for collisions
+        Q = self.Q.copy()
+        if x_collision:
+            Q += np.diag([self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE, 0.0])
+        if y_collision:
+            Q += np.diag([0.0, self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE])
 
+        # Prediction step
         self.state = self.F @ self.state
         self.P = self.F @ self.P @ self.F.T + Q
 
-    def update(self, measurement):
+    def update(self, measurement: tuple[float, float]) -> None:
+        """
+        Update state with new measurement.
+        
+        Args:
+            measurement: Measured position (x, y)
+        """
         z = np.array(measurement)
         y = z - (self.H @ self.state)
         S = self.H @ self.P @ self.H.T + self.R
         K = self.P @ self.H.T @ np.linalg.inv(S)
+        
         self.state = self.state + K @ y
         self.P = (np.eye(4) - K @ self.H) @ self.P
 
         if self.stop_threshold > 0:
-            self.check_stop_threshold()
+            self._check_stop_threshold()
 
-    def get_position(self):
+    def get_position(self) -> np.ndarray:
+        """Get current estimated position."""
         return self.state[0:2]
 
-    def get_velocity(self):
-        v_x = self.state[2]
-        v_y = self.state[3]
-
-        if abs(v_x) < 1.0:
-            v_x = 0.0
-        if abs(v_y) < 1.0:
-            v_y = 0.0
-
+    def get_velocity(self) -> list[float]:
+        """Get current estimated velocity with threshold filtering."""
+        v_x = self.state[2] if abs(self.state[2]) >= self.velocity_threshold else 0.0
+        v_y = self.state[3] if abs(self.state[3]) >= self.velocity_threshold else 0.0
         return [v_x, v_y]
 
-    def check_stop_threshold(self):
+    def _check_stop_threshold(self) -> None:
+        """Check if object has stopped moving based on position change."""
         current_position = self.get_position()
 
         if self.previous_position is None:
             self.previous_position = current_position
             return
 
-        dx = np.linalg.norm(
-            np.array(current_position) - np.array(self.previous_position)
-        )
+        displacement = np.linalg.norm(current_position - self.previous_position)
 
-        if dx < self.stop_threshold:
-            self.state[2] = 0.0
-            self.state[3] = 0.0
+        if displacement < self.stop_threshold:
+            self.state[2:4] = 0.0  # Set velocities to zero
 
         self.previous_position = current_position
 
 
-def load_calibration_data(filename="calibration_data.npz"):
-    # Get the path to where the script is running
+def load_calibration_data(filename: str = "calibration_data.npz") -> tuple[np.ndarray, np.ndarray]:
+    """
+    Load camera calibration data from file.
+    
+    Args:
+        filename: Name of the calibration file
+        
+    Returns:
+        Tuple of (camera_matrix, distortion_coefficients)
+        
+    Raises:
+        FileNotFoundError: If calibration file or ros2_ws not found
+    """
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    # Find the index of the 'ros2_ws' string in the path
     ros2_ws_index = current_dir.find("ros2_ws")
 
     if ros2_ws_index == -1:
         raise FileNotFoundError("ROS2 workspace not found in the path")
 
-    # Extract the path to the ROS2 workspace
-    ros2_ws_path = current_dir[: ros2_ws_index + len("ros2_ws")]
-    # Construct the full path to the calibration file
+    ros2_ws_path = current_dir[:ros2_ws_index + len("ros2_ws")]
     filepath = os.path.join(
-        ros2_ws_path, "src/klask_state_estimation_pkg/klask_state_estimation_pkg", filename
+        ros2_ws_path, 
+        "src/klask_state_estimation_pkg/klask_state_estimation_pkg", 
+        filename
     )
 
-    # Check if the file exists before loading
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Calibration file not found at: {filepath}")
 
-    # Load the calibration data
     with np.load(filepath) as data:
-        mtx = data["mtx"]
-        dist = data["dist"]
-    return mtx, dist
+        return data["mtx"], data["dist"]
 
 
-def apply_ema_filter(current_value, previous_value, alpha=0.1):
-    """Apply Exponential Moving Average (EMA) filter."""
+def apply_ema_filter(
+    current_value: np.ndarray, 
+    previous_value: np.ndarray | None, 
+    alpha: float = 0.1
+) -> np.ndarray:
+    """
+    Apply Exponential Moving Average (EMA) filter for smoothing.
+    
+    Args:
+        current_value: Current measurement
+        previous_value: Previous filtered value (None on first call)
+        alpha: Smoothing factor (0-1), higher = more responsive
+        
+    Returns:
+        Filtered value
+    """
     if previous_value is None:
         return current_value
     return alpha * current_value + (1 - alpha) * previous_value
 
 
-def resize_with_aspect_ratio(image, target_width, target_height):
+def resize_with_aspect_ratio(
+    image: np.ndarray, 
+    target_width: int, 
+    target_height: int
+) -> tuple[np.ndarray, int, int]:
+    """
+    Resize image while maintaining aspect ratio to fit within target dimensions.
+    
+    Args:
+        image: Input image
+        target_width: Maximum width
+        target_height: Maximum height
+        
+    Returns:
+        Tuple of (resized_image, actual_width, actual_height)
+    """
     h, w = image.shape[:2]
-    if w > h:
+    aspect_ratio = w / h
+    target_aspect_ratio = target_width / target_height
+    
+    # Determine which dimension is the limiting factor
+    if aspect_ratio > target_aspect_ratio:
+        # Width is limiting
         new_w = target_width
-        new_h = int(h * (target_width / w))
-        if new_h > target_height:
-            new_h = target_height
-            new_w = int(w * (target_height / h))
+        new_h = int(target_width / aspect_ratio)
     else:
+        # Height is limiting
         new_h = target_height
-        new_w = int(w * (target_height / h))
-        if new_w > target_width:
-            new_w = target_width
-            new_h = int(h * (target_width / w))
+        new_w = int(target_height * aspect_ratio)
+    
     resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     return resized_image, new_w, new_h
 
