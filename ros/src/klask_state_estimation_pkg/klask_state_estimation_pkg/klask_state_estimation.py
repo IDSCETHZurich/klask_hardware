@@ -270,6 +270,9 @@ class BallPegDetection(Node):
     CANVAS_WIDTH = 1280
     CANVAS_HEIGHT = 720
     
+    # Display update rate
+    DISPLAY_UPDATE_INTERVAL = 0.1  # 10Hz display update (100ms between frames)
+    
     def __init__(self):
         super().__init__("detect_ball_peg")
         
@@ -325,6 +328,9 @@ class BallPegDetection(Node):
         self.fps_last_update_time = time.time()
         self.fps_frame_count = 0
         self.current_fps = 0.0
+        
+        # Display throttling
+        self.last_display_time = 0.0
 
         # Detection state flags
         self.apriltags_detected_once = False
@@ -412,6 +418,10 @@ class BallPegDetection(Node):
             self.current_fps = self.fps_frame_count / elapsed
             self.fps_frame_count = 0
             self.fps_last_update_time = current_time
+            
+            # Log FPS when image display is disabled
+            if not self.show_image:
+                self.get_logger().info(f"FPS: {self.current_fps:.1f}")
 
     def detect_apriltags(self, undistorted_frame: np.ndarray) -> None:
         """Detect and process AprilTags in the frame."""
@@ -506,9 +516,13 @@ class BallPegDetection(Node):
             )
         )
 
+        # Display image at 10Hz to improve performance
         if self.show_image:
-            cv2.imshow("Canvas", canvas)
-            cv2.waitKey(1)
+            current_time = time.time()
+            if current_time - self.last_display_time >= self.DISPLAY_UPDATE_INTERVAL:
+                cv2.imshow("Canvas", canvas)
+                cv2.waitKey(1)
+                self.last_display_time = current_time
 
         # Publish states
         self.publish_estimated_positions_and_velocities()
