@@ -9,6 +9,12 @@ git config commit.template .gitmessage.txt
 xhost +local:root
 ```
 
+Prerequisites
+
+- Git and Docker installed
+- Your user added to the docker group
+- (Docker compose installed)
+
 Repo Setup on `idsc4gpu`
 
 - Create SSH-Key on machine with passphrase (alex is the example user here)
@@ -40,3 +46,18 @@ Repo Setup on `idsc4gpu`
     git config user.name  "Your Name"
     git config user.email "you@example.com"
     ```
+
+SDK:
+
+```bash
+./ros/ros_env/klask_docker_sdk.sh build
+./ros/ros_env/klask_docker_sdk.sh run
+```
+
+VS Code
+
+- bottom left
+- attach to running container
+- select container
+
+Or just click on reopen in container
