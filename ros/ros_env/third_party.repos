@@ -1,0 +1,5 @@
+repositories:
+  ros_odrive:
+    type: git
+    url: https://github.com/odriverobotics/ros_odrive.git
+    version: 050dbb557567a205260a5a2f128e84821bb8c78a

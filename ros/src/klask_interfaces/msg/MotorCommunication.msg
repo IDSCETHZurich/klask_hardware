@@ -1,0 +1,4 @@
+std_msgs/Bool calibration_flag
+geometry_msgs/Point player_peg_pos
+geometry_msgs/Point opponent_peg_pos
+std_msgs/Int32 desired_motor_state

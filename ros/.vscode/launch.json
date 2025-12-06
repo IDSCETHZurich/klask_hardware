@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug klask_state_estimation (ROS2)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "klask_state_estimation_pkg.klask_state_estimation",
+            "console": "integratedTerminal"
+        }
+    ]
+}
