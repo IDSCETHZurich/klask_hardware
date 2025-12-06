@@ -12,7 +12,11 @@ find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 find_package(klask_interfaces REQUIRED)
 
-add_executable(motor_commander src/motor_commander.cpp)
+add_executable(motor_commander 
+  src/motor_commander.cpp
+  src/player.cpp
+  src/odrive_controller.cpp
+)
 
 ament_target_dependencies(motor_commander rclcpp std_msgs odrive_can klask_interfaces)
 
