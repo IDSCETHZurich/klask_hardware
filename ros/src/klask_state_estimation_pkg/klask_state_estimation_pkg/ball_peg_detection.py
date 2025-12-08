@@ -28,7 +28,7 @@ class BallPegDetection(Node):
     TAG_SIZE_MM = 20
     APRILTAG_FAMILY = "tag36h11"
     FLOOD_SEED = (CAMERA_WIDTH // 2, CAMERA_HEIGHT // 2)
-    FLOOD_THRESHOLD = 5
+    FLOOD_THRESHOLD = 3
 
     # Debug/Display settings
     DEBUG_VIEW = False
@@ -170,7 +170,6 @@ class BallPegDetection(Node):
         self.M: np.ndarray | None = None
         self.width = 0
         self.height = 0
-        self.inset_pixels = 0
 
         # Object positions
         self.left_peg_position: tuple[float, float] | None = None
@@ -251,10 +250,46 @@ class BallPegDetection(Node):
         ret, frame = self.cap.read()
         frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
+        # Perform flood fill to detect board boundaries
         h, s, v, flood_mask, rect = self._board_flood_fill(
             frame_rec, self.FLOOD_SEED, self.FLOOD_THRESHOLD
         )
+
+        # Find rotated rectangle from flood fill mask
         rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
+
+        # Create boarder masks
+        corner_pts, rect_width, rect_height, rotation_matrix = (
+            self._corners_from_rotated_rect(rotated_rect)
+        )
+        boarder_segment_masks = [np.zeros_like(s, dtype=np.uint8) for _ in range(4)]
+        outside_offset = 30
+        inside_offset = 10
+        corner_distance = 50
+        long_side_length = rect_width - 2 * corner_distance
+        short_side_length = rect_height - 2 * corner_distance
+        center = np.reshape(rotated_rect.center, (2, 1))
+        def rect_from_offset(outside_offset, inside_offset, length) -> np.ndarray:
+            return np.array(
+            [
+                [-length/2, outside_offset],
+                [length/2, outside_offset],
+                [length/2, -inside_offset],
+                [-length/2, -inside_offset],
+            ]
+        ).T
+        long_side_rect = rect_from_offset(outside_offset, inside_offset, long_side_length)
+        short_side_rect = rect_from_offset(outside_offset, inside_offset, short_side_length)
+        long_side_rect_transformed = rotation_matrix @ long_side_rect + center
+        short_side_rect_transformed = rotation_matrix @ short_side_rect + center
+        for i, boarder_segment_mask in enumerate(boarder_segment_masks):
+            pt1 = corner_pts[i]
+            pt2 = corner_pts[(i + 1) % 4]
+            line_center = (pt2 - pt1) / 2 + pt1
+            parallel_dir = line_center - center
+            parallel_dir /= np.linalg.norm(parallel_dir)
+            segment_center = line_center + parallel_dir * (inside_offset - outside_offset) / 2
+            #cv2.RotatedRect(segment_center, ())
 
         # Compute perspective transform
         self.compute_perspective_transform_from_rotated_rect(rotated_rect)
@@ -502,16 +537,13 @@ class BallPegDetection(Node):
             (self.width, self.height),
         )
 
-        # No cropping needed since flood fill rectangle defines the exact board area
-        cropped = warped
-
         # Publish the transformed and cropped image
-        self.publish_board_image(cropped)
+        self.publish_board_image(warped)
 
         # Detect ball and pegs
         canvas, self.left_peg_position, self.right_peg_position, self.ball_position = (
             self.detect_ball_peg(
-                cropped,
+                warped,
                 left_goal=self.left_goal,
                 right_goal=self.right_goal,
             )
@@ -540,10 +572,10 @@ class BallPegDetection(Node):
         ):
             self.check_goal()
 
-    def compute_perspective_transform_from_rotated_rect(
-        self, rotated_rect: tuple[tuple[float, float], tuple[float, float], float]
-    ) -> None:
-        """Compute perspective transformation matrix from rotated rectangle."""
+    def _corners_from_rotated_rect(
+        self, rotated_rect: cv2.RotatedRect
+    ) -> tuple[np.ndarray, float, float, np.ndarray]:
+        """Get corner points from rotated rectangle."""
         # rotated_rect format: ((center_x, center_y), (width, height), angle)
         center, (rect_width, rect_height), angle = rotated_rect
 
@@ -573,12 +605,21 @@ class BallPegDetection(Node):
 
         # Rotate corners
         rotated_corners = corners @ rotation_matrix.T
+        rotated_corners += np.array(center, dtype=np.float32)
 
         # Translate to actual center position
-        src_pts = rotated_corners + np.array(center, dtype=np.float32)
+        return (rotated_corners, rect_width, rect_height, rotation_matrix)
+
+    def compute_perspective_transform_from_rotated_rect(
+        self, rotated_rect: tuple[tuple[float, float], tuple[float, float], float]
+    ) -> None:
+        """Compute perspective transformation matrix from rotated rectangle."""
+
+        src_pts, rect_width, rect_height, _ = self._corners_from_rotated_rect(
+            rotated_rect
+        )
 
         # Set dimensions
-        self.inset_pixels = 0
         self.width = int(rect_width)
         self.height = int(rect_height)
 
