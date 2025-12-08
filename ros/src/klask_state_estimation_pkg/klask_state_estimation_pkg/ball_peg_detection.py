@@ -28,16 +28,11 @@ class BallPegDetection(Node):
     TAG_NAMES = {
         0: "center right",
         1: "center left",
-        2: "top left",
-        3: "bottom left",
-        4: "top right",
-        5: "bottom right",
         6: "xy gantry",
         7: "x gantry",
     }
     
-    # Corner detection constants
-    CORNER_TAG_IDS = range(2, 6)  # Tags 2-5 are corner tags
+    # Goal detection constants
     GOAL_TAG_IDS = range(2)  # Tags 0-1 are goal tags
     
     # Goal detection constants
@@ -73,7 +68,7 @@ class BallPegDetection(Node):
         self.outcome_publisher = self.create_publisher(StampedInt32, "outcome", 10)
 
         # Timers
-        self.timer = self.create_timer(1.0 / 1200.0, self.timer_callback)
+        self.timer = self.create_timer(1.0 / 240.0, self.timer_callback)
 
         # Debug/Display settings
         self.show_image = True
@@ -135,6 +130,7 @@ class BallPegDetection(Node):
         self.width = 0
         self.height = 0
         self.inset_pixels = 0
+        self.board_rect: tuple[int, int, int, int] | None = None  # Store flood fill rect
 
         # Object positions
         self.left_peg_position: tuple[float, float] | None = None
@@ -199,6 +195,13 @@ class BallPegDetection(Node):
         threshold = 5
 
         h, s, v, flood_mask, rect = self._board_flood_fill(frame_rec, seed, threshold)
+        
+        # Store the board rectangle and compute perspective transform
+        self.board_rect = rect
+        self.compute_perspective_transform_from_rect(rect, frame_rec.shape)
+        self.apriltags_detected_once = True  # Board is detected via flood fill
+        self.corner_points_detected_once_printed = True
+        self.get_logger().info(f"Board detected via flood fill: rect={rect}")
 
         if self.DEBUG_VIEW:
             cv2.imshow("Initial Board Analysis - H Channel", h)
@@ -324,21 +327,8 @@ class BallPegDetection(Node):
             tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
             self.previous_tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
 
-        # Check corner tags (2-5) for perspective transform
-        detected_corner_tags = sum(1 for tag_id in self.CORNER_TAG_IDS if tag_corners[tag_id] is not None)
-        
-        if self.print_apriltags_not_found:
-            for tag_id in self.CORNER_TAG_IDS:
-                if tag_corners[tag_id] is None:
-                    tag_name = self.TAG_NAMES.get(tag_id, f"unknown tag {tag_id}")
-                    self.get_logger().warn(f"{tag_name} AprilTag not detected")
-
-        if detected_corner_tags == 4:
-            self.apriltags_detected_once = True
-            if not self.corner_points_detected_once_printed:
-                self.get_logger().info("All corner tags detected")
-                self.corner_points_detected_once_printed = True
-            self.compute_perspective_transform(tag_corners)
+        # Skip corner tags detection - using flood fill rectangle instead
+        # Corner tags (2-5) are no longer used for perspective transform
 
         # Check goal tags (0-1)
         detected_goal_tags = sum(1 for tag_id in self.GOAL_TAG_IDS if tag_corners[tag_id] is not None)
@@ -368,14 +358,11 @@ class BallPegDetection(Node):
         warped = cv2.warpPerspective(
             undistorted_frame,
             self.M,
-            (self.width + 2 * self.inset_pixels, self.height + 2 * self.inset_pixels),
+            (self.width, self.height),
         )
 
-        # Crop to playing area (adjust if AprilTags are moved on physical board)
-        cropped = warped[
-            self.inset_pixels + 16 : -self.inset_pixels - 14,
-            self.inset_pixels + 18 : -self.inset_pixels - 18,
-        ]
+        # No cropping needed since flood fill rectangle defines the exact board area
+        cropped = warped
 
         # Detect ball and pegs
         canvas, self.left_peg_position, self.right_peg_position, self.ball_position = (
@@ -402,51 +389,37 @@ class BallPegDetection(Node):
                 self.left_goal, self.right_goal]):
             self.check_goal()
 
-    def compute_perspective_transform(self, tag_corners: dict[int, np.ndarray | None]) -> None:
-        """Compute perspective transformation matrix from corner AprilTags."""
-        # Calculate average tag size in pixels
-        tag_pixel_sizes = [
-            np.linalg.norm(tag_corners[tag_id][0] - tag_corners[tag_id][1])
-            for tag_id in range(2, 6)
-        ]
-        tag_pixel_size = np.mean(tag_pixel_sizes)
-        pixels_per_mm = tag_pixel_size / self.TAG_SIZE_MM
-
-        # Source points from corner tags (clockwise from top-left)
+    def compute_perspective_transform_from_rect(self, rect: tuple[int, int, int, int], frame_shape: tuple[int, int, int]) -> None:
+        """Compute perspective transformation matrix from flood fill rectangle."""
+        x, y, w, h = rect
+        
+        # Source points from rectangle corners (clockwise from top-left)
         src_pts = np.array(
             [
-                tag_corners[2][3],  # Top-left corner
-                tag_corners[4][2],  # Top-right corner
-                tag_corners[5][2],  # Bottom-right corner
-                tag_corners[3][0],  # Bottom-left corner
+                [x, y],           # Top-left
+                [x + w, y],       # Top-right
+                [x + w, y + h],   # Bottom-right
+                [x, y + h],       # Bottom-left
             ],
             dtype="float32",
         )
-
-        # Calculate dimensions with inset
-        self.inset_pixels = int(50 * pixels_per_mm)
         
-        # Width: max of top and bottom edges
-        width_top = np.linalg.norm(tag_corners[2][3] - tag_corners[4][2])
-        width_bottom = np.linalg.norm(tag_corners[3][0] - tag_corners[5][2])
-        self.width = int(max(width_top, width_bottom)) - 2 * self.inset_pixels
+        # Set dimensions (no inset needed for flood fill rectangle)
+        self.inset_pixels = 0
+        self.width = w
+        self.height = h
         
-        # Height: max of left and right edges
-        height_left = np.linalg.norm(tag_corners[2][3] - tag_corners[3][0])
-        height_right = np.linalg.norm(tag_corners[4][2] - tag_corners[5][2])
-        self.height = int(max(height_left, height_right)) - 2 * self.inset_pixels
-
         # Destination points (perfect rectangle)
         dst_pts = np.array(
             [
-                [self.inset_pixels, self.inset_pixels],
-                [self.width + self.inset_pixels, self.inset_pixels],
-                [self.width + self.inset_pixels, self.height + self.inset_pixels],
-                [self.inset_pixels, self.height + self.inset_pixels],
+                [0, 0],
+                [self.width, 0],
+                [self.width, self.height],
+                [0, self.height],
             ],
             dtype="float32",
         )
-
+        
         # Compute transformation matrix
         self.M = cv2.getPerspectiveTransform(src_pts, dst_pts)
 
@@ -738,11 +711,8 @@ class BallPegDetection(Node):
             right_goal_warped = cv2.perspectiveTransform(
                 np.array([[right_goal_centroid]], dtype="float32"), self.M
             )[0][0]
-            offset = np.array([
-                self.GOAL_PERSPECTIVE_SHIFT - 18 - self.inset_pixels,
-                -16 - self.inset_pixels,
-            ])
-            self.right_goal = (right_goal_warped + offset).tolist()
+            # No offset needed since flood fill rect defines exact board boundaries
+            self.right_goal = right_goal_warped.tolist()
 
         # Update left goal (tag 1)
         if self.previous_tag_corners[1] is not None:
@@ -750,19 +720,13 @@ class BallPegDetection(Node):
             left_goal_warped = cv2.perspectiveTransform(
                 np.array([[left_goal_centroid]], dtype="float32"), self.M
             )[0][0]
-            offset = np.array([
-                self.GOAL_PERSPECTIVE_SHIFT + 18 + self.inset_pixels,
-                16 + self.inset_pixels,
-            ])
-            self.left_goal = (left_goal_warped - offset).tolist()
+            # No offset needed since flood fill rect defines exact board boundaries
+            self.left_goal = left_goal_warped.tolist()
 
     def update_gantry_coordinates(self) -> None:
         """Update gantry positions from AprilTag detections."""
         if self.M is None:
             return
-
-        # Tag offset for gantry position correction
-        tag_offset = np.array([18 + self.inset_pixels, 16 + self.inset_pixels])
 
         # Update xy gantry position (tag 6)
         if self.previous_tag_corners[6] is not None:
@@ -770,7 +734,7 @@ class BallPegDetection(Node):
             xy_gantry_warped = cv2.perspectiveTransform(
                 np.array([[xy_gantry_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.xy_gantry = (xy_gantry_warped - tag_offset).tolist()
+            self.xy_gantry = xy_gantry_warped.tolist()
         else:
             self.xy_gantry = None
 
@@ -780,7 +744,7 @@ class BallPegDetection(Node):
             x_gantry_warped = cv2.perspectiveTransform(
                 np.array([[x_gantry_centroid]], dtype="float32"), self.M
             )[0][0]
-            self.x_gantry = (x_gantry_warped - tag_offset).tolist()
+            self.x_gantry = x_gantry_warped.tolist()
         else:
             self.x_gantry = None
 
