@@ -5,6 +5,9 @@ import time
 import rclpy
 import numpy as np
 import apriltag
+import cProfile
+import pstats
+import io
 from rclpy.node import Node
 from geometry_msgs.msg import Polygon, Point32
 from klask_interfaces.msg import StampedPolygon, StampedInt32
@@ -30,6 +33,11 @@ class BallPegDetection(Node):
     SHOW_IMAGE = False
     SHOW_FPS = False
     PRINT_OUTCOME = False
+    
+    # Profiling settings
+    ENABLE_PROFILING = False
+    PROFILING_DURATION = 100.0  # Run profiler for N seconds
+    PROFILING_TOP_FUNCTIONS = 30  # Show top N functions in stats
 
     # AprilTag IDs mapping
     TAG_NAMES = {
@@ -53,6 +61,9 @@ class BallPegDetection(Node):
     # EMA filter alpha values
     EMA_ALPHA_APRILTAG = 0.1
     EMA_ALPHA_GANTRY = 1.0  # No smoothing for gantry tags
+    
+    # AprilTag detection rate
+    APRILTAG_DETECTION_FPS = 5.0  # Detect AprilTags at this frequency (Hz)
     
     # HSV color range constants for object detection
     BALL_HSV_LOWER = (0, 150, 150)  # Orange ball lower bound
@@ -111,6 +122,10 @@ class BallPegDetection(Node):
         self.previous_time: float | None = None
         self.dt: float = 0.01
         
+        # AprilTag detection timing
+        self.last_apriltag_detection_time: float = 0.0
+        self.apriltag_detection_interval: float = 1.0 / self.APRILTAG_DETECTION_FPS
+        
         # FPS tracking
         self.fps_update_interval = 1.0  # Update FPS display every second
         self.fps_last_update_time = time.time()
@@ -154,6 +169,15 @@ class BallPegDetection(Node):
         self.peg_in_left_goal_counter = 0
         self.peg_in_right_goal_counter = 0
         self.outcome_published = False
+
+        # Profiling setup
+        self.profiler = None
+        self.profiling_start_time = None
+        if self.ENABLE_PROFILING:
+            self.profiler = cProfile.Profile()
+            self.profiler.enable()
+            self.profiling_start_time = time.time()
+            self.get_logger().info(f"cProfile profiling enabled for {self.PROFILING_DURATION} seconds")
 
         # Comprehensive initial board image analysis
         self._initial_board_detection()
@@ -255,9 +279,47 @@ class BallPegDetection(Node):
 
         cv2.imshow(title, s_with_scale)
 
+    def _print_profiling_stats(self) -> None:
+        """Print cProfile statistics."""
+        if self.profiler is None:
+            return
+        
+        self.profiler.disable()
+        
+        # Create a string buffer to capture the stats output
+        s = io.StringIO()
+        
+        # Sort by total time (tottime) and print top functions
+        ps = pstats.Stats(self.profiler, stream=s).sort_stats('tottime')
+        
+        self.get_logger().info("\n" + "="*80)
+        self.get_logger().info(f"cProfile Statistics (profiled for {self.PROFILING_DURATION} seconds)")
+        self.get_logger().info("="*80)
+        
+        # Print stats to string buffer
+        ps.print_stats(self.PROFILING_TOP_FUNCTIONS)
+        
+        # Log the output
+        self.get_logger().info("\n" + s.getvalue())
+        
+        # Also print callers for more detailed analysis
+        s = io.StringIO()
+        ps = pstats.Stats(self.profiler, stream=s).sort_stats('tottime')
+        ps.print_callers(20)
+        
+        self.get_logger().info("\nTop Callers:")
+        self.get_logger().info(s.getvalue())
+        self.get_logger().info("="*80 + "\n")
+
 
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
+        # Check if profiling duration has elapsed
+        if self.ENABLE_PROFILING and self.profiler is not None:
+            if time.time() - self.profiling_start_time >= self.PROFILING_DURATION:
+                self._print_profiling_stats()
+                self.profiler = None  # Disable further profiling
+        
         # Capture and validate frame
         ret, frame = self.cap.read()
         if not ret:
@@ -267,8 +329,11 @@ class BallPegDetection(Node):
         # Undistort frame using calibration data
         rectified_frame = cv2.undistort(frame, self.mtx, self.dist, None, self.mtx)
 
-        # Detect AprilTags (every frame)
-        self.detect_apriltags(rectified_frame)
+        # Detect AprilTags at specified frequency
+        current_time = time.time()
+        if current_time - self.last_apriltag_detection_time >= self.apriltag_detection_interval:
+            self.detect_apriltags(rectified_frame)
+            self.last_apriltag_detection_time = current_time
 
         # Process frame for ball/peg detection
         self.process_frame(rectified_frame)
