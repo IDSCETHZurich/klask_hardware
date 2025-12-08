@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'klask_state_estimation = klask_state_estimation_pkg.klask_state_estimation:main'
+            'klask_state_estimation = klask_state_estimation_pkg.klask_state_estimation:main',
+            'image_viewer = klask_state_estimation_pkg.image_viewer:main'
         ],
     },
 )

@@ -11,6 +11,8 @@ import io
 from rclpy.node import Node
 from geometry_msgs.msg import Polygon, Point32
 from klask_interfaces.msg import StampedPolygon, StampedInt32
+from sensor_msgs.msg import CompressedImage
+from cv_bridge import CvBridge
 
 from .kalman_filter import KalmanFilter
 from .utils import load_calibration_data, apply_ema_filter, resize_with_aspect_ratio
@@ -84,6 +86,10 @@ class BallPegDetection(Node):
         # Publishers
         self.state_publisher = self.create_publisher(StampedPolygon, "ball_peg_states", 10)
         self.outcome_publisher = self.create_publisher(StampedInt32, "outcome", 10)
+        self.image_publisher = self.create_publisher(CompressedImage, "board_image/compressed", 10)
+
+        # CV Bridge for image conversion
+        self.bridge = CvBridge()
 
         # Timers
         self.timer = self.create_timer(1.0 / 240.0, self.timer_callback)
@@ -425,6 +431,9 @@ class BallPegDetection(Node):
         # No cropping needed since flood fill rectangle defines the exact board area
         cropped = warped
 
+        # Publish the transformed and cropped image
+        self.publish_board_image(cropped)
+
         # Detect ball and pegs
         canvas, self.left_peg_position, self.right_peg_position, self.ball_position = (
             self.detect_ball_peg(
@@ -760,6 +769,17 @@ class BallPegDetection(Node):
         point.y = float(y)
         point.z = z
         return point
+
+    def publish_board_image(self, image: np.ndarray) -> None:
+        """Publish the transformed and cropped board image as a compressed ROS2 message."""
+        try:
+            # Convert OpenCV image to ROS CompressedImage message
+            msg = self.bridge.cv2_to_compressed_imgmsg(image, dst_format='jpg')
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = 'camera_frame'
+            self.image_publisher.publish(msg)
+        except Exception as e:
+            self.get_logger().error(f"Failed to publish board image: {e}")
 
     def update_goal_coordinates(self) -> None:
         """Update goal positions from AprilTag detections."""
