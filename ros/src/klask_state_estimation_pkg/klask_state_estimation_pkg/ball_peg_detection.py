@@ -32,8 +32,8 @@ class BallPegDetection(Node):
 
     # Debug/Display settings
     DEBUG_VIEW = False
-    SHOW_IMAGE = False
-    SHOW_FPS = False
+    SHOW_IMAGE = True
+    SHOW_FPS = True
     PRINT_OUTCOME = False
 
     # Profiling settings
@@ -171,9 +171,6 @@ class BallPegDetection(Node):
         self.width = 0
         self.height = 0
         self.inset_pixels = 0
-        self.board_rect: tuple[int, int, int, int] | None = (
-            None  # Store flood fill rect
-        )
 
         # Object positions
         self.left_peg_position: tuple[float, float] | None = None
@@ -248,22 +245,22 @@ class BallPegDetection(Node):
         for i in range(5):
             ret, frame = self.cap.read()
 
+        self.apriltags_detected_once = True  # Board is detected via flood fill
+        self.corner_points_detected_once_printed = True
+
+        ret, frame = self.cap.read()
         frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
-        if self.DEBUG_VIEW:
-            cv2.imshow("Initial Board Analysis - Rect", frame_rec)
 
         h, s, v, flood_mask, rect = self._board_flood_fill(
             frame_rec, self.FLOOD_SEED, self.FLOOD_THRESHOLD
         )
+        rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
 
-        # Store the board rectangle and compute perspective transform
-        self.board_rect = rect
-        self.compute_perspective_transform_from_rect(rect, frame_rec.shape)
-        self.apriltags_detected_once = True  # Board is detected via flood fill
-        self.corner_points_detected_once_printed = True
-        self.get_logger().info(f"Board detected via flood fill: rect={rect}")
+        # Compute perspective transform
+        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
 
         if self.DEBUG_VIEW:
+            cv2.imshow("Initial Board Analysis - Rect", frame_rec)
             cv2.imshow("Initial Board Analysis - H Channel", h)
             cv2.imshow("Initial Board Analysis - S Channel", s)
             cv2.imshow("Initial Board Analysis - V Channel", v)
@@ -273,19 +270,18 @@ class BallPegDetection(Node):
 
             cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
 
-            # Draw the bounding rectangle on a copy of the original image
+            # Draw the rotated rectangle on a copy of the original image
             frame_with_rect = frame_rec.copy()
-            x, y, w, h = rect
-            cv2.rectangle(frame_with_rect, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            box = cv2.boxPoints(rotated_rect)
+            box = np.intp(box)
+            cv2.drawContours(frame_with_rect, [box], 0, (0, 255, 0), 2)
 
             cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
-
             cv2.waitKey(0)
-            cv2.destroyAllWindows()
 
     def _board_flood_fill(
         self, frame_rec: np.ndarray, seed: tuple[int, int], threshold: int
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, cv2.typing.Rect]:
         frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
         # Perform flood fill
@@ -294,7 +290,28 @@ class BallPegDetection(Node):
         retval, image, flood_mask, rect = cv2.floodFill(
             s, None, seed, 255, loDiff=threshold, upDiff=threshold, flags=flags
         )
+
+        # Get all points where flood_mask is non-zero
+        flood_mask = flood_mask[1:-1, 1:-1]
+
         return h, s, v, flood_mask, rect
+
+    def _find_rotated_rect_from_flood_mask(
+        self, flood_mask: np.ndarray, rect: cv2.typing.Rect
+    ) -> cv2.RotatedRect:
+
+        # Get all points where flood_mask is non-zero
+        points = cv2.findNonZero(flood_mask)
+
+        if points is not None and len(points) > 0:
+            # Get minimum area rectangle (rotated rectangle) directly from points
+            rotated_rect = cv2.minAreaRect(points)
+        else:
+            # Fallback to axis-aligned rectangle if no points found
+            x, y, w, h = rect
+            rotated_rect = cv2.RotatedRect((x + w / 2, y + h / 2), (w, h), 0.0)
+
+        return rotated_rect
 
     def _plot_single_channel(self, channel: np.ndarray, title: str) -> None:
         """Plot a single channel with color scale."""
@@ -473,10 +490,10 @@ class BallPegDetection(Node):
         h, s, v, flood_mask, rect = self._board_flood_fill(
             undistorted_frame, self.FLOOD_SEED, self.FLOOD_THRESHOLD
         )
+        rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
 
-        # Update perspective transform from flood fill rectangle
-        self.board_rect = rect
-        self.compute_perspective_transform_from_rect(rect, undistorted_frame.shape)
+        # Update perspective transform from flood fill rotated rectangle
+        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
 
         # Apply perspective warp to get top-down view
         warped = cv2.warpPerspective(
@@ -523,27 +540,47 @@ class BallPegDetection(Node):
         ):
             self.check_goal()
 
-    def compute_perspective_transform_from_rect(
-        self, rect: tuple[int, int, int, int], frame_shape: tuple[int, int, int]
+    def compute_perspective_transform_from_rotated_rect(
+        self, rotated_rect: tuple[tuple[float, float], tuple[float, float], float]
     ) -> None:
-        """Compute perspective transformation matrix from flood fill rectangle."""
-        x, y, w, h = rect
+        """Compute perspective transformation matrix from rotated rectangle."""
+        # rotated_rect format: ((center_x, center_y), (width, height), angle)
+        center, (rect_width, rect_height), angle = rotated_rect
 
-        # Source points from rectangle corners (clockwise from top-left)
-        src_pts = np.array(
+        if rect_height > rect_width:
+            rect_width, rect_height = rect_height, rect_width
+            angle -= 90.0
+
+        # Create corner points of axis-aligned rectangle centered at origin
+        # Order: [top-left, top-right, bottom-right, bottom-left]
+        half_w = rect_width / 2.0
+        half_h = rect_height / 2.0
+        corners = np.array(
             [
-                [x, y],  # Top-left
-                [x + w, y],  # Top-right
-                [x + w, y + h],  # Bottom-right
-                [x, y + h],  # Bottom-left
+                [-half_w, -half_h],  # top-left
+                [half_w, -half_h],  # top-right
+                [half_w, half_h],  # bottom-right
+                [-half_w, half_h],  # bottom-left
             ],
-            dtype="float32",
+            dtype=np.float32,
         )
 
-        # Set dimensions (no inset needed for flood fill rectangle)
+        # Create rotation matrix
+        angle_rad = np.deg2rad(angle)
+        cos_a = np.cos(angle_rad)
+        sin_a = np.sin(angle_rad)
+        rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+
+        # Rotate corners
+        rotated_corners = corners @ rotation_matrix.T
+
+        # Translate to actual center position
+        src_pts = rotated_corners + np.array(center, dtype=np.float32)
+
+        # Set dimensions
         self.inset_pixels = 0
-        self.width = w
-        self.height = h
+        self.width = int(rect_width)
+        self.height = int(rect_height)
 
         # Destination points (perfect rectangle)
         dst_pts = np.array(
