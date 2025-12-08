@@ -92,7 +92,7 @@ class BallPegDetection(Node):
         self.bridge = CvBridge()
 
         # Timers
-        self.timer = self.create_timer(1.0 / 240.0, self.timer_callback)
+        self.timer = self.create_timer(1.0 / 480.0, self.timer_callback)
 
         # Kalman Filters
         self.ball_kf = KalmanFilter(
@@ -117,7 +117,22 @@ class BallPegDetection(Node):
         self._setup_camera()
         
         # Load camera calibration
-        self.mtx, self.dist = load_calibration_data("calibration_data.npz")
+        mtx, dist = load_calibration_data("calibration_data.npz")
+        newcameramtx, _ = cv2.getOptimalNewCameraMatrix(
+            mtx,
+            dist,
+            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+            0,
+            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+        )
+        self.mapx, self.mapy = cv2.initUndistortRectifyMap(
+            mtx,
+            dist,
+            None,
+            newcameramtx,
+            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+            5,
+        )
 
         # AprilTag detector
         options = apriltag.DetectorOptions(families=self.APRILTAG_FAMILY)
@@ -209,13 +224,19 @@ class BallPegDetection(Node):
         self.get_logger().info(f"Camera configured: Target {self.CAMERA_FPS} FPS, Actual {actual_fps} FPS")
 
     def _initial_board_detection(self) -> None:
+        """Perform initial board detection using flood fill to establish perspective transform."""
 
+        # Wait for a valid frame from the camera
         ret, frame = self.cap.read()
         while not ret:
             rclpy.spin_once(self, timeout_sec=0.1)
             ret, frame = self.cap.read()
 
-        frame_rec = cv2.undistort(frame, self.mtx, self.dist, None, self.mtx)
+        # Skip a few frames to allow camera auto-adjustments
+        for i in range(5):
+            ret, frame = self.cap.read()
+
+        frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
         if self.DEBUG_VIEW:
             cv2.imshow("Initial Board Analysis - Rect", frame_rec)
 
@@ -333,7 +354,7 @@ class BallPegDetection(Node):
             return
 
         # Undistort frame using calibration data
-        rectified_frame = cv2.undistort(frame, self.mtx, self.dist, None, self.mtx)
+        rectified_frame = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
         # Detect AprilTags at specified frequency
         current_time = time.time()
