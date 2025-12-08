@@ -22,8 +22,15 @@ class BallPegDetection(Node):
     CAMERA_HEIGHT = 720
     TAG_SIZE_MM = 20
     APRILTAG_FAMILY = "tag36h11"
-    DEBUG_VIEW = False
+    FLOOD_SEED = (CAMERA_WIDTH // 2, CAMERA_HEIGHT // 2)
+    FLOOD_THRESHOLD = 5
     
+    # Debug/Display settings
+    DEBUG_VIEW = False
+    SHOW_IMAGE = False
+    SHOW_FPS = False
+    PRINT_OUTCOME = False
+
     # AprilTag IDs mapping
     TAG_NAMES = {
         0: "center right",
@@ -70,12 +77,6 @@ class BallPegDetection(Node):
         # Timers
         self.timer = self.create_timer(1.0 / 240.0, self.timer_callback)
 
-        # Debug/Display settings
-        self.show_image = True
-        self.show_fps = True
-        self.print_apriltags_not_found = False
-        self.print_outcome = False
-
         # Kalman Filters
         self.ball_kf = KalmanFilter(
             process_noise_position=2.0,
@@ -120,8 +121,6 @@ class BallPegDetection(Node):
         self.last_display_time = 0.0
 
         # Detection state flags
-        self.apriltags_detected_once = False
-        self.corner_points_detected_once_printed = False
         self.goals_detected_once_printed = False
         self.goals_detected_this_frame = False
 
@@ -190,11 +189,7 @@ class BallPegDetection(Node):
         if self.DEBUG_VIEW:
             cv2.imshow("Initial Board Analysis - Rect", frame_rec)
 
-        # Seed point at center
-        seed = (frame_rec.shape[1] // 2, frame_rec.shape[0] // 2)
-        threshold = 5
-
-        h, s, v, flood_mask, rect = self._board_flood_fill(frame_rec, seed, threshold)
+        h, s, v, flood_mask, rect = self._board_flood_fill(frame_rec, self.FLOOD_SEED, self.FLOOD_THRESHOLD)
         
         # Store the board rectangle and compute perspective transform
         self.board_rect = rect
@@ -293,7 +288,7 @@ class BallPegDetection(Node):
             self.fps_last_update_time = current_time
             
             # Log FPS when image display is disabled
-            if not self.show_image:
+            if not self.SHOW_IMAGE:
                 self.get_logger().info(f"FPS: {self.current_fps:.1f}")
 
     def detect_apriltags(self, undistorted_frame: np.ndarray) -> None:
@@ -327,9 +322,6 @@ class BallPegDetection(Node):
             tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
             self.previous_tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
 
-        # Skip corner tags detection - using flood fill rectangle instead
-        # Corner tags (2-5) are no longer used for perspective transform
-
         # Check goal tags (0-1)
         detected_goal_tags = sum(1 for tag_id in self.GOAL_TAG_IDS if tag_corners[tag_id] is not None)
         self.goals_detected_this_frame = (detected_goal_tags == 2)
@@ -351,8 +343,12 @@ class BallPegDetection(Node):
         self.dt = current_time - self.previous_time if self.previous_time is not None else 0.01
         self.previous_time = current_time
 
-        if not self.apriltags_detected_once:
-            return
+        # Perform flood fill to detect board boundaries every frame
+        h, s, v, flood_mask, rect = self._board_flood_fill(undistorted_frame, self.FLOOD_SEED, self.FLOOD_THRESHOLD)
+        
+        # Update perspective transform from flood fill rectangle
+        self.board_rect = rect
+        self.compute_perspective_transform_from_rect(rect, undistorted_frame.shape)
 
         # Apply perspective warp to get top-down view
         warped = cv2.warpPerspective(
@@ -374,7 +370,7 @@ class BallPegDetection(Node):
         )
 
         # Display image at 10Hz to improve performance
-        if self.show_image:
+        if self.SHOW_IMAGE:
             current_time = time.time()
             if current_time - self.last_display_time >= self.DISPLAY_UPDATE_INTERVAL:
                 cv2.imshow("Canvas", canvas)
@@ -458,7 +454,7 @@ class BallPegDetection(Node):
         ball_position = self._detect_ball(masked_ball, left_peg_position, right_peg_position, overlaid_frame)
 
         # Draw goals and magnet visualization
-        if self.show_image:
+        if self.SHOW_IMAGE:
             self._draw_goals(overlaid_frame, left_goal, right_goal)
 
         # Resize and center on canvas
@@ -504,7 +500,7 @@ class BallPegDetection(Node):
 
         position = kf.get_position()
         
-        if self.show_image:
+        if self.SHOW_IMAGE:
             velocity = kf.get_velocity()
             self._draw_object_with_velocity(overlaid_frame, position, velocity, color, velocity_color, 0.5)
 
@@ -544,7 +540,7 @@ class BallPegDetection(Node):
 
         position = self.ball_kf.get_position()
         
-        if self.show_image:
+        if self.SHOW_IMAGE:
             velocity = self.ball_kf.get_velocity()
             self._draw_object_with_velocity(overlaid_frame, position, velocity, (0, 0, 255), (0, 165, 255), 0.2)
 
@@ -642,7 +638,7 @@ class BallPegDetection(Node):
         canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
         
         # Draw FPS counter on canvas
-        if self.show_fps and self.current_fps > 0:
+        if self.SHOW_FPS and self.current_fps > 0:
             fps_text = f"FPS: {self.current_fps:.1f}"
             cv2.putText(
                 canvas,
@@ -828,7 +824,7 @@ class BallPegDetection(Node):
     ) -> int:
         """Check if goal threshold reached and publish outcome."""
         if counter == self.MAX_GOAL_COUNTER:
-            if self.print_outcome:
+            if self.PRINT_OUTCOME:
                 self.get_logger().info(message)
             
             # Reset counter to avoid repeated triggers
