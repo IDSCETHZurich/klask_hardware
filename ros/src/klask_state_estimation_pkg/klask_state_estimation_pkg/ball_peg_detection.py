@@ -2,6 +2,7 @@
 
 import cv2
 import time
+import rclpy
 import numpy as np
 import apriltag
 from rclpy.node import Node
@@ -21,6 +22,7 @@ class BallPegDetection(Node):
     CAMERA_HEIGHT = 720
     TAG_SIZE_MM = 20
     APRILTAG_FAMILY = "tag36h11"
+    DEBUG_VIEW = False
     
     # AprilTag IDs mapping
     TAG_NAMES = {
@@ -157,6 +159,9 @@ class BallPegDetection(Node):
         self.peg_in_left_goal_counter = 0
         self.peg_in_right_goal_counter = 0
         self.outcome_published = False
+
+        # Comprehensive initial board image analysis
+        self._initial_board_detection()
     
     def _setup_camera(self) -> None:
         """Initialize and configure the camera."""
@@ -177,6 +182,81 @@ class BallPegDetection(Node):
 
         actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.get_logger().info(f"Camera configured: Target {self.CAMERA_FPS} FPS, Actual {actual_fps} FPS")
+
+    def _initial_board_detection(self) -> None:
+
+        ret, frame = self.cap.read()
+        while not ret:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            ret, frame = self.cap.read()
+
+        frame_rec = cv2.undistort(frame, self.mtx, self.dist, None, self.mtx)
+        if self.DEBUG_VIEW:
+            cv2.imshow("Initial Board Analysis - Rect", frame_rec)
+
+        # Seed point at center
+        seed = (frame_rec.shape[1] // 2, frame_rec.shape[0] // 2)
+        threshold = 5
+
+        h, s, v, flood_mask, rect = self._board_flood_fill(frame_rec, seed, threshold)
+
+        if self.DEBUG_VIEW:
+            cv2.imshow("Initial Board Analysis - H Channel", h)
+            cv2.imshow("Initial Board Analysis - S Channel", s)
+            cv2.imshow("Initial Board Analysis - V Channel", v)
+            self._plot_single_channel(s, "Initial Board Analysis - S Channel with Color Scale")
+        
+            cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
+        
+            # Draw the bounding rectangle on a copy of the original image
+            frame_with_rect = frame_rec.copy()
+            x, y, w, h = rect
+            cv2.rectangle(frame_with_rect, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
+            
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    def _board_flood_fill(self, frame_rec: np.ndarray, seed: tuple[int, int], threshold: int) -> np.ndarray:
+        frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(frame_hsv)
+        # Perform flood fill
+        # flags: connectivity (4 or 8) + fill mask only option
+        flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
+        retval, image, flood_mask, rect = cv2.floodFill(
+            s, None, seed, 255, 
+            loDiff=threshold, upDiff=threshold, 
+            flags=flags
+        )
+        return h, s, v, flood_mask, rect
+
+
+
+    def _plot_single_channel(self, channel: np.ndarray, title: str) -> None:
+        """Plot a single channel with color scale."""
+
+        # Apply colormap to S channel for better visualization
+        s_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
+        
+        # Create a color scale bar (0-255 range)
+        scale_height = s_colored.shape[0]
+        scale_width = 50
+        scale_bar = np.linspace(255, 0, scale_height, dtype=np.uint8).reshape(-1, 1)
+        scale_bar = np.tile(scale_bar, (1, scale_width))
+        scale_bar_colored = cv2.applyColorMap(scale_bar, cv2.COLORMAP_JET)
+        
+        # Add text labels to the scale
+        for i in range(0, 256, 51):  # Labels at 0, 51, 102, 153, 204, 255
+            y_pos = int((255 - i) / 255 * (scale_height - 1))
+            cv2.putText(scale_bar_colored, str(i), (5, y_pos + 5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Concatenate the colored S channel with the scale bar
+        s_with_scale = np.hstack([s_colored, scale_bar_colored])
+
+        cv2.imshow(title, s_with_scale)
+
 
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
