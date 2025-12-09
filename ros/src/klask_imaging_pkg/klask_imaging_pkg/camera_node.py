@@ -29,7 +29,7 @@ class CameraNode(Node):
     FLOOD_THRESHOLD = 3
 
     # Debug/Display settings
-    DEBUG_VIEW = False
+    DEBUG_VIEW = True
 
     # Profiling settings
     ENABLE_PROFILING = False
@@ -191,36 +191,44 @@ class CameraNode(Node):
         short_side_length = rect_height - 2 * corner_distance
         center = np.reshape(rotated_rect[0], (2, 1))
 
-        def rect_from_offset(outside_offset, inside_offset, length) -> np.ndarray:
+        def rect_from_offset(
+            top_offset, bottom_offset, left_offset, right_offset
+        ) -> np.ndarray:
             return np.array(
                 [
-                    [-length / 2, outside_offset],
-                    [length / 2, outside_offset],
-                    [length / 2, -inside_offset],
-                    [-length / 2, -inside_offset],
+                    [-left_offset, top_offset],
+                    [right_offset, top_offset],
+                    [right_offset, -bottom_offset],
+                    [-left_offset, -bottom_offset],
                 ]
             ).T
 
-        long_side_rect = rect_from_offset(
-            outside_offset, inside_offset, long_side_length
-        )
-        short_side_rect = rect_from_offset(
-            outside_offset, inside_offset, short_side_length
-        )
-        long_side_rect_transformed = rotation_matrix @ long_side_rect + center
-        short_side_rect_transformed = rotation_matrix @ short_side_rect + center
+        parameter_combination = [
+            (outside_offset, inside_offset, long_side_length / 2, long_side_length / 2),
+            (
+                short_side_length / 2,
+                short_side_length / 2,
+                outside_offset,
+                inside_offset,
+            ),
+            (inside_offset, outside_offset, long_side_length / 2, long_side_length / 2),
+            (
+                short_side_length / 2,
+                short_side_length / 2,
+                inside_offset,
+                outside_offset,
+            ),
+        ]
+
+        rects = [rect_from_offset(*params) for params in parameter_combination]
+        rects_transformed = [rotation_matrix @ rect + center for rect in rects]
 
         for i, boarder_segment_mask in enumerate(boarder_segment_masks):
             pt1 = np.reshape(corner_pts[i], (2, 1))
             pt2 = np.reshape(corner_pts[(i + 1) % 4], (2, 1))
             line_center = (pt2 - pt1) / 2 + pt1
             parallel_dir = line_center - center
-            parallel_dir /= np.linalg.norm(parallel_dir)
-
-            if i % 2 == 0:
-                rect_pts = long_side_rect_transformed + parallel_dir
-            else:
-                rect_pts = short_side_rect_transformed + parallel_dir
+            rect_pts = rects_transformed[i] + parallel_dir
 
             # Transpose from 2xN to Nx2 and convert to int32 for cv2
             rect_pts = np.intp(rect_pts.T)
@@ -234,11 +242,36 @@ class CameraNode(Node):
         self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
 
         if self.DEBUG_VIEW:
+
             cv2.imshow("Initial Board Analysis - Rect", frame_rec)
             self._plot_single_channel(h, "Initial Board Analysis - H Channel")
             self._plot_single_channel(s, "Initial Board Analysis - S Channel")
             self._plot_single_channel(v, "Initial Board Analysis - V Channel")
             cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
+
+            # Display border segment masks
+            for i, mask in enumerate(boarder_segment_masks):
+                masked_image = cv2.bitwise_and(s, s, mask=mask)
+                self._plot_single_channel(masked_image, f"Border Segment Mask {i}")
+
+            # Draw all border segment polygons on the original frame
+            frame_with_polygons = frame_rec.copy()
+            colors = [
+                (255, 0, 0),
+                (0, 255, 0),
+                (0, 0, 255),
+                (255, 255, 0),
+            ]  # Blue, Green, Red, Yellow
+            for i, mask in enumerate(boarder_segment_masks):
+                # Find contours from the mask
+                contours, _ = cv2.findContours(
+                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+                cv2.drawContours(frame_with_polygons, contours, -1, colors[i], 2)
+
+            cv2.imshow(
+                "Initial Board Analysis - Border Segments Overlay", frame_with_polygons
+            )
 
             # Draw the rotated rectangle on a copy of the original image
             frame_with_rect = frame_rec.copy()
@@ -350,11 +383,11 @@ class CameraNode(Node):
     def _plot_single_channel(self, channel: np.ndarray, title: str) -> None:
         """Plot a single channel with color scale."""
 
-        # Apply colormap to S channel for better visualization
-        s_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
+        # Apply colormap to the channel for better visualization
+        channel_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
 
         # Create a color scale bar (0-255 range)
-        scale_height = s_colored.shape[0]
+        scale_height = channel_colored.shape[0]
         scale_width = 50
         scale_bar = np.linspace(255, 0, scale_height, dtype=np.uint8).reshape(-1, 1)
         scale_bar = np.tile(scale_bar, (1, scale_width))
@@ -374,10 +407,10 @@ class CameraNode(Node):
                 cv2.LINE_AA,
             )
 
-        # Concatenate the colored S channel with the scale bar
-        s_with_scale = np.hstack([s_colored, scale_bar_colored])
+        # Concatenate the colored channel with the scale bar
+        channel_with_scale = np.hstack([channel_colored, scale_bar_colored])
 
-        cv2.imshow(title, s_with_scale)
+        cv2.imshow(title, channel_with_scale)
 
     def _print_profiling_stats(self) -> None:
         """Print cProfile statistics."""
