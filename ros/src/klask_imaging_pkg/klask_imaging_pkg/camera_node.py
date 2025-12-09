@@ -26,7 +26,7 @@ class CameraNode(Node):
     CAMERA_HEIGHT = 720
     APRILTAG_FAMILY = "tag36h11"
     FLOOD_SEED = (CAMERA_WIDTH // 2, CAMERA_HEIGHT // 2)
-    FLOOD_THRESHOLD = 3
+    FLOOD_THRESHOLD = 5
 
     # Debug/Display settings
     DEBUG_VIEW = True
@@ -171,22 +171,162 @@ class CameraNode(Node):
         ret, frame = self.cap.read()
         frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
+        frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(frame_hsv)
+
         # Perform flood fill to detect board boundaries
-        h, s, v, flood_mask, rect = self._board_flood_fill(
-            frame_rec, self.FLOOD_SEED, self.FLOOD_THRESHOLD
+        flood_mask, rect = self._board_flood_fill(
+            s, None, self.FLOOD_SEED, self.FLOOD_THRESHOLD
         )
 
         # Find rotated rectangle from flood fill mask
         rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
 
+        # Compute border segment masks
+        boarder_segment_masks, seed_lines = self._compute_boarder_segment_masks(
+            rotated_rect, s.shape
+        )
+
+        line_samples = self._compute_seed_line_samples(seed_lines)
+
+        boarder_segment_flood_masks = []
+
+        for i, (boarder_segment_mask, line_sample_points) in enumerate(
+            zip(boarder_segment_masks, line_samples)
+        ):
+            boarder_segment_flood_mask = None
+            for sample_point in line_sample_points:
+                masked_image = cv2.bitwise_and(s, s, mask=boarder_segment_mask)
+                boarder_segment_flood_mask, _ = self._board_flood_fill(
+                    masked_image,
+                    boarder_segment_flood_mask,
+                    tuple(sample_point),
+                    self.FLOOD_THRESHOLD,
+                    crop_mask=False,
+                )
+            boarder_segment_flood_mask = boarder_segment_flood_mask[1:-1, 1:-1]
+            boarder_segment_flood_masks.append(boarder_segment_flood_mask)
+
+        # Compute perspective transform
+        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
+
+        self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
+
+        if self.DEBUG_VIEW:
+            self._print_debug_view(
+                frame_rec,
+                h,
+                s,
+                v,
+                flood_mask,
+                boarder_segment_masks,
+                rotated_rect,
+                seed_lines,
+                line_samples,
+                boarder_segment_flood_masks,
+            )
+
+    def _compute_seed_line_samples(self, seed_lines: list[np.ndarray]):
+
+        line_sample_count = 4
+        line_samples = []
+        for seed_line in seed_lines:
+            line_vec = seed_line[:, 1] - seed_line[:, 0]
+            line_length = np.linalg.norm(line_vec)
+            dir = line_vec / line_length
+            interval = line_length / (line_sample_count + 1)
+            sample_points = [
+                np.intp(seed_line[:, 0] + dir * (interval * (j + 1)))
+                for j in range(line_sample_count)
+            ]
+            line_samples.append(sample_points)
+        return line_samples
+
+    def _print_debug_view(
+        self,
+        frame_rec: np.ndarray,
+        h: np.ndarray,
+        s: np.ndarray,
+        v: np.ndarray,
+        flood_mask: np.ndarray,
+        boarder_segment_masks: list[np.ndarray],
+        rotated_rect: cv2.RotatedRect,
+        seed_lines: list[tuple[np.ndarray, np.ndarray]],
+        seed_line_samples: list[list[np.ndarray]],
+        boarder_segment_flood_masks: list[np.ndarray],
+    ) -> None:
+        cv2.imshow("Initial Board Analysis - Rect", frame_rec)
+        self._plot_single_channel(h, "Initial Board Analysis - H Channel")
+        self._plot_single_channel(s, "Initial Board Analysis - S Channel")
+        self._plot_single_channel(v, "Initial Board Analysis - V Channel")
+        cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
+
+        # Draw all border segment polygons on the original frame
+        frame_with_polygons = frame_rec.copy()
+        merged_mask = np.zeros_like(s, dtype=np.uint8)
+        merged_flood_mask = np.zeros_like(s, dtype=np.uint8)
+        for i, (mask, seed_line, seed_line_sample, boarder_segment_flood_mask) in enumerate(
+            zip(boarder_segment_masks, seed_lines, seed_line_samples, boarder_segment_flood_masks)
+        ):
+            # Find contours from the mask
+            contours, _ = cv2.findContours(
+                mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+            cv2.drawContours(frame_with_polygons, contours, -1, (255, 0, 0), 2)
+            # Draw seed line
+            cv2.line(
+                frame_with_polygons,
+                seed_line[:, 0],
+                seed_line[:, 1],
+                (255, 255, 0),
+                2,
+            )
+            # Draw seed sample points
+            for sample_point in seed_line_sample:
+                cv2.circle(
+                    frame_with_polygons,
+                    tuple(sample_point),
+                    5,
+                    (0, 255, 255),
+                    -1,
+                )
+            # Merge the current mask into the combined mask
+            merged_mask = cv2.bitwise_or(merged_mask, mask)
+            merged_flood_mask = cv2.bitwise_or(merged_flood_mask, boarder_segment_flood_mask)
+
+        # Display border segment
+        masked_image = cv2.bitwise_and(s, s, mask=merged_mask)
+        self._plot_single_channel(masked_image, "Initial Board Analysis - Border Segments")
+
+        cv2.imshow(
+                f"Initial Board Analysis - Border Segment Flood Mask",
+                merged_flood_mask,
+            )
+
+        cv2.imshow(
+            "Initial Board Analysis - Border Segments Overlay", frame_with_polygons
+        )
+
+        # Draw the rotated rectangle on a copy of the original image
+        frame_with_rect = frame_rec.copy()
+        box = cv2.boxPoints(rotated_rect)
+        box = np.intp(box)
+        cv2.drawContours(frame_with_rect, [box], 0, (0, 255, 0), 2)
+
+        cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
+        cv2.waitKey(0)
+
+    def _compute_boarder_segment_masks(
+        self, rotated_rect, shape: tuple[int, int]
+    ) -> list[np.ndarray]:
         # Create boarder masks
         corner_pts, rect_width, rect_height, rotation_matrix = (
             self._corners_from_rotated_rect(rotated_rect)
         )
-        boarder_segment_masks = [np.zeros_like(s, dtype=np.uint8) for _ in range(4)]
-        outside_offset = 30
-        inside_offset = 10
-        corner_distance = 50
+        boarder_segment_masks = [np.zeros(shape, dtype=np.uint8) for _ in range(4)]
+        outside_offset = 20
+        inside_offset = 50
+        corner_distance = 100
         long_side_length = rect_width - 2 * corner_distance
         short_side_length = rect_height - 2 * corner_distance
         center = np.reshape(rotated_rect[0], (2, 1))
@@ -204,13 +344,6 @@ class CameraNode(Node):
             ).T
 
         parameter_combination = [
-            (outside_offset, inside_offset, long_side_length / 2, long_side_length / 2),
-            (
-                short_side_length / 2,
-                short_side_length / 2,
-                outside_offset,
-                inside_offset,
-            ),
             (inside_offset, outside_offset, long_side_length / 2, long_side_length / 2),
             (
                 short_side_length / 2,
@@ -218,86 +351,64 @@ class CameraNode(Node):
                 inside_offset,
                 outside_offset,
             ),
+            (outside_offset, inside_offset, long_side_length / 2, long_side_length / 2),
+            (
+                short_side_length / 2,
+                short_side_length / 2,
+                outside_offset,
+                inside_offset,
+            ),
         ]
 
         rects = [rect_from_offset(*params) for params in parameter_combination]
         rects_transformed = [rotation_matrix @ rect + center for rect in rects]
+        seed_lines = []
 
         for i, boarder_segment_mask in enumerate(boarder_segment_masks):
             pt1 = np.reshape(corner_pts[i], (2, 1))
             pt2 = np.reshape(corner_pts[(i + 1) % 4], (2, 1))
             line_center = (pt2 - pt1) / 2 + pt1
             parallel_dir = line_center - center
-            rect_pts = rects_transformed[i] + parallel_dir
+            rect_pts = np.intp(rects_transformed[i] + parallel_dir)
+            seed_line_pts = np.hstack(
+                (
+                    rect_pts[:, (1 - i) % 4].reshape(2, 1),
+                    rect_pts[:, (4 - i) % 4].reshape(2, 1),
+                )
+            )
+            seed_offset = np.intp(parallel_dir / np.linalg.norm(parallel_dir) * 10)
+            seed_line_pts += seed_offset
+            seed_lines.append(np.intp(seed_line_pts).astype(np.int32))
 
             # Transpose from 2xN to Nx2 and convert to int32 for cv2
-            rect_pts = np.intp(rect_pts.T)
+            rect_pts = rect_pts.T
 
             # Fill the polygon mask
             cv2.fillConvexPoly(boarder_segment_mask, rect_pts, 255)
 
-        # Compute perspective transform
-        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
-
-        self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
-
-        if self.DEBUG_VIEW:
-
-            cv2.imshow("Initial Board Analysis - Rect", frame_rec)
-            self._plot_single_channel(h, "Initial Board Analysis - H Channel")
-            self._plot_single_channel(s, "Initial Board Analysis - S Channel")
-            self._plot_single_channel(v, "Initial Board Analysis - V Channel")
-            cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
-
-            # Display border segment masks
-            for i, mask in enumerate(boarder_segment_masks):
-                masked_image = cv2.bitwise_and(s, s, mask=mask)
-                self._plot_single_channel(masked_image, f"Border Segment Mask {i}")
-
-            # Draw all border segment polygons on the original frame
-            frame_with_polygons = frame_rec.copy()
-            colors = [
-                (255, 0, 0),
-                (0, 255, 0),
-                (0, 0, 255),
-                (255, 255, 0),
-            ]  # Blue, Green, Red, Yellow
-            for i, mask in enumerate(boarder_segment_masks):
-                # Find contours from the mask
-                contours, _ = cv2.findContours(
-                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-                )
-                cv2.drawContours(frame_with_polygons, contours, -1, colors[i], 2)
-
-            cv2.imshow(
-                "Initial Board Analysis - Border Segments Overlay", frame_with_polygons
-            )
-
-            # Draw the rotated rectangle on a copy of the original image
-            frame_with_rect = frame_rec.copy()
-            box = cv2.boxPoints(rotated_rect)
-            box = np.intp(box)
-            cv2.drawContours(frame_with_rect, [box], 0, (0, 255, 0), 2)
-
-            cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
-            cv2.waitKey(0)
+        return boarder_segment_masks, seed_lines
 
     def _board_flood_fill(
-        self, frame_rec: np.ndarray, seed: tuple[int, int], threshold: int
+        self,
+        channel: np.ndarray,
+        mask: np.ndarray | None,
+        seed: tuple[int, int],
+        threshold: int,
+        crop_mask: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, cv2.typing.Rect]:
-        frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
-        h, s, v = cv2.split(frame_hsv)
+
         # Perform flood fill
         # flags: connectivity (4 or 8) + fill mask only option
         flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
         retval, image, flood_mask, rect = cv2.floodFill(
-            s, None, seed, 255, loDiff=threshold, upDiff=threshold, flags=flags
+            channel, mask, seed, 255, loDiff=threshold, upDiff=threshold, flags=flags
         )
 
         # Get all points where flood_mask is non-zero
-        flood_mask = flood_mask[1:-1, 1:-1]
+        if crop_mask:
+            flood_mask = flood_mask[1:-1, 1:-1]
 
-        return h, s, v, flood_mask, rect
+        return flood_mask, rect
 
     def _find_rotated_rect_from_flood_mask(
         self, flood_mask: np.ndarray, rect: cv2.typing.Rect
