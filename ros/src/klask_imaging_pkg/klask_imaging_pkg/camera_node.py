@@ -15,7 +15,6 @@ from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Polygon, Point32
 from klask_interfaces.msg import StampedPolygon
 from cv_bridge import CvBridge
-from ament_index_python.packages import get_package_share_directory
 
 from .utils import load_calibration_data, apply_ema_filter
 
@@ -214,14 +213,78 @@ class CameraNode(Node):
 
         # Compute border segment masks
         (
-            boarder_segment_masks,
+            self.boarder_segment_masks,
             seed_lines,
-            rotation_matrix,
-            segment_offsets,
-            segment_lengths,
+            self.rotation_matrix,
+            self.segment_offsets,
+            self.segment_lengths,
         ) = self._compute_boarder_segment_masks(rotated_rect, s.shape)
 
-        line_samples = self._compute_seed_line_samples(seed_lines)
+        self.line_samples = self._compute_seed_line_samples(seed_lines)
+
+        (
+            (
+                boarder_segment_flood_masks,
+                boarder_segment_flood_masks_aligned,
+                boarder_segment_edge_points,
+                boarder_segment_edge_lines,
+            ),
+            board_corners,
+        ) = self._fit_boarder_segment_lines(
+            s,
+            self.boarder_segment_masks,
+            self.line_samples,
+            self.segment_offsets,
+            self.segment_lengths,
+            self.rotation_matrix,
+        )
+
+        # Compute perspective transform from fitted line intersections
+        self.compute_perspective_transform_from_corners(board_corners)
+
+        # Apply the transformation and display the result
+        warped_from_corners = cv2.warpPerspective(
+            frame_rec,
+            self.M,
+            (self.width, self.height),
+        )
+        cv2.imshow(
+            "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
+        )
+
+        self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
+
+        if self.DEBUG_VIEW:
+            self._print_segment_debug_view(
+                frame_rec,
+                s,
+                self.boarder_segment_masks,
+                seed_lines,
+                self.line_samples,
+                boarder_segment_flood_masks,
+                boarder_segment_flood_masks_aligned,
+                boarder_segment_edge_points,
+                boarder_segment_edge_lines,
+            )
+            self._print_initial_debug_view(
+                frame_rec,
+                h,
+                s,
+                v,
+                flood_mask,
+                rotated_rect,
+            )
+            cv2.waitKey(0)
+
+    def _fit_boarder_segment_lines(
+        self,
+        channel: np.ndarray,
+        boarder_segment_masks,
+        line_samples,
+        segment_offsets,
+        segment_lengths,
+        rotation_matrix,
+    ) -> np.ndarray:
 
         boarder_segment_flood_masks = []
         boarder_segment_flood_masks_aligned = []
@@ -250,7 +313,7 @@ class CameraNode(Node):
                 diff_rotations,
             )
         ):
-            masked_image = cv2.bitwise_and(s, s, mask=boarder_segment_mask)
+            masked_image = cv2.bitwise_and(channel, channel, mask=boarder_segment_mask)
             boarder_segment_flood_mask, _ = self._board_flood_fill(
                 masked_image, line_sample_points, self.FLOOD_THRESHOLD
             )
@@ -359,37 +422,16 @@ class CameraNode(Node):
             np.float32
         )
 
-        # Compute perspective transform from fitted line intersections
-        self.compute_perspective_transform_from_corners(board_corners)
-
-        # Apply the transformation and display the result
-        warped_from_corners = cv2.warpPerspective(
-            frame_rec,
-            self.M,
-            (self.width, self.height),
-        )
-        cv2.imshow(
-            "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
-        )
-
-        self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
-
-        if self.DEBUG_VIEW:
-            self._print_debug_view(
-                frame_rec,
-                h,
-                s,
-                v,
-                flood_mask,
-                boarder_segment_masks,
-                rotated_rect,
-                seed_lines,
-                line_samples,
+        # TODO: Return only board_corners and remove other return values
+        return (
+            (
                 boarder_segment_flood_masks,
                 boarder_segment_flood_masks_aligned,
                 boarder_segment_edge_points,
                 boarder_segment_edge_lines,
-            )
+            ),
+            board_corners,
+        )
 
     def _compute_seed_line_samples(
         self, seed_lines: list[np.ndarray]
@@ -408,33 +450,23 @@ class CameraNode(Node):
             line_samples.append(sample_points)
         return line_samples
 
-    def _print_debug_view(
+    def _print_segment_debug_view(
         self,
         frame_rec: np.ndarray,
-        h: np.ndarray,
-        s: np.ndarray,
-        v: np.ndarray,
-        flood_mask: np.ndarray,
+        s_channel: np.ndarray,
         boarder_segment_masks: list[np.ndarray],
-        rotated_rect: cv2.RotatedRect,
         seed_lines: list[tuple[np.ndarray, np.ndarray]],
         seed_line_samples: list[list[np.ndarray]],
         boarder_segment_flood_masks: list[np.ndarray],
         boarder_segment_flood_masks_aligned: list[np.ndarray],
         boarder_segment_edge_points: list[np.ndarray],
         boarder_segment_edge_lines: list[list[np.ndarray]],
-    ) -> None:
-        cv2.imshow("Initial Board Analysis - Rect", frame_rec)
-        self._plot_single_channel(h, "Initial Board Analysis - H Channel")
-        self._plot_single_channel(s, "Initial Board Analysis - S Channel")
-        self._plot_single_channel(v, "Initial Board Analysis - V Channel")
-        cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
-
+    ):
         # Draw all border segment polygons on the original frame
         frame_with_polygons = frame_rec.copy()
         frame_with_edges = frame_rec.copy()
-        merged_mask = np.zeros_like(s, dtype=np.uint8)
-        merged_flood_mask = np.zeros_like(s, dtype=np.uint8)
+        merged_mask = np.zeros_like(s_channel, dtype=np.uint8)
+        merged_flood_mask = np.zeros_like(s_channel, dtype=np.uint8)
         for i, (
             mask,
             seed_line,
@@ -480,9 +512,6 @@ class CameraNode(Node):
             merged_mask = cv2.bitwise_or(merged_mask, mask)
             merged_flood_mask = cv2.bitwise_or(merged_flood_mask, flood_mask)
 
-            # Display aligned flood mask
-            cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
-
             # Draw edge points and fitted line on original image
             vx, vy, x0, y0 = line_params
             # Draw the fitted line across the image
@@ -499,14 +528,11 @@ class CameraNode(Node):
             edge_points_int = edge_points_original.astype(np.int32)
             frame_with_edges[edge_points_int[:, 1], edge_points_int[:, 0]] = [0, 0, 255]
 
+            # Display aligned flood mask
+            cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
+
         cv2.imshow(
             f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
-        )
-
-        # Display border segment
-        masked_image = cv2.bitwise_and(s, s, mask=merged_mask)
-        self._plot_single_channel(
-            masked_image, "Initial Board Analysis - Border Segments"
         )
 
         cv2.imshow(
@@ -514,10 +540,25 @@ class CameraNode(Node):
             merged_flood_mask,
         )
 
+        # Display border segment
+        masked_image = cv2.bitwise_and(s_channel, s_channel, mask=merged_mask)
+        self._plot_single_channel(
+            masked_image, "Initial Board Analysis - Border Segments"
+        )
+
         cv2.imshow(
             "Initial Board Analysis - Border Segments Overlay", frame_with_polygons
         )
 
+    def _print_initial_debug_view(
+        self,
+        frame_rec: np.ndarray,
+        h: np.ndarray,
+        s: np.ndarray,
+        v: np.ndarray,
+        flood_mask: np.ndarray,
+        rotated_rect: cv2.RotatedRect,
+    ) -> None:
         # Draw the rotated rectangle on a copy of the original image
         frame_with_rect = frame_rec.copy()
         box = cv2.boxPoints(rotated_rect)
@@ -527,7 +568,13 @@ class CameraNode(Node):
         for center_pt in self.FLOOD_SEED:
             cv2.circle(frame_with_rect, center_pt, 5, (0, 255, 0), -1)
         cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
-        cv2.waitKey(0)
+
+        cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
+
+        self._plot_single_channel(v, "Initial Board Analysis - V Channel")
+        self._plot_single_channel(s, "Initial Board Analysis - S Channel")
+        self._plot_single_channel(h, "Initial Board Analysis - H Channel")
+        cv2.imshow("Initial Board Analysis - Rect", frame_rec)
 
     def _compute_boarder_segment_masks(
         self, rotated_rect, shape: tuple[int, int]
@@ -715,38 +762,12 @@ class CameraNode(Node):
         # Translate to actual center position
         return (rotated_corners, rect_width, rect_height, rotation_matrix)
 
-    def compute_perspective_transform_from_rotated_rect(
-        self, rotated_rect: tuple[tuple[float, float], tuple[float, float], float]
-    ) -> None:
-        """Compute perspective transformation matrix from rotated rectangle."""
-
-        src_pts, rect_width, rect_height, _ = self._corners_from_rotated_rect(
-            rotated_rect
-        )
-
-        # Set dimensions
-        self.width = int(rect_width)
-        self.height = int(rect_height)
-
-        # Destination points (perfect rectangle)
-        dst_pts = np.array(
-            [
-                [0, 0],
-                [self.width, 0],
-                [self.width, self.height],
-                [0, self.height],
-            ],
-            dtype="float32",
-        )
-
-        # Compute transformation matrix
-        self.M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-
     def compute_perspective_transform_from_corners(self, corners: np.ndarray) -> None:
         """Compute perspective transformation matrix from board corners."""
 
         # corners should be in order: [top-left, top-right, bottom-right, bottom-left]
         # Calculate board dimensions from corners
+        # TODO: Should we use a fixed size instead?
         top_width = np.linalg.norm(corners[1] - corners[0])
         bottom_width = np.linalg.norm(corners[2] - corners[3])
         left_height = np.linalg.norm(corners[3] - corners[0])
@@ -905,14 +926,25 @@ class CameraNode(Node):
 
     def process_frame(self, undistorted_frame: np.ndarray) -> None:
         """Process frame to create perspective-corrected view and publish."""
-        # Perform flood fill to detect board boundaries every frame
-        h, s, v, flood_mask, rect = self._board_flood_fill(
-            undistorted_frame, self.FLOOD_SEED, self.FLOOD_THRESHOLD
-        )
-        rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
 
-        # Update perspective transform from flood fill rotated rectangle
-        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
+        # Convert to HSV and split channels
+        frame_hsv = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(frame_hsv)
+
+        (
+            _,
+            board_corners,
+        ) = self._fit_boarder_segment_lines(
+            s,
+            self.boarder_segment_masks,
+            self.line_samples,
+            self.segment_offsets,
+            self.segment_lengths,
+            self.rotation_matrix,
+        )
+
+        # Compute perspective transform from fitted line intersections
+        self.compute_perspective_transform_from_corners(board_corners)
 
         # Apply perspective warp to get top-down view
         warped = cv2.warpPerspective(
