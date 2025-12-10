@@ -34,11 +34,11 @@ class CameraNode(Node):
         (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) + 50),
         (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) - 50),
     ]
-    FLOOD_THRESHOLD = 5
+    FLOOD_THRESHOLD = 7
 
     # Initial board detection settings
     USE_STORED_IMAGE = True  # Set to True to load image from data/ folder
-    STORED_IMAGE_FILENAME = "debug_board_tilted_2.jpg"  # Filename in data/ folder
+    STORED_IMAGE_FILENAME = "debug_board_tilted_1.jpg"  # Filename in data/ folder
 
     # Debug/Display settings
     DEBUG_VIEW = True
@@ -224,6 +224,9 @@ class CameraNode(Node):
         line_samples = self._compute_seed_line_samples(seed_lines)
 
         boarder_segment_flood_masks = []
+        boarder_segment_flood_masks_aligned = []
+        boarder_segment_edge_points = []
+        boarder_segment_edge_lines = []
 
         diff_rotations = (
             -np.eye(2),
@@ -268,13 +271,106 @@ class CameraNode(Node):
                 affine_matrix,
                 (length, inside_offset + outside_offset),
             )
+            aliasing_crop_size = 2
+            aligned_mask = aligned_mask[
+                aliasing_crop_size:-aliasing_crop_size,
+                aliasing_crop_size:-aliasing_crop_size,
+            ]
+            boarder_segment_flood_masks_aligned.append(aligned_mask)
 
-            # diff = np.diff(aligned_mask.astype(np.int16), axis=diff_axis)
+            # Detect falling edges (255 -> 0) in y direction
+            diff_y = np.diff(aligned_mask.astype(np.int16), axis=0)
+            falling_edges = diff_y < -100
 
-            cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
+            # Get the first falling edge row index for each column
+            first_edge_rows = np.argmax(falling_edges, axis=0)
 
-        # Compute perspective transform
-        self.compute_perspective_transform_from_rotated_rect(rotated_rect)
+            # Filter out columns with no edges
+            has_edge = falling_edges[first_edge_rows, np.arange(falling_edges.shape[1])]
+
+            # Create edge points array
+            edge_points = np.column_stack(
+                [
+                    np.arange(falling_edges.shape[1]),
+                    first_edge_rows,
+                ]
+            )
+            edge_points = edge_points[has_edge] + np.array(
+                [aliasing_crop_size, aliasing_crop_size]
+            )
+
+            # Transform edge points back to original frame
+            # Inverse affine transform: x_orig = R^T @ (x_aligned - offset)
+            # Where affine_matrix = [R | offset]
+            rotation_part = diff_rotation @ rotation_matrix.T
+            offset_part = offset + np.array([[1], [1]])
+
+            # Add homogeneous coordinate and apply inverse transform
+            edge_points_homogeneous = np.hstack(
+                [edge_points, np.ones((len(edge_points), 1))]
+            )
+
+            # Inverse: x_orig = R^T @ x_aligned - R^T @ offset
+            # Which equals: x_orig = R^T @ (x_aligned - offset)
+            inverse_rotation = rotation_part.T
+            inverse_offset = -inverse_rotation @ offset_part
+            inverse_affine = np.hstack([inverse_rotation, inverse_offset])
+
+            edge_points_original = edge_points_homogeneous @ inverse_affine.T
+            boarder_segment_edge_points.append(edge_points_original)
+
+            # Fit line to edge points
+            [vx, vy, x0, y0] = cv2.fitLine(
+                edge_points_original, cv2.DIST_HUBER, 0, 0.01, 0.01
+            )
+
+            # If too slow try this instead:
+            # [vx, vy, x0, y0] = cv2.fitLine(edge_points_original, cv2.DIST_L2, 0, 0.01, 0.01)
+
+            boarder_segment_edge_lines.append([vx, vy, x0, y0])
+
+        # Compute intersection points of fitted lines to get board corners
+        # Vectorize the intersection computation for all 4 corners
+        lines = np.roll(
+            np.array(boarder_segment_edge_lines), 1, axis=0
+        )  # Shape: (4, 4) - [vx, vy, x0, y0] for each line
+
+        # Get current and next lines (with wrapping)
+        vx1 = lines[:, 0].flatten()
+        vy1 = lines[:, 1].flatten()
+        x01 = lines[:, 2].flatten()
+        y01 = lines[:, 3].flatten()
+
+        # Shift by one to get next lines (wrapping around)
+        vx2 = np.roll(vx1, -1)
+        vy2 = np.roll(vy1, -1)
+        x02 = np.roll(x01, -1)
+        y02 = np.roll(y01, -1)
+
+        # Compute intersection using vectorized analytical formula
+        # t1 = (dx*vy2 - dy*vx2) / (vx1*vy2 - vy1*vx2)
+        dx = x02 - x01
+        dy = y02 - y01
+        denominator = vx1 * vy2 - vy1 * vx2
+        t1 = (dx * vy2 - dy * vx2) / denominator
+
+        # Compute intersection points
+        board_corners = np.column_stack([x01 + t1 * vx1, y01 + t1 * vy1]).astype(
+            np.float32
+        )
+
+        # Compute perspective transform from fitted line intersections
+        self.compute_perspective_transform_from_corners(board_corners)
+
+        # Apply the transformation and display the result
+        warped_from_corners = cv2.warpPerspective(
+            frame_rec,
+            self.M,
+            (self.width, self.height),
+        )
+        cv2.imshow(
+            "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
+        )
 
         self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
 
@@ -290,6 +386,9 @@ class CameraNode(Node):
                 seed_lines,
                 line_samples,
                 boarder_segment_flood_masks,
+                boarder_segment_flood_masks_aligned,
+                boarder_segment_edge_points,
+                boarder_segment_edge_lines,
             )
 
     def _compute_seed_line_samples(
@@ -321,6 +420,9 @@ class CameraNode(Node):
         seed_lines: list[tuple[np.ndarray, np.ndarray]],
         seed_line_samples: list[list[np.ndarray]],
         boarder_segment_flood_masks: list[np.ndarray],
+        boarder_segment_flood_masks_aligned: list[np.ndarray],
+        boarder_segment_edge_points: list[np.ndarray],
+        boarder_segment_edge_lines: list[list[np.ndarray]],
     ) -> None:
         cv2.imshow("Initial Board Analysis - Rect", frame_rec)
         self._plot_single_channel(h, "Initial Board Analysis - H Channel")
@@ -330,19 +432,26 @@ class CameraNode(Node):
 
         # Draw all border segment polygons on the original frame
         frame_with_polygons = frame_rec.copy()
+        frame_with_edges = frame_rec.copy()
         merged_mask = np.zeros_like(s, dtype=np.uint8)
         merged_flood_mask = np.zeros_like(s, dtype=np.uint8)
         for i, (
             mask,
             seed_line,
             seed_line_sample,
-            boarder_segment_flood_mask,
+            flood_mask,
+            aligned_mask,
+            edge_points_original,
+            line_params,
         ) in enumerate(
             zip(
                 boarder_segment_masks,
                 seed_lines,
                 seed_line_samples,
                 boarder_segment_flood_masks,
+                boarder_segment_flood_masks_aligned,
+                boarder_segment_edge_points,
+                boarder_segment_edge_lines,
             )
         ):
             # Find contours from the mask
@@ -369,9 +478,30 @@ class CameraNode(Node):
                 )
             # Merge the current mask into the combined mask
             merged_mask = cv2.bitwise_or(merged_mask, mask)
-            merged_flood_mask = cv2.bitwise_or(
-                merged_flood_mask, boarder_segment_flood_mask
+            merged_flood_mask = cv2.bitwise_or(merged_flood_mask, flood_mask)
+
+            # Display aligned flood mask
+            cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
+
+            # Draw edge points and fitted line on original image
+            vx, vy, x0, y0 = line_params
+            # Draw the fitted line across the image
+            # Parametric line: p = p0 + t*v, calculate endpoints at image boundaries
+            lefty = int((-x0[0] * vy[0] / vx[0]) + y0[0])
+            righty = int(((frame_rec.shape[1] - x0[0]) * vy[0] / vx[0]) + y0[0])
+            cv2.line(
+                frame_with_edges,
+                (frame_rec.shape[1] - 1, righty),
+                (0, lefty),
+                (0, 255, 0),
+                2,
             )
+            edge_points_int = edge_points_original.astype(np.int32)
+            frame_with_edges[edge_points_int[:, 1], edge_points_int[:, 0]] = [0, 0, 255]
+
+        cv2.imshow(
+            f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
+        )
 
         # Display border segment
         masked_image = cv2.bitwise_and(s, s, mask=merged_mask)
@@ -611,6 +741,34 @@ class CameraNode(Node):
 
         # Compute transformation matrix
         self.M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+
+    def compute_perspective_transform_from_corners(self, corners: np.ndarray) -> None:
+        """Compute perspective transformation matrix from board corners."""
+
+        # corners should be in order: [top-left, top-right, bottom-right, bottom-left]
+        # Calculate board dimensions from corners
+        top_width = np.linalg.norm(corners[1] - corners[0])
+        bottom_width = np.linalg.norm(corners[2] - corners[3])
+        left_height = np.linalg.norm(corners[3] - corners[0])
+        right_height = np.linalg.norm(corners[2] - corners[1])
+
+        # Use average dimensions
+        self.width = int((top_width + bottom_width) / 2)
+        self.height = int((left_height + right_height) / 2)
+
+        # Destination points (perfect rectangle)
+        dst_pts = np.array(
+            [
+                [0, 0],
+                [self.width, 0],
+                [self.width, self.height],
+                [0, self.height],
+            ],
+            dtype="float32",
+        )
+
+        # Compute transformation matrix
+        self.M = cv2.getPerspectiveTransform(corners, dst_pts)
 
     def _plot_single_channel(self, channel: np.ndarray, title: str) -> None:
         """Plot a single channel with color scale."""
