@@ -8,11 +8,14 @@ import apriltag
 import cProfile
 import pstats
 import io
+import os
+from pathlib import Path
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Polygon, Point32
 from klask_interfaces.msg import StampedPolygon
 from cv_bridge import CvBridge
+from ament_index_python.packages import get_package_share_directory
 
 from .utils import load_calibration_data, apply_ema_filter
 
@@ -25,8 +28,17 @@ class CameraNode(Node):
     CAMERA_WIDTH = 1280
     CAMERA_HEIGHT = 720
     APRILTAG_FAMILY = "tag36h11"
-    FLOOD_SEED = (CAMERA_WIDTH // 2, CAMERA_HEIGHT // 2)
+    FLOOD_SEED = [
+        (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) + 50),
+        (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) - 50),
+        (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) + 50),
+        (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) - 50),
+    ]
     FLOOD_THRESHOLD = 5
+
+    # Initial board detection settings
+    USE_STORED_IMAGE = True  # Set to True to load image from data/ folder
+    STORED_IMAGE_FILENAME = "debug_board_tilted_2.jpg"  # Filename in data/ folder
 
     # Debug/Display settings
     DEBUG_VIEW = True
@@ -158,19 +170,37 @@ class CameraNode(Node):
     def _initial_board_detection(self) -> None:
         """Perform initial board detection using flood fill to establish perspective transform."""
 
-        # Wait for a valid frame from the camera
-        ret, frame = self.cap.read()
-        while not ret:
-            rclpy.spin_once(self, timeout_sec=0.1)
-            ret, frame = self.cap.read()
+        if self.USE_STORED_IMAGE:
+            # Load stored image
+            package_dir = Path(__file__).resolve().parent
+            image_path = os.path.join(package_dir, "data", self.STORED_IMAGE_FILENAME)
 
-        # Skip a few frames to allow camera auto-adjustments
-        for i in range(5):
-            ret, frame = self.cap.read()
+            self.get_logger().info(f"Loading stored image from: {image_path}")
+            frame = cv2.imread(image_path)
 
-        ret, frame = self.cap.read()
+            if frame is None:
+                self.get_logger().error(
+                    f"Failed to load stored image from {image_path}, falling back to camera"
+                )
+            else:
+                self.get_logger().info(
+                    f"Successfully loaded stored image: {frame.shape}"
+                )
+        else:
+            # Wait for a valid frame from the camera
+            ret, frame = self.cap.read()
+            while not ret:
+                rclpy.spin_once(self, timeout_sec=0.1)
+                ret, frame = self.cap.read()
+
+            # Skip a few frames to allow camera auto-adjustments
+            for i in range(5):
+                ret, frame = self.cap.read()
+
+        # Undistort frame
         frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
+        # Convert to HSV and split channels
         frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
 
@@ -188,16 +218,33 @@ class CameraNode(Node):
             seed_lines,
             rotation_matrix,
             segment_offsets,
-            segment_parameters,
+            segment_lengths,
         ) = self._compute_boarder_segment_masks(rotated_rect, s.shape)
 
         line_samples = self._compute_seed_line_samples(seed_lines)
 
         boarder_segment_flood_masks = []
 
-        for i, (boarder_segment_mask, line_sample_points, offset, params) in enumerate(
+        diff_rotations = (
+            -np.eye(2),
+            np.array([[0, -1], [1, 0]]),
+            np.eye(2),
+            np.array([[0, 1], [-1, 0]]),
+        )
+
+        for i, (
+            boarder_segment_mask,
+            line_sample_points,
+            segment_offset,
+            length,
+            diff_rotation,
+        ) in enumerate(
             zip(
-                boarder_segment_masks, line_samples, segment_offsets, segment_parameters
+                boarder_segment_masks,
+                line_samples,
+                segment_offsets,
+                segment_lengths,
+                diff_rotations,
             )
         ):
             masked_image = cv2.bitwise_and(s, s, mask=boarder_segment_mask)
@@ -207,15 +254,22 @@ class CameraNode(Node):
 
             boarder_segment_flood_masks.append(boarder_segment_flood_mask)
 
-            affine_matrix = np.hstack(
-                [rotation_matrix.T, -rotation_matrix.T @ offset.reshape(2, 1)]
-            )
+            inside_offset = 50  # TODO: make global
+            outside_offset = 20
+
+            offset = -diff_rotation @ rotation_matrix.T @ segment_offset.reshape(
+                (2, 1)
+            ) + np.array([[int(length // 2)], [inside_offset]])
+
+            affine_matrix = np.hstack([diff_rotation @ rotation_matrix.T, offset])
 
             aligned_mask = cv2.warpAffine(
                 boarder_segment_flood_mask,
                 affine_matrix,
-                (params[3] + params[2], params[0] - params[1]),
+                (length, inside_offset + outside_offset),
             )
+
+            # diff = np.diff(aligned_mask.astype(np.int16), axis=diff_axis)
 
             cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
 
@@ -340,6 +394,8 @@ class CameraNode(Node):
         box = np.intp(box)
         cv2.drawContours(frame_with_rect, [box], 0, (0, 255, 0), 2)
 
+        for center_pt in self.FLOOD_SEED:
+            cv2.circle(frame_with_rect, center_pt, 5, (0, 255, 0), -1)
         cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
         cv2.waitKey(0)
 
@@ -350,7 +406,7 @@ class CameraNode(Node):
         list[np.ndarray],
         np.ndarray,
         list[np.ndarray],
-        list[tuple[float, float]],
+        tuple[int, int, int, int],
     ]:
         # Create boarder masks
         corner_pts, rect_width, rect_height, rotation_matrix = (
@@ -402,6 +458,12 @@ class CameraNode(Node):
                 inside_offset,
             ),
         ]
+        rects_length = (
+            int(long_side_length),
+            int(short_side_length),
+            int(long_side_length),
+            int(short_side_length),
+        )
 
         rects = [rect_from_offset(*params) for params in parameter_combination]
         rects_transformed = [rotation_matrix @ rect + center for rect in rects]
@@ -436,7 +498,7 @@ class CameraNode(Node):
             seed_lines,
             rotation_matrix,
             segment_offsets,
-            parameter_combination,
+            rects_length,
         )
 
     def _board_flood_fill(

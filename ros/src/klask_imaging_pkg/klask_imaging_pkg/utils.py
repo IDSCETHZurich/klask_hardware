@@ -28,7 +28,7 @@ def load_calibration_data(
     ros2_ws_path = current_dir[: ros2_ws_index + len("ros2_ws")]
     filepath = os.path.join(
         ros2_ws_path,
-        "src/klask_imaging_pkg/klask_imaging_pkg",
+        "src/klask_imaging_pkg/klask_imaging_pkg/data",
         filename,
     )
 
