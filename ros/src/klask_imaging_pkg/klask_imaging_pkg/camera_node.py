@@ -6,8 +6,6 @@ import rclpy
 import numpy as np
 import apriltag
 import cProfile
-import pstats
-import io
 import os
 from pathlib import Path
 from rclpy.node import Node
@@ -17,6 +15,11 @@ from klask_interfaces.msg import StampedPolygon
 from cv_bridge import CvBridge
 
 from .utils import load_calibration_data, apply_ema_filter
+from .debug import (
+    print_segment_debug_view,
+    print_initial_debug_view,
+    print_profiling_stats,
+)
 
 
 class CameraNode(Node):
@@ -255,7 +258,7 @@ class CameraNode(Node):
         self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
 
         if self.DEBUG_VIEW:
-            self._print_segment_debug_view(
+            print_segment_debug_view(
                 frame_rec,
                 s,
                 self.boarder_segment_masks,
@@ -266,11 +269,12 @@ class CameraNode(Node):
                 boarder_segment_edge_points,
                 boarder_segment_edge_lines,
             )
-            self._print_initial_debug_view(
+            print_initial_debug_view(
                 frame_rec,
                 h,
                 s,
                 v,
+                self.FLOOD_SEED,
                 flood_mask,
                 rotated_rect,
             )
@@ -449,132 +453,6 @@ class CameraNode(Node):
             ]
             line_samples.append(sample_points)
         return line_samples
-
-    def _print_segment_debug_view(
-        self,
-        frame_rec: np.ndarray,
-        s_channel: np.ndarray,
-        boarder_segment_masks: list[np.ndarray],
-        seed_lines: list[tuple[np.ndarray, np.ndarray]],
-        seed_line_samples: list[list[np.ndarray]],
-        boarder_segment_flood_masks: list[np.ndarray],
-        boarder_segment_flood_masks_aligned: list[np.ndarray],
-        boarder_segment_edge_points: list[np.ndarray],
-        boarder_segment_edge_lines: list[list[np.ndarray]],
-    ):
-        # Draw all border segment polygons on the original frame
-        frame_with_polygons = frame_rec.copy()
-        frame_with_edges = frame_rec.copy()
-        merged_mask = np.zeros_like(s_channel, dtype=np.uint8)
-        merged_flood_mask = np.zeros_like(s_channel, dtype=np.uint8)
-        for i, (
-            mask,
-            seed_line,
-            seed_line_sample,
-            flood_mask,
-            aligned_mask,
-            edge_points_original,
-            line_params,
-        ) in enumerate(
-            zip(
-                boarder_segment_masks,
-                seed_lines,
-                seed_line_samples,
-                boarder_segment_flood_masks,
-                boarder_segment_flood_masks_aligned,
-                boarder_segment_edge_points,
-                boarder_segment_edge_lines,
-            )
-        ):
-            # Find contours from the mask
-            contours, _ = cv2.findContours(
-                mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-            )
-            cv2.drawContours(frame_with_polygons, contours, -1, (255, 0, 0), 2)
-            # Draw seed line
-            cv2.line(
-                frame_with_polygons,
-                seed_line[:, 0],
-                seed_line[:, 1],
-                (255, 255, 0),
-                2,
-            )
-            # Draw seed sample points
-            for sample_point in seed_line_sample:
-                cv2.circle(
-                    frame_with_polygons,
-                    tuple(sample_point),
-                    5,
-                    (0, 255, 255),
-                    -1,
-                )
-            # Merge the current mask into the combined mask
-            merged_mask = cv2.bitwise_or(merged_mask, mask)
-            merged_flood_mask = cv2.bitwise_or(merged_flood_mask, flood_mask)
-
-            # Draw edge points and fitted line on original image
-            vx, vy, x0, y0 = line_params
-            # Draw the fitted line across the image
-            # Parametric line: p = p0 + t*v, calculate endpoints at image boundaries
-            lefty = int((-x0[0] * vy[0] / vx[0]) + y0[0])
-            righty = int(((frame_rec.shape[1] - x0[0]) * vy[0] / vx[0]) + y0[0])
-            cv2.line(
-                frame_with_edges,
-                (frame_rec.shape[1] - 1, righty),
-                (0, lefty),
-                (0, 255, 0),
-                2,
-            )
-            edge_points_int = edge_points_original.astype(np.int32)
-            frame_with_edges[edge_points_int[:, 1], edge_points_int[:, 0]] = [0, 0, 255]
-
-            # Display aligned flood mask
-            cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
-
-        cv2.imshow(
-            f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
-        )
-
-        cv2.imshow(
-            f"Initial Board Analysis - Border Segment Flood Mask",
-            merged_flood_mask,
-        )
-
-        # Display border segment
-        masked_image = cv2.bitwise_and(s_channel, s_channel, mask=merged_mask)
-        self._plot_single_channel(
-            masked_image, "Initial Board Analysis - Border Segments"
-        )
-
-        cv2.imshow(
-            "Initial Board Analysis - Border Segments Overlay", frame_with_polygons
-        )
-
-    def _print_initial_debug_view(
-        self,
-        frame_rec: np.ndarray,
-        h: np.ndarray,
-        s: np.ndarray,
-        v: np.ndarray,
-        flood_mask: np.ndarray,
-        rotated_rect: cv2.RotatedRect,
-    ) -> None:
-        # Draw the rotated rectangle on a copy of the original image
-        frame_with_rect = frame_rec.copy()
-        box = cv2.boxPoints(rotated_rect)
-        box = np.intp(box)
-        cv2.drawContours(frame_with_rect, [box], 0, (0, 255, 0), 2)
-
-        for center_pt in self.FLOOD_SEED:
-            cv2.circle(frame_with_rect, center_pt, 5, (0, 255, 0), -1)
-        cv2.imshow("Initial Board Analysis - Flood Fill Rectangle", frame_with_rect)
-
-        cv2.imshow("Initial Board Analysis - Flood Fill", flood_mask)
-
-        self._plot_single_channel(v, "Initial Board Analysis - V Channel")
-        self._plot_single_channel(s, "Initial Board Analysis - S Channel")
-        self._plot_single_channel(h, "Initial Board Analysis - H Channel")
-        cv2.imshow("Initial Board Analysis - Rect", frame_rec)
 
     def _compute_boarder_segment_masks(
         self, rotated_rect, shape: tuple[int, int]
@@ -790,72 +668,6 @@ class CameraNode(Node):
 
         # Compute transformation matrix
         self.M = cv2.getPerspectiveTransform(corners, dst_pts)
-
-    def _plot_single_channel(self, channel: np.ndarray, title: str) -> None:
-        """Plot a single channel with color scale."""
-
-        # Apply colormap to the channel for better visualization
-        channel_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
-
-        # Create a color scale bar (0-255 range)
-        scale_height = channel_colored.shape[0]
-        scale_width = 50
-        scale_bar = np.linspace(255, 0, scale_height, dtype=np.uint8).reshape(-1, 1)
-        scale_bar = np.tile(scale_bar, (1, scale_width))
-        scale_bar_colored = cv2.applyColorMap(scale_bar, cv2.COLORMAP_JET)
-
-        # Add text labels to the scale
-        for i in range(0, 256, 51):  # Labels at 0, 51, 102, 153, 204, 255
-            y_pos = int((255 - i) / 255 * (scale_height - 1))
-            cv2.putText(
-                scale_bar_colored,
-                str(i),
-                (5, y_pos + 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.4,
-                (255, 255, 255),
-                1,
-                cv2.LINE_AA,
-            )
-
-        # Concatenate the colored channel with the scale bar
-        channel_with_scale = np.hstack([channel_colored, scale_bar_colored])
-
-        cv2.imshow(title, channel_with_scale)
-
-    def _print_profiling_stats(self) -> None:
-        """Print cProfile statistics."""
-        if self.profiler is None:
-            return
-
-        self.profiler.disable()
-
-        # Create a string buffer to capture the stats output
-        s = io.StringIO()
-
-        # Sort by total time (tottime) and print top functions
-        ps = pstats.Stats(self.profiler, stream=s).sort_stats("tottime")
-
-        self.get_logger().info("\n" + "=" * 80)
-        self.get_logger().info(
-            f"cProfile Statistics (profiled for {self.PROFILING_DURATION} seconds)"
-        )
-        self.get_logger().info("=" * 80)
-
-        # Print stats to string buffer
-        ps.print_stats(self.PROFILING_TOP_FUNCTIONS)
-
-        # Log the output
-        self.get_logger().info("\n" + s.getvalue())
-
-        # Also print callers for more detailed analysis
-        s = io.StringIO()
-        ps = pstats.Stats(self.profiler, stream=s).sort_stats("tottime")
-        ps.print_callers(20)
-
-        self.get_logger().info("\nTop Callers:")
-        self.get_logger().info(s.getvalue())
-        self.get_logger().info("=" * 80 + "\n")
 
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
