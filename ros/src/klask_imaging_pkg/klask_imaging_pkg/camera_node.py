@@ -98,7 +98,6 @@ class CameraNode(Node):
         )
 
         # Perspective transform
-        self.M: np.ndarray | None = None
         self.width = 0
         self.height = 0
 
@@ -188,7 +187,9 @@ class CameraNode(Node):
 
         # Apply smoothing to saturation channel for more stable border detection
         if self.USE_SMOOTHING:
-            s_smooth = cv2.GaussianBlur(s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0)
+            s_smooth = cv2.GaussianBlur(
+                s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0
+            )
         else:
             s_smooth = s
 
@@ -228,15 +229,19 @@ class CameraNode(Node):
                 boarder_segment_edge_lines,
             ),
             board_corners,
+            self.width,
+            self.height,
         ) = self._fit_boarder_segment_lines(s_smooth)
 
         # Compute perspective transform from fitted line intersections
-        self._compute_perspective_transform_from_corners(board_corners)
+        M = self._compute_perspective_transform_from_corners(
+            board_corners, self.width, self.height
+        )
 
         # Apply the transformation and display the result
         warped_from_corners = cv2.warpPerspective(
             frame_rec,
-            self.M,
+            M,
             (self.width, self.height),
         )
 
@@ -434,7 +439,13 @@ class CameraNode(Node):
             np.float32
         )
 
-        # TODO: Return only board_corners and remove other return values
+        # Compute board width and height from corner points
+        edge_lengths = np.linalg.norm(
+            board_corners - np.roll(board_corners, 1, axis=0), axis=1
+        )
+        width = int((edge_lengths[1] + edge_lengths[3]) / 2)
+        height = int((edge_lengths[0] + edge_lengths[2]) / 2)
+
         return (
             (
                 boarder_segment_flood_masks,
@@ -443,6 +454,8 @@ class CameraNode(Node):
                 boarder_segment_edge_lines,
             ),
             board_corners,
+            width,
+            height,
         )
 
     def _compute_seed_line_samples(
@@ -672,34 +685,24 @@ class CameraNode(Node):
         # Translate to actual center position
         return (rotated_corners, rect_width, rect_height, rotation_matrix)
 
-    def _compute_perspective_transform_from_corners(self, corners: np.ndarray) -> None:
+    def _compute_perspective_transform_from_corners(
+        self, corners: np.ndarray, width: int, height: int
+    ) -> None:
         """Compute perspective transformation matrix from board corners."""
-
-        # corners should be in order: [top-left, top-right, bottom-right, bottom-left]
-        # Calculate board dimensions from corners
-        # TODO: Should we use a fixed size instead?
-        top_width = np.linalg.norm(corners[1] - corners[0])
-        bottom_width = np.linalg.norm(corners[2] - corners[3])
-        left_height = np.linalg.norm(corners[3] - corners[0])
-        right_height = np.linalg.norm(corners[2] - corners[1])
-
-        # Use average dimensions
-        self.width = int((top_width + bottom_width) / 2)
-        self.height = int((left_height + right_height) / 2)
 
         # Destination points (perfect rectangle)
         dst_pts = np.array(
             [
                 [0, 0],
-                [self.width, 0],
-                [self.width, self.height],
-                [0, self.height],
+                [width, 0],
+                [width, height],
+                [0, height],
             ],
             dtype="float32",
         )
 
         # Compute transformation matrix
-        self.M = cv2.getPerspectiveTransform(corners, dst_pts)
+        return cv2.getPerspectiveTransform(corners, dst_pts)
 
     def update_fps_display(self) -> None:
         """Update FPS display value every second."""
@@ -740,7 +743,9 @@ class CameraNode(Node):
 
         # Apply smoothing to saturation channel for more stable border detection
         if self.USE_SMOOTHING:
-            s_smooth = cv2.GaussianBlur(s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0)
+            s_smooth = cv2.GaussianBlur(
+                s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0
+            )
         else:
             s_smooth = s
 
@@ -752,15 +757,19 @@ class CameraNode(Node):
                 boarder_segment_edge_lines,
             ),
             board_corners,
+            _,
+            _,
         ) = self._fit_boarder_segment_lines(s_smooth)
 
         # Compute perspective transform from fitted line intersections
-        self._compute_perspective_transform_from_corners(board_corners)
+        M = self._compute_perspective_transform_from_corners(
+            board_corners, self.width, self.height
+        )
 
         # Apply perspective warp to get top-down view
         warped = cv2.warpPerspective(
             undistorted_frame,
-            self.M,
+            M,
             (self.width, self.height),
         )
 
