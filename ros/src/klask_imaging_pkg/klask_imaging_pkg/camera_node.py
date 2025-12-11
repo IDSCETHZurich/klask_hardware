@@ -101,6 +101,12 @@ class CameraNode(Node):
         self.width = 0
         self.height = 0
 
+        # Border line tracking for outlier detection
+        self.previous_boarder_lines: list[np.ndarray] | None = None
+        self.line_angle_threshold = 10.0  # degrees
+        self.line_position_threshold = 50.0  # pixels
+        self.min_edge_points = 10  # minimum points needed for line fitting
+
         # Goal positions
         self.left_goal: list[float] | None = None
         self.right_goal: list[float] | None = None
@@ -399,15 +405,12 @@ class CameraNode(Node):
             edge_points_original = edge_points_homogeneous @ inverse_affine.T
             boarder_segment_edge_points.append(edge_points_original)
 
-            # Fit line to edge points
-            [vx, vy, x0, y0] = cv2.fitLine(
-                edge_points_original, cv2.DIST_HUBER, 0, 0.01, 0.01
+            # Fit line to edge points with validation
+            segment_idx = len(boarder_segment_edge_lines)
+            fitted_line = self._fit_and_validate_line(
+                edge_points_original, segment_idx
             )
-
-            # If too slow try this instead:
-            # [vx, vy, x0, y0] = cv2.fitLine(edge_points_original, cv2.DIST_L2, 0, 0.01, 0.01)
-
-            boarder_segment_edge_lines.append([vx, vy, x0, y0])
+            boarder_segment_edge_lines.append(fitted_line)
 
         # Compute intersection points of fitted lines to get board corners
         # Vectorize the intersection computation for all 4 corners
@@ -446,6 +449,9 @@ class CameraNode(Node):
         width = int((edge_lengths[1] + edge_lengths[3]) / 2)
         height = int((edge_lengths[0] + edge_lengths[2]) / 2)
 
+        # Store validated lines for next iteration
+        self.previous_boarder_lines = boarder_segment_edge_lines.copy()
+
         return (
             (
                 boarder_segment_flood_masks,
@@ -457,6 +463,71 @@ class CameraNode(Node):
             width,
             height,
         )
+
+    def _fit_and_validate_line(
+        self, edge_points: np.ndarray, segment_idx: int
+    ) -> list[float]:
+        """Fit a line to edge points with outlier detection and validation.
+        
+        Args:
+            edge_points: Array of edge points (Nx2)
+            segment_idx: Index of the border segment (0-3)
+            
+        Returns:
+            Line parameters [vx, vy, x0, y0]
+        """
+        # Check if we have enough points to fit a line
+        if len(edge_points) < self.min_edge_points:
+            if self.previous_boarder_lines is not None:
+                # Not enough points, use previous line
+                return self.previous_boarder_lines[segment_idx]
+            else:
+                # No previous line available, return a default horizontal line
+                return [1.0, 0.0, 0.0, 0.0]
+        
+        # Fit line to edge points
+        [vx, vy, x0, y0] = cv2.fitLine(
+            edge_points, cv2.DIST_HUBER, 0, 0.01, 0.01
+        )
+        current_line = [vx, vy, x0, y0]
+        
+        # If no previous line, accept current fit
+        if self.previous_boarder_lines is None:
+            return current_line
+        
+        # Validate against previous line
+        previous_line = self.previous_boarder_lines[segment_idx]
+        
+        # Extract direction vectors and positions
+        prev_vx, prev_vy, prev_x0, prev_y0 = previous_line
+        
+        # Compute angle difference between lines
+        # Normalize direction vectors
+        prev_dir = np.array([prev_vx, prev_vy]).flatten()
+        curr_dir = np.array([vx, vy]).flatten()
+        prev_dir = prev_dir / np.linalg.norm(prev_dir)
+        curr_dir = curr_dir / np.linalg.norm(curr_dir)
+        
+        # Compute angle using dot product (handle both parallel and anti-parallel)
+        dot_product = np.abs(np.dot(prev_dir, curr_dir))
+        dot_product = np.clip(dot_product, -1.0, 1.0)
+        angle_diff = np.rad2deg(np.arccos(dot_product))
+        
+        # Compute position difference (perpendicular distance between lines)
+        # Distance from point (prev_x0, prev_y0) to current line
+        point_to_curr = np.array([prev_x0 - x0, prev_y0 - y0]).flatten()
+        # Project onto perpendicular direction (rotate direction by 90 degrees)
+        perp_dir = np.array([-curr_dir[1], curr_dir[0]])
+        position_diff = np.abs(np.dot(point_to_curr, perp_dir))
+        
+        # Check if differences exceed thresholds
+        if (angle_diff > self.line_angle_threshold or 
+            position_diff > self.line_position_threshold):
+            # Outlier detected, use previous line
+            return previous_line
+        
+        # Valid fit, return current line
+        return current_line
 
     def _compute_seed_line_samples(
         self, seed_lines: list[np.ndarray], line_sample_count: int
