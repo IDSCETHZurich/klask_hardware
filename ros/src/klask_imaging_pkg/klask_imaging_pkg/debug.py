@@ -186,6 +186,27 @@ def plot_single_channel(channel: np.ndarray, title: str) -> None:
     cv2.imshow(title, channel_with_scale)
 
 
+def show_final_output(warped, fps_display) -> None:
+    """Display the final warped board view with FPS overlay."""
+
+    # Draw FPS on image
+    display_image = warped.copy()
+    fps_text = f"FPS: {fps_display}"
+    cv2.putText(
+        display_image,
+        fps_text,
+        (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.0,
+        (0, 255, 0),
+        2,
+        cv2.LINE_AA,
+    )
+
+    cv2.imshow("Board View", display_image)
+    cv2.waitKey(1)
+
+
 def print_profiling_stats(UUT) -> None:
     """Print cProfile statistics."""
     if UUT.profiler is None:

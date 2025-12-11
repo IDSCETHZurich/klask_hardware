@@ -18,6 +18,7 @@ from .debug import (
     print_segment_debug_view,
     print_initial_debug_view,
     print_profiling_stats,
+    show_final_output,
 )
 
 
@@ -40,11 +41,13 @@ class CameraNode(Node):
     BOARDER_SEG_CORNER_DISTANCE = 100
 
     # Initial board detection settings
-    USE_STORED_IMAGE = True  # Set to True to load image from data/ folder
+    USE_STORED_IMAGE = False  # Set to True to load image from data/ folder
     STORED_IMAGE_FILENAME = "debug_board_tilted_1.jpg"  # Filename in data/ folder
 
     # Debug/Display settings
-    DEBUG_VIEW = True
+    DEBUG_VIEW = False  # Set to True to show debug views during processing
+    SHOW_IMAGE = True  # Set to True to display final output image
+    SHOW_IMAGE_FPS = 10  # Display update frequency in Hz
 
     # Profiling settings
     ENABLE_PROFILING = False
@@ -97,6 +100,13 @@ class CameraNode(Node):
         # Goal positions
         self.left_goal: list[float] | None = None
         self.right_goal: list[float] | None = None
+
+        # Image display tracking
+        if self.SHOW_IMAGE:
+            self.last_display_time = 0.0
+            self.frame_count = 0
+            self.fps_display = 0.0
+            self.fps_timer = self.create_timer(1.0, self.update_fps_display)
 
         # Profiling setup
         self.profiler = None
@@ -678,6 +688,11 @@ class CameraNode(Node):
         # Compute transformation matrix
         self.M = cv2.getPerspectiveTransform(corners, dst_pts)
 
+    def update_fps_display(self) -> None:
+        """Update FPS display value every second."""
+        self.fps_display = self.frame_count
+        self.frame_count = 0
+
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
         # Capture and validate frame
@@ -710,6 +725,18 @@ class CameraNode(Node):
             self.M,
             (self.width, self.height),
         )
+
+        # Display image if enabled and enough time has elapsed
+        if self.SHOW_IMAGE:
+
+            # Increment frame counter
+            self.frame_count += 1
+
+            current_time = time.time()
+            if current_time - self.last_display_time >= 1.0 / self.SHOW_IMAGE_FPS:
+                self.last_display_time = current_time
+
+                show_final_output(warped, self.fps_display)
 
         # Publish the transformed image
         self.publish_board_image(warped)
