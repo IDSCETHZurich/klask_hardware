@@ -154,13 +154,55 @@ def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_se
     # Draw edge points and fitted line on original image
         vx, vy, x0, y0 = line_params
         # Draw the fitted line across the image
-        # Parametric line: p = p0 + t*v, calculate endpoints at image boundaries
-        left = int((-x0[0] * vy[0] / vx[0]) + y0[0])
-        right = int(((frame_rec.shape[1] - x0[0]) * vy[0] / vx[0]) + y0[0])
+        # Parametric line: p = p0 + t*v
+        # Find intersections with image boundaries
+        img_h, img_w = frame_rec.shape[:2]
+        
+        # Check if line is nearly vertical or horizontal
+        if abs(vx[0]) < 1e-6:  # Nearly vertical line
+            pt1 = (int(x0[0]), 0)
+            pt2 = (int(x0[0]), img_h - 1)
+        elif abs(vy[0]) < 1e-6:  # Nearly horizontal line
+            pt1 = (0, int(y0[0]))
+            pt2 = (img_w - 1, int(y0[0]))
+        else:
+            # General case: find intersections with image boundaries
+            # Left edge (x=0): t = -x0/vx, y = y0 + t*vy
+            t_left = -x0[0] / vx[0]
+            y_left = int(y0[0] + t_left * vy[0])
+            # Right edge (x=w-1): t = (w-1-x0)/vx, y = y0 + t*vy
+            t_right = (img_w - 1 - x0[0]) / vx[0]
+            y_right = int(y0[0] + t_right * vy[0])
+            # Top edge (y=0): t = -y0/vy, x = x0 + t*vx
+            t_top = -y0[0] / vy[0]
+            x_top = int(x0[0] + t_top * vx[0])
+            # Bottom edge (y=h-1): t = (h-1-y0)/vy, x = x0 + t*vx
+            t_bottom = (img_h - 1 - y0[0]) / vy[0]
+            x_bottom = int(x0[0] + t_bottom * vx[0])
+            
+            # Collect valid intersection points
+            points = []
+            if 0 <= y_left < img_h:
+                points.append((0, y_left))
+            if 0 <= y_right < img_h:
+                points.append((img_w - 1, y_right))
+            if 0 <= x_top < img_w:
+                points.append((x_top, 0))
+            if 0 <= x_bottom < img_w:
+                points.append((x_bottom, img_h - 1))
+            
+            # Use first two valid points
+            if len(points) >= 2:
+                pt1, pt2 = points[:2]
+            else:
+                # Fallback to center point if no valid intersections
+                pt1 = (int(x0[0]), int(y0[0]))
+                pt2 = (int(x0[0] + vx[0] * 100), int(y0[0] + vy[0] * 100))
+        
         cv2.line(
             frame_with_edges,
-            (frame_rec.shape[1] - 1, right),
-            (0, left),
+            pt1,
+            pt2,
             (0, 255, 0),
             2,
         )

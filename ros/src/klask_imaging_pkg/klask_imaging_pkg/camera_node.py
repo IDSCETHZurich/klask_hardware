@@ -41,10 +41,6 @@ class CameraNode(Node):
     BOARDER_SEG_OUTSIDE_OFFSET = 20
     BOARDER_SEG_CORNER_DISTANCE = 100
 
-    # Initial board detection settings
-    USE_STORED_IMAGE = False  # Set to True to load image from data/ folder
-    STORED_IMAGE_FILENAME = "debug_board_tilted_1.jpg"  # Filename in data/ folder
-
     # Image processing settings
     USE_SMOOTHING = True  # Apply smoothing to improve border detection stability
     SMOOTHING_KERNEL = 5  # Kernel size for Gaussian blur (3, 5, 7, etc.)
@@ -156,33 +152,15 @@ class CameraNode(Node):
     def initial_board_detection(self) -> None:
         """Perform initial board detection using flood fill to establish perspective transform."""
 
-        # TODO: Remove this after the debuging is done
-        if self.USE_STORED_IMAGE:
-            # Load stored image
-            package_dir = Path(__file__).resolve().parent
-            image_path = os.path.join(package_dir, "data", self.STORED_IMAGE_FILENAME)
-
-            self.get_logger().info(f"Loading stored image from: {image_path}")
-            frame = cv2.imread(image_path)
-
-            if frame is None:
-                self.get_logger().error(
-                    f"Failed to load stored image from {image_path}, falling back to camera"
-                )
-            else:
-                self.get_logger().info(
-                    f"Successfully loaded stored image: {frame.shape}"
-                )
-        else:
-            # Wait for a valid frame from the camera
+        # Wait for a valid frame from the camera
+        ret, frame = self.cap.read()
+        while not ret:
+            rclpy.spin_once(self, timeout_sec=0.1)
             ret, frame = self.cap.read()
-            while not ret:
-                rclpy.spin_once(self, timeout_sec=0.1)
-                ret, frame = self.cap.read()
 
-            # Skip a few frames to allow camera auto-adjustments
-            for i in range(5):
-                ret, frame = self.cap.read()
+        # Skip a few frames to allow camera auto-adjustments
+        for i in range(5):
+            ret, frame = self.cap.read()
 
         # Undistort frame
         frame_rec = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
@@ -407,9 +385,7 @@ class CameraNode(Node):
 
             # Fit line to edge points with validation
             segment_idx = len(boarder_segment_edge_lines)
-            fitted_line = self._fit_and_validate_line(
-                edge_points_original, segment_idx
-            )
+            fitted_line = self._fit_and_validate_line(edge_points_original, segment_idx)
             boarder_segment_edge_lines.append(fitted_line)
 
         # Compute intersection points of fitted lines to get board corners
@@ -468,11 +444,11 @@ class CameraNode(Node):
         self, edge_points: np.ndarray, segment_idx: int
     ) -> list[float]:
         """Fit a line to edge points with outlier detection and validation.
-        
+
         Args:
             edge_points: Array of edge points (Nx2)
             segment_idx: Index of the border segment (0-3)
-            
+
         Returns:
             Line parameters [vx, vy, x0, y0]
         """
@@ -483,49 +459,54 @@ class CameraNode(Node):
                 return self.previous_boarder_lines[segment_idx]
             else:
                 # No previous line available, return a default horizontal line
-                return [1.0, 0.0, 0.0, 0.0]
-        
+                return [
+                    np.array([1.0]),
+                    np.array([0.0]),
+                    np.array([0.0]),
+                    np.array([0.0]),
+                ]
+
         # Fit line to edge points
-        [vx, vy, x0, y0] = cv2.fitLine(
-            edge_points, cv2.DIST_HUBER, 0, 0.01, 0.01
-        )
+        [vx, vy, x0, y0] = cv2.fitLine(edge_points, cv2.DIST_HUBER, 0, 0.01, 0.01)
         current_line = [vx, vy, x0, y0]
-        
+
         # If no previous line, accept current fit
         if self.previous_boarder_lines is None:
             return current_line
-        
+
         # Validate against previous line
         previous_line = self.previous_boarder_lines[segment_idx]
-        
+
         # Extract direction vectors and positions
         prev_vx, prev_vy, prev_x0, prev_y0 = previous_line
-        
+
         # Compute angle difference between lines
         # Normalize direction vectors
         prev_dir = np.array([prev_vx, prev_vy]).flatten()
         curr_dir = np.array([vx, vy]).flatten()
         prev_dir = prev_dir / np.linalg.norm(prev_dir)
         curr_dir = curr_dir / np.linalg.norm(curr_dir)
-        
+
         # Compute angle using dot product (handle both parallel and anti-parallel)
         dot_product = np.abs(np.dot(prev_dir, curr_dir))
         dot_product = np.clip(dot_product, -1.0, 1.0)
         angle_diff = np.rad2deg(np.arccos(dot_product))
-        
+
         # Compute position difference (perpendicular distance between lines)
         # Distance from point (prev_x0, prev_y0) to current line
         point_to_curr = np.array([prev_x0 - x0, prev_y0 - y0]).flatten()
         # Project onto perpendicular direction (rotate direction by 90 degrees)
         perp_dir = np.array([-curr_dir[1], curr_dir[0]])
         position_diff = np.abs(np.dot(point_to_curr, perp_dir))
-        
+
         # Check if differences exceed thresholds
-        if (angle_diff > self.line_angle_threshold or 
-            position_diff > self.line_position_threshold):
+        if (
+            angle_diff > self.line_angle_threshold
+            or position_diff > self.line_position_threshold
+        ):
             # Outlier detected, use previous line
             return previous_line
-        
+
         # Valid fit, return current line
         return current_line
 
@@ -685,10 +666,12 @@ class CameraNode(Node):
 
         flood_mask = None
         for single_seed in seed:
+            sane_seed = (max(0, single_seed[0]), max(0, single_seed[1]))
+
             _, _, flood_mask, rect = cv2.floodFill(
                 channel,
                 flood_mask,
-                tuple(single_seed),
+                tuple(sane_seed),
                 255,
                 loDiff=threshold,
                 upDiff=threshold,
