@@ -227,36 +227,32 @@ def show_final_output(warped, fps_display, title) -> None:
     cv2.waitKey(1)
 
 
-def print_profiling_stats(UUT) -> None:
+def print_profiling_stats(profiler, top_functions: int) -> None:
     """Print cProfile statistics."""
-    if UUT.profiler is None:
+    if profiler is None:
         return
-
-    UUT.profiler.disable()
 
     # Create a string buffer to capture the stats output
     s = io.StringIO()
 
     # Sort by total time (tottime) and print top functions
-    ps = pstats.Stats(UUT.profiler, stream=s).sort_stats("tottime")
+    ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
 
-    UUT.get_logger().info("\n" + "=" * 80)
-    UUT.get_logger().info(
-        f"cProfile Statistics (profiled for {UUT.PROFILING_DURATION} seconds)"
-    )
-    UUT.get_logger().info("=" * 80)
+    print("\n" + "=" * 80)
+    print(f"cProfile Statistics")
+    print("=" * 80)
 
     # Print stats to string buffer
-    ps.print_stats(UUT.PROFILING_TOP_FUNCTIONS)
+    ps.print_stats(top_functions)
 
-    # Log the output
-    UUT.get_logger().info("\n" + s.getvalue())
+    # Print the output
+    print("\n" + s.getvalue())
 
     # Also print callers for more detailed analysis
     s = io.StringIO()
-    ps = pstats.Stats(UUT.profiler, stream=s).sort_stats("tottime")
+    ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
     ps.print_callers(20)
 
-    UUT.get_logger().info("\nTop Callers:")
-    UUT.get_logger().info(s.getvalue())
-    UUT.get_logger().info("=" * 80 + "\n")
+    print("\nTop Callers:")
+    print(s.getvalue())
+    print("=" * 80 + "\n")

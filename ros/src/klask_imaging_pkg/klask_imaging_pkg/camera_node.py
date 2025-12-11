@@ -115,13 +115,15 @@ class CameraNode(Node):
 
         # Profiling setup
         self.profiler = None
-        self.profiling_start_time = None
         if self.ENABLE_PROFILING:
             self.profiler = cProfile.Profile()
             self.profiler.enable()
-            self.profiling_start_time = time.time()
             self.get_logger().info(
                 f"cProfile profiling enabled for {self.PROFILING_DURATION} seconds"
+            )
+            # Create one-shot timer to stop profiling after duration
+            self.profiling_timer = self.create_timer(
+                self.PROFILING_DURATION, self._stop_profiling
             )
 
     def _setup_camera(self) -> None:
@@ -703,6 +705,17 @@ class CameraNode(Node):
         """Update FPS display value every second."""
         self.fps_display = self.frame_count
         self.frame_count = 0
+
+    def _stop_profiling(self) -> None:
+        """Stop profiling and print stats (called once by timer)."""
+        if self.profiler is not None:
+            self.profiler.disable()
+            self.get_logger().info("Profiling complete. Generating stats...")
+            print_profiling_stats(self.profiler, self.PROFILING_TOP_FUNCTIONS)
+            self.profiler = None
+            # Cancel the timer so it doesn't fire again
+            self.profiling_timer.cancel()
+            self.profiling_timer = None
 
     def timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
