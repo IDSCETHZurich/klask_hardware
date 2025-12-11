@@ -31,8 +31,8 @@ class StateEstimatorNode(Node):
     # HSV color range constants for object detection
     BALL_HSV_LOWER = (10, 60, 200)  # Orange ball lower bound
     BALL_HSV_UPPER = (45, 160, 255)  # Orange ball upper bound
-    PEG_HSV_LOWER = (0, 0, 0)  # Black peg lower bound
-    PEG_HSV_UPPER = (255, 255, 45)  # Black peg upper bound
+    PEG_HSV_LOWER = (90, 150, 0)  # Black peg lower bound
+    PEG_HSV_UPPER = (130, 255, 45)  # Black peg upper bound
 
     # Visualization canvas size
     CANVAS_WIDTH = 1280

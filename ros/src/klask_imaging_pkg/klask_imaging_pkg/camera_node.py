@@ -56,7 +56,7 @@ class CameraNode(Node):
 
     # Debug/Display settings
     DEBUG_VIEW = False  # Set to True to enable extensive debug views of the initial board detection
-    SHOW_IMAGE = True  # Set to True to display final output image
+    SHOW_IMAGE = False  # Set to True to display final output image
     SHOW_IMAGE_FPS = 10  # Display update frequency in Hz
 
     # Profiling settings
