@@ -1,5 +1,6 @@
 """ROS2 node for camera image acquisition, AprilTag detection, and perspective transformation."""
 
+import itertools
 import cv2
 import time
 import rclpy
@@ -41,12 +42,20 @@ class CameraNode(Node):
     BOARDER_SEG_OUTSIDE_OFFSET = 20
     BOARDER_SEG_CORNER_DISTANCE = 100
 
+    # Goal detection settings
+    GOAL_FLOOD_THRESHOLD = 20
+    GOAL_H_FACTOR = 0.085  # Horizontal factor for goal seed positioning (percentage of width from border)
+    GOAL_O_FACTOR = (
+        0.01  # Offset factor for goal seed positioning (percentage of width/height)
+    )
+    GOAL_E_FACTOR = 1.2  # Ellipse scaling factor for goal size
+
     # Image processing settings
     USE_SMOOTHING = True  # Apply smoothing to improve border detection stability
     SMOOTHING_KERNEL = 5  # Kernel size for Gaussian blur (3, 5, 7, etc.)
 
     # Debug/Display settings
-    DEBUG_VIEW = False  # Set to True to show debug views during processing
+    DEBUG_VIEW = False  # Set to True to enable extensive debug views of the initial board detection
     SHOW_IMAGE = True  # Set to True to display final output image
     SHOW_IMAGE_FPS = 10  # Display update frequency in Hz
 
@@ -70,7 +79,10 @@ class CameraNode(Node):
         self.bridge = CvBridge()
 
         # Timer for image acquisition
-        self.timer = self.create_timer(1.0 / 480.0, self.timer_callback)
+        self.timer = self.create_timer(1.0 / 480.0, self._timer_callback)
+
+        # Timer for goal publishing
+        self.goal_timer = self.create_timer(1.0, self._publish_goal_positions)
 
         # Camera setup
         self._setup_camera()
@@ -112,7 +124,7 @@ class CameraNode(Node):
             self.last_display_time = 0.0
             self.frame_count = 0
             self.fps_display = 0.0
-            self.fps_timer = self.create_timer(1.0, self.update_fps_display)
+            self.fps_timer = self.create_timer(1.0, self._update_fps_display)
 
         # Profiling setup
         self.profiler = None
@@ -222,11 +234,23 @@ class CameraNode(Node):
             board_corners, self.width, self.height
         )
 
-        # Apply the transformation and display the result
-        warped_from_corners = cv2.warpPerspective(
+        # Apply the transformation
+        warped_frame = cv2.warpPerspective(
             frame_rec,
             M,
             (self.width, self.height),
+        )
+        warped_v_channel = cv2.warpPerspective(
+            v,
+            M,
+            (self.width, self.height),
+        )
+
+        self.left_goal, self.right_goal = self._find_goal_positions(
+            warped_v_channel,
+            self.GOAL_H_FACTOR,
+            self.GOAL_O_FACTOR,
+            self.GOAL_E_FACTOR,
         )
 
         # Display debug views if enabled
@@ -241,7 +265,7 @@ class CameraNode(Node):
                 boarder_segment_flood_masks_aligned,
                 boarder_segment_edge_points,
                 boarder_segment_edge_lines,
-                warped_from_corners,
+                warped_frame,
             )
             print_initial_debug_view(
                 frame_rec,
@@ -251,8 +275,72 @@ class CameraNode(Node):
                 self.FLOOD_SEED,
                 flood_mask,
                 rotated_rect,
+                warped_v_channel,
+                (self.left_goal, self.right_goal),
             )
             cv2.waitKey(0)
+
+    def _find_goal_positions(
+        self,
+        warped_v_channel: np.ndarray,
+        h_factor: float,
+        o_factor: float,
+        e_factor: float,
+    ) -> tuple[cv2.RotatedRect, cv2.RotatedRect]:
+        """Find goal positions in the warped V channel image.
+
+        Args:
+            warped_v_channel: The perspective-corrected V channel image.
+            h_factor: Horizontal factor for goal seed positioning.
+            o_factor: Offset factor for goal seed positioning.
+            e_factor: Ellipse scaling factor for goal size.
+        """
+
+        offset_combinations = list(
+            itertools.product([-o_factor, o_factor], [-o_factor, o_factor])
+        )
+        goal_seed_centers = (
+            (int(self.width * h_factor), int(self.height * 0.5)),
+            (int(self.width * (1 - h_factor)), int(self.height * 0.5)),
+        )
+
+        goals = []
+
+        for goal_seed_center in goal_seed_centers:
+            goal_seed = [
+                (
+                    int(goal_seed_center[0] + self.width * offset[0]),
+                    int(goal_seed_center[1] + self.height * offset[1]),
+                )
+                for offset in offset_combinations
+            ]
+
+            goal_mask, rect = self._board_flood_fill(
+                warped_v_channel, goal_seed, self.GOAL_FLOOD_THRESHOLD
+            )
+
+            # Get all points where flood_mask is non-zero
+            points = cv2.findNonZero(goal_mask)
+            goal_ellipse = cv2.fitEllipse(points)
+
+            # Scale ellipse size by e_factor
+            center, axes, angle = goal_ellipse
+            goal_ellipse = (center, (axes[0] * e_factor, axes[1] * e_factor), angle)
+
+            goals.append(goal_ellipse)
+
+            if self.DEBUG_VIEW:
+                cv2.ellipse(warped_v_channel, goal_ellipse, (0, 255, 0), 2)
+                for x, y in goal_seed:
+                    cv2.circle(
+                        warped_v_channel,
+                        (x, y),
+                        3,
+                        (0, 255, 0),
+                        -1,
+                    )
+
+        return tuple(goals)
 
     def _precompute_segment_transforms(
         self,
@@ -758,7 +846,7 @@ class CameraNode(Node):
         # Compute transformation matrix
         return cv2.getPerspectiveTransform(corners, dst_pts)
 
-    def update_fps_display(self) -> None:
+    def _update_fps_display(self) -> None:
         """Update FPS display value every second."""
         self.fps_display = self.frame_count
         self.frame_count = 0
@@ -774,7 +862,7 @@ class CameraNode(Node):
             self.profiling_timer.cancel()
             self.profiling_timer = None
 
-    def timer_callback(self) -> None:
+    def _timer_callback(self) -> None:
         """Main timer callback for processing camera frames."""
         # Capture and validate frame
         ret, frame = self.cap.read()
@@ -786,9 +874,9 @@ class CameraNode(Node):
         rectified_frame = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
         # Process frame
-        self.process_frame(rectified_frame)
+        self._process_frame(rectified_frame)
 
-    def process_frame(self, undistorted_frame: np.ndarray) -> None:
+    def _process_frame(self, undistorted_frame: np.ndarray) -> None:
         """Process frame to create perspective-corrected view and publish."""
 
         # Convert to HSV and split channels
@@ -837,7 +925,12 @@ class CameraNode(Node):
             if current_time - self.last_display_time >= 1.0 / self.SHOW_IMAGE_FPS:
                 self.last_display_time = current_time
 
-                show_final_output(warped, self.fps_display, "Board View")
+                show_final_output(
+                    warped,
+                    self.fps_display,
+                    "Board View",
+                    goal_ellipses=(self.left_goal, self.right_goal),
+                )
                 show_online_boarders(
                     undistorted_frame,
                     boarder_segment_edge_points,
@@ -847,9 +940,9 @@ class CameraNode(Node):
                 )
 
         # Publish the transformed image
-        self.publish_board_image(warped)
+        self._publish_board_image(warped)
 
-    def publish_board_image(self, image: np.ndarray) -> None:
+    def _publish_board_image(self, image: np.ndarray) -> None:
         """Publish the transformed and cropped board image as a compressed ROS2 message."""
         try:
             # Convert OpenCV image to ROS CompressedImage message
@@ -860,21 +953,21 @@ class CameraNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to publish board image: {e}")
 
-    def publish_goal_positions(self) -> None:
+    def _publish_goal_positions(self) -> None:
         """Publish goal positions."""
         polygon = Polygon()
 
         if self.left_goal is not None:
             point = Point32()
-            point.x = float(self.left_goal[0])
-            point.y = float(self.left_goal[1])
+            point.x = float(self.left_goal[0][0])
+            point.y = float(self.left_goal[0][1])
             point.z = 0.0
             polygon.points.append(point)
 
         if self.right_goal is not None:
             point = Point32()
-            point.x = float(self.right_goal[0])
-            point.y = float(self.right_goal[1])
+            point.x = float(self.right_goal[0][0])
+            point.y = float(self.right_goal[0][1])
             point.z = 0.0
             polygon.points.append(point)
 

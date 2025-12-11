@@ -15,6 +15,8 @@ def print_initial_debug_view(
     flood_seed: list[tuple[int, int]],
     flood_mask: np.ndarray,
     rotated_rect: cv2.RotatedRect,
+    warped_v_channel: np.ndarray,
+    goal_ellipses: tuple[cv2.RotatedRect, cv2.RotatedRect],
 ) -> None:
     """
     Display debug views for initial board analysis.
@@ -27,6 +29,11 @@ def print_initial_debug_view(
         flood_mask (np.ndarray): The flood fill mask.
         rotated_rect (cv2.RotatedRect): The detected rotated rectangle.
     """
+    # Display warped V channel with goal ellipses
+    for goal_ellipse in goal_ellipses:
+        cv2.ellipse(warped_v_channel, goal_ellipse, (0, 255, 0), 2)
+    plot_single_channel(warped_v_channel, "Warped V Channel with Goal Seeds")
+
     # Draw the rotated rectangle on a copy of the original image
     frame_with_rect = frame_rec.copy()
     box = cv2.boxPoints(rotated_rect)
@@ -78,7 +85,7 @@ def print_segment_debug_view(
 
     # Draw all border segment polygons on the original frame
     frame_with_polygons = frame_rec.copy()
-    
+
     merged_mask = np.zeros_like(s_channel, dtype=np.uint8)
     merged_flood_mask = np.zeros_like(s_channel, dtype=np.uint8)
     for i, (
@@ -123,13 +130,14 @@ def print_segment_debug_view(
         # Merge the current mask into the combined mask
         merged_mask = cv2.bitwise_or(merged_mask, mask)
         merged_flood_mask = cv2.bitwise_or(merged_flood_mask, flood_mask)
-        
+
         # Display aligned flood mask
         cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
 
     # Prepare frame with edge points and fitted lines
     frame_with_edges = _prepare_frame_with_lines(
-        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
+        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
+    )
     cv2.imshow(
         f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
     )
@@ -142,7 +150,10 @@ def print_segment_debug_view(
     plot_single_channel(masked_image, "Initial Board Analysis - Border Segments")
     cv2.imshow("Initial Board Analysis - Border Segments Overlay", frame_with_polygons)
 
-def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines):
+
+def _prepare_frame_with_lines(
+    frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
+):
     frame_with_edges = frame_rec.copy()
     for (
         edge_points_original,
@@ -151,13 +162,13 @@ def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_se
         boarder_segment_edge_points,
         boarder_segment_edge_lines,
     ):
-    # Draw edge points and fitted line on original image
+        # Draw edge points and fitted line on original image
         vx, vy, x0, y0 = line_params
         # Draw the fitted line across the image
         # Parametric line: p = p0 + t*v
         # Find intersections with image boundaries
         img_h, img_w = frame_rec.shape[:2]
-        
+
         # Check if line is nearly vertical or horizontal
         if abs(vx[0]) < 1e-6:  # Nearly vertical line
             pt1 = (int(x0[0]), 0)
@@ -179,7 +190,7 @@ def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_se
             # Bottom edge (y=h-1): t = (h-1-y0)/vy, x = x0 + t*vx
             t_bottom = (img_h - 1 - y0[0]) / vy[0]
             x_bottom = int(x0[0] + t_bottom * vx[0])
-            
+
             # Collect valid intersection points
             points = []
             if 0 <= y_left < img_h:
@@ -190,7 +201,7 @@ def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_se
                 points.append((x_top, 0))
             if 0 <= x_bottom < img_w:
                 points.append((x_bottom, img_h - 1))
-            
+
             # Use first two valid points
             if len(points) >= 2:
                 pt1, pt2 = points[:2]
@@ -198,7 +209,7 @@ def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_se
                 # Fallback to center point if no valid intersections
                 pt1 = (int(x0[0]), int(y0[0]))
                 pt2 = (int(x0[0] + vx[0] * 100), int(y0[0] + vy[0] * 100))
-        
+
         cv2.line(
             frame_with_edges,
             pt1,
@@ -243,12 +254,22 @@ def plot_single_channel(channel: np.ndarray, title: str) -> None:
 
     cv2.imshow(title, channel_with_scale)
 
-def show_online_boarders(frame_rec: np.ndarray, boarder_segment_edge_points, boarder_segment_edge_lines, fps_display, title) -> None:
-    frame_with_edges = _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
+
+def show_online_boarders(
+    frame_rec: np.ndarray,
+    boarder_segment_edge_points,
+    boarder_segment_edge_lines,
+    fps_display,
+    title,
+) -> None:
+    frame_with_edges = _prepare_frame_with_lines(
+        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
+    )
 
     show_final_output(frame_with_edges, fps_display, title)
 
-def show_final_output(warped, fps_display, title) -> None:
+
+def show_final_output(warped, fps_display, title, goal_ellipses=None) -> None:
     """Display the final warped board view with FPS overlay."""
 
     # Draw FPS on image
@@ -264,6 +285,16 @@ def show_final_output(warped, fps_display, title) -> None:
         2,
         cv2.LINE_AA,
     )
+    if goal_ellipses is not None:
+        for goal_ellipse in goal_ellipses:
+            cv2.ellipse(display_image, goal_ellipse, (0, 255, 0), 2)
+            cv2.circle(
+                display_image,
+                (int(goal_ellipse[0][0]), int(goal_ellipse[0][1])),
+                5,
+                (0, 255, 0),
+                -1,
+            )
 
     cv2.imshow(title, display_image)
     cv2.waitKey(1)
