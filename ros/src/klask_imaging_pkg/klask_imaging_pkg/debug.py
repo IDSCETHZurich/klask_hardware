@@ -55,6 +55,7 @@ def print_segment_debug_view(
     boarder_segment_flood_masks_aligned: list[np.ndarray],
     boarder_segment_edge_points: list[np.ndarray],
     boarder_segment_edge_lines: list[list[np.ndarray]],
+    warped_from_corners: np.ndarray,
 ):
     """Display debug views for border segment analysis.
 
@@ -68,7 +69,12 @@ def print_segment_debug_view(
         boarder_segment_flood_masks_aligned (list[np.ndarray]): List of aligned flood masks.
         boarder_segment_edge_points (list[np.ndarray]): List of edge points for each segment.
         boarder_segment_edge_lines (list[list[np.ndarray]]): List of fitted line parameters for each segment.
+        warped_from_corners (np.ndarray): The warped image from fitted corners.
     """
+    # Display warped image from fitted corners
+    cv2.imshow(
+        "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
+    )
 
     # Draw all border segment polygons on the original frame
     frame_with_polygons = frame_rec.copy()

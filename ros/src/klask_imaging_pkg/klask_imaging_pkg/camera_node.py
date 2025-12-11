@@ -4,7 +4,6 @@ import cv2
 import time
 import rclpy
 import numpy as np
-import apriltag
 import cProfile
 import os
 from pathlib import Path
@@ -29,7 +28,6 @@ class CameraNode(Node):
     CAMERA_FPS = 120
     CAMERA_WIDTH = 1280
     CAMERA_HEIGHT = 720
-    APRILTAG_FAMILY = "tag36h11"
     FLOOD_SEED = [
         (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) + 50),
         (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) - 50),
@@ -37,6 +35,9 @@ class CameraNode(Node):
         (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) - 50),
     ]
     FLOOD_THRESHOLD = 7
+    BOARDER_SEG_INSIDE_OFFSET = 50
+    BOARDER_SEG_OUTSIDE_OFFSET = 20
+    BOARDER_SEG_CORNER_DISTANCE = 100
 
     # Initial board detection settings
     USE_STORED_IMAGE = True  # Set to True to load image from data/ folder
@@ -50,24 +51,6 @@ class CameraNode(Node):
     PROFILING_DURATION = 100.0  # Run profiler for N seconds
     PROFILING_TOP_FUNCTIONS = 30  # Show top N functions in stats
 
-    # AprilTag IDs mapping
-    TAG_NAMES = {
-        0: "center right",
-        1: "center left",
-        6: "xy gantry",
-        7: "x gantry",
-    }
-
-    # Goal detection constants
-    GOAL_TAG_IDS = range(2)  # Tags 0-1 are goal tags
-
-    # EMA filter alpha values
-    EMA_ALPHA_APRILTAG = 0.1
-    EMA_ALPHA_GANTRY = 1.0  # No smoothing for gantry tags
-
-    # AprilTag detection rate
-    APRILTAG_DETECTION_FPS = 5.0  # Detect AprilTags at this frequency (Hz)
-
     def __init__(self):
         super().__init__("camera_node")
 
@@ -77,9 +60,6 @@ class CameraNode(Node):
         )
         self.goal_publisher = self.create_publisher(
             StampedPolygon, "goal_positions", 10
-        )
-        self.gantry_publisher = self.create_publisher(
-            StampedPolygon, "gantry_positions", 10
         )
 
         # CV Bridge for image conversion
@@ -109,17 +89,6 @@ class CameraNode(Node):
             5,
         )
 
-        # AprilTag detector
-        options = apriltag.DetectorOptions(families=self.APRILTAG_FAMILY)
-        self.detector = apriltag.Detector(options)
-        self.previous_tag_corners: dict[int, np.ndarray | None] = {
-            i: None for i in range(8)
-        }
-
-        # AprilTag detection timing
-        self.last_apriltag_detection_time: float = 0.0
-        self.apriltag_detection_interval: float = 1.0 / self.APRILTAG_DETECTION_FPS
-
         # Perspective transform
         self.M: np.ndarray | None = None
         self.width = 0
@@ -128,10 +97,6 @@ class CameraNode(Node):
         # Goal positions
         self.left_goal: list[float] | None = None
         self.right_goal: list[float] | None = None
-
-        # Gantry/magnet tracking
-        self.xy_gantry: list[float] | None = None
-        self.x_gantry: list[float] | None = None
 
         # Profiling setup
         self.profiler = None
@@ -143,9 +108,6 @@ class CameraNode(Node):
             self.get_logger().info(
                 f"cProfile profiling enabled for {self.PROFILING_DURATION} seconds"
             )
-
-        # Comprehensive initial board detection
-        self._initial_board_detection()
 
     def _setup_camera(self) -> None:
         """Initialize and configure the camera."""
@@ -169,9 +131,10 @@ class CameraNode(Node):
             f"Camera configured: Target {self.CAMERA_FPS} FPS, Actual {actual_fps} FPS"
         )
 
-    def _initial_board_detection(self) -> None:
+    def initial_board_detection(self) -> None:
         """Perform initial board detection using flood fill to establish perspective transform."""
 
+        # TODO: Remove this after the debuging is done
         if self.USE_STORED_IMAGE:
             # Load stored image
             package_dir = Path(__file__).resolve().parent
@@ -214,7 +177,7 @@ class CameraNode(Node):
         # Find rotated rectangle from flood fill mask
         rotated_rect = self._find_rotated_rect_from_flood_mask(flood_mask, rect)
 
-        # Compute border segment masks
+        # Compute border segment masks and seed lines
         (
             self.boarder_segment_masks,
             seed_lines,
@@ -223,8 +186,17 @@ class CameraNode(Node):
             self.segment_lengths,
         ) = self._compute_boarder_segment_masks(rotated_rect, s.shape)
 
-        self.line_samples = self._compute_seed_line_samples(seed_lines)
+        # Compute seed line samples
+        self.line_samples = self._compute_seed_line_samples(seed_lines, 4)
 
+        # Precompute static affine transformations for border segment processing
+        self._precompute_segment_transforms(
+            self.rotation_matrix,
+            self.segment_offsets,
+            self.segment_lengths,
+        )
+
+        # Fit border segment lines and get board corners
         (
             (
                 boarder_segment_flood_masks,
@@ -233,17 +205,10 @@ class CameraNode(Node):
                 boarder_segment_edge_lines,
             ),
             board_corners,
-        ) = self._fit_boarder_segment_lines(
-            s,
-            self.boarder_segment_masks,
-            self.line_samples,
-            self.segment_offsets,
-            self.segment_lengths,
-            self.rotation_matrix,
-        )
+        ) = self._fit_boarder_segment_lines(s)
 
         # Compute perspective transform from fitted line intersections
-        self.compute_perspective_transform_from_corners(board_corners)
+        self._compute_perspective_transform_from_corners(board_corners)
 
         # Apply the transformation and display the result
         warped_from_corners = cv2.warpPerspective(
@@ -251,12 +216,8 @@ class CameraNode(Node):
             self.M,
             (self.width, self.height),
         )
-        cv2.imshow(
-            "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
-        )
 
-        self.get_logger().info(f"Board detected: {self.width}x{self.height} pixels")
-
+        # Display debug views if enabled
         if self.DEBUG_VIEW:
             print_segment_debug_view(
                 frame_rec,
@@ -268,6 +229,7 @@ class CameraNode(Node):
                 boarder_segment_flood_masks_aligned,
                 boarder_segment_edge_points,
                 boarder_segment_edge_lines,
+                warped_from_corners,
             )
             print_initial_debug_view(
                 frame_rec,
@@ -280,68 +242,104 @@ class CameraNode(Node):
             )
             cv2.waitKey(0)
 
-    def _fit_boarder_segment_lines(
+    def _precompute_segment_transforms(
         self,
-        channel: np.ndarray,
-        boarder_segment_masks,
-        line_samples,
-        segment_offsets,
-        segment_lengths,
-        rotation_matrix,
-    ) -> np.ndarray:
+        rotation_matrix: np.ndarray,
+        segment_offsets: list[np.ndarray],
+        segment_lengths: list[int],
+    ) -> None:
+        """Precompute static affine transformations for border segment processing.
 
-        boarder_segment_flood_masks = []
-        boarder_segment_flood_masks_aligned = []
-        boarder_segment_edge_points = []
-        boarder_segment_edge_lines = []
-
-        diff_rotations = (
+        These transformations remain constant across all frames and only depend on
+        the initial board detection results.
+        """
+        # Define rotation matrices for each segment (constant)
+        self.diff_rotations = (
             -np.eye(2),
             np.array([[0, -1], [1, 0]]),
             np.eye(2),
             np.array([[0, 1], [-1, 0]]),
         )
 
-        for i, (
+        # Aliasing crop size (constant)
+        self.aliasing_crop_size = 2
+
+        # Precompute affine matrices and inverse affine matrices for each segment
+        self.affine_matrices = []
+        self.inverse_affine_matrices = []
+        self.warp_sizes = []
+
+        for segment_offset, length, diff_rotation in zip(
+            segment_offsets, segment_lengths, self.diff_rotations
+        ):
+            # Compute offset for affine transform
+            offset = -diff_rotation @ rotation_matrix.T @ segment_offset.reshape(
+                (2, 1)
+            ) + np.array([[int(length // 2)], [self.BOARDER_SEG_INSIDE_OFFSET]])
+
+            # Compute affine matrix
+            affine_matrix = np.hstack([diff_rotation @ rotation_matrix.T, offset])
+            self.affine_matrices.append(affine_matrix)
+
+            # Compute inverse affine matrix for transforming edge points back
+            rotation_part = diff_rotation @ rotation_matrix.T
+            offset_part = offset + np.array([[1], [1]])
+            inverse_rotation = rotation_part.T
+            inverse_offset = -inverse_rotation @ offset_part
+            inverse_affine = np.hstack([inverse_rotation, inverse_offset])
+            self.inverse_affine_matrices.append(inverse_affine)
+
+            # Store warp size
+            warp_size = (
+                length,
+                self.BOARDER_SEG_INSIDE_OFFSET + self.BOARDER_SEG_OUTSIDE_OFFSET,
+            )
+            self.warp_sizes.append(warp_size)
+
+    def _fit_boarder_segment_lines(
+        self,
+        channel: np.ndarray,
+    ) -> np.ndarray:
+
+        # Lists to store results
+        boarder_segment_flood_masks = []
+        boarder_segment_flood_masks_aligned = []
+        boarder_segment_edge_points = []
+        boarder_segment_edge_lines = []
+
+        # Process each border segment using precomputed transformations
+        for (
             boarder_segment_mask,
             line_sample_points,
-            segment_offset,
-            length,
-            diff_rotation,
-        ) in enumerate(
-            zip(
-                boarder_segment_masks,
-                line_samples,
-                segment_offsets,
-                segment_lengths,
-                diff_rotations,
-            )
+            affine_matrix,
+            inverse_affine,
+            warp_size,
+        ) in zip(
+            self.boarder_segment_masks,
+            self.line_samples,
+            self.affine_matrices,
+            self.inverse_affine_matrices,
+            self.warp_sizes,
         ):
+            # Mask the channel to the current border segment
             masked_image = cv2.bitwise_and(channel, channel, mask=boarder_segment_mask)
+
+            # Perform flood fill on the masked image with the seed line sample points
             boarder_segment_flood_mask, _ = self._board_flood_fill(
                 masked_image, line_sample_points, self.FLOOD_THRESHOLD
             )
-
             boarder_segment_flood_masks.append(boarder_segment_flood_mask)
 
-            inside_offset = 50  # TODO: make global
-            outside_offset = 20
-
-            offset = -diff_rotation @ rotation_matrix.T @ segment_offset.reshape(
-                (2, 1)
-            ) + np.array([[int(length // 2)], [inside_offset]])
-
-            affine_matrix = np.hstack([diff_rotation @ rotation_matrix.T, offset])
-
+            # Align the flood mask using precomputed affine transform
             aligned_mask = cv2.warpAffine(
                 boarder_segment_flood_mask,
                 affine_matrix,
-                (length, inside_offset + outside_offset),
+                warp_size,
             )
-            aliasing_crop_size = 2
+            # Because the affine transform can introduce edge artifacts, we crop a few pixels
             aligned_mask = aligned_mask[
-                aliasing_crop_size:-aliasing_crop_size,
-                aliasing_crop_size:-aliasing_crop_size,
+                self.aliasing_crop_size : -self.aliasing_crop_size,
+                self.aliasing_crop_size : -self.aliasing_crop_size,
             ]
             boarder_segment_flood_masks_aligned.append(aligned_mask)
 
@@ -363,26 +361,13 @@ class CameraNode(Node):
                 ]
             )
             edge_points = edge_points[has_edge] + np.array(
-                [aliasing_crop_size, aliasing_crop_size]
+                [self.aliasing_crop_size, self.aliasing_crop_size]
             )
 
-            # Transform edge points back to original frame
-            # Inverse affine transform: x_orig = R^T @ (x_aligned - offset)
-            # Where affine_matrix = [R | offset]
-            rotation_part = diff_rotation @ rotation_matrix.T
-            offset_part = offset + np.array([[1], [1]])
-
-            # Add homogeneous coordinate and apply inverse transform
+            # Transform edge points back to original frame using precomputed inverse affine
             edge_points_homogeneous = np.hstack(
                 [edge_points, np.ones((len(edge_points), 1))]
             )
-
-            # Inverse: x_orig = R^T @ x_aligned - R^T @ offset
-            # Which equals: x_orig = R^T @ (x_aligned - offset)
-            inverse_rotation = rotation_part.T
-            inverse_offset = -inverse_rotation @ offset_part
-            inverse_affine = np.hstack([inverse_rotation, inverse_offset])
-
             edge_points_original = edge_points_homogeneous @ inverse_affine.T
             boarder_segment_edge_points.append(edge_points_original)
 
@@ -438,14 +423,17 @@ class CameraNode(Node):
         )
 
     def _compute_seed_line_samples(
-        self, seed_lines: list[np.ndarray]
+        self, seed_lines: list[np.ndarray], line_sample_count: int
     ) -> list[list[np.ndarray]]:
-        line_sample_count = 4
+        """Compute sample points along each seed line for flood fill seeding."""
+
         line_samples = []
         for seed_line in seed_lines:
+            # Move the seed sample line slightly inward to avoid edge artifacts
             line_vec = seed_line[:, 1] - seed_line[:, 0]
             line_length = np.linalg.norm(line_vec)
             dir = line_vec / line_length
+            # Sample points along the line
             interval = line_length / (line_sample_count + 1)
             sample_points = [
                 np.intp(seed_line[:, 0] + dir * (interval * (j + 1)))
@@ -468,13 +456,13 @@ class CameraNode(Node):
             self._corners_from_rotated_rect(rotated_rect)
         )
         boarder_segment_masks = [np.zeros(shape, dtype=np.uint8) for _ in range(4)]
-        outside_offset = 20
-        inside_offset = 50
-        corner_distance = 100
-        long_side_length = rect_width - 2 * corner_distance
-        short_side_length = rect_height - 2 * corner_distance
+
+        # Compute segment dimensions
+        long_side_length = rect_width - 2 * self.BOARDER_SEG_CORNER_DISTANCE
+        short_side_length = rect_height - 2 * self.BOARDER_SEG_CORNER_DISTANCE
         center = np.reshape(rotated_rect[0], (2, 1))
 
+        # Helper to create rectangle points from offsets
         def rect_from_offset(
             top_offset, bottom_offset, left_offset, right_offset
         ) -> np.ndarray:
@@ -487,32 +475,34 @@ class CameraNode(Node):
                 ]
             ).T
 
+        # Define parameter combinations for each border segment
         parameter_combination = [
             (
-                inside_offset,
-                outside_offset,
+                self.BOARDER_SEG_INSIDE_OFFSET,
+                self.BOARDER_SEG_OUTSIDE_OFFSET,
                 int(long_side_length // 2),
                 int(long_side_length // 2),
             ),
             (
                 int(short_side_length // 2),
                 int(short_side_length // 2),
-                inside_offset,
-                outside_offset,
+                self.BOARDER_SEG_INSIDE_OFFSET,
+                self.BOARDER_SEG_OUTSIDE_OFFSET,
             ),
             (
-                outside_offset,
-                inside_offset,
+                self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.BOARDER_SEG_INSIDE_OFFSET,
                 int(long_side_length // 2),
                 int(long_side_length // 2),
             ),
             (
                 int(short_side_length // 2),
                 int(short_side_length // 2),
-                outside_offset,
-                inside_offset,
+                self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.BOARDER_SEG_INSIDE_OFFSET,
             ),
         ]
+        # Lengths of each border segment rectangle
         rects_length = (
             int(long_side_length),
             int(short_side_length),
@@ -520,18 +510,24 @@ class CameraNode(Node):
             int(short_side_length),
         )
 
+        # Compute rectangles
         rects = [rect_from_offset(*params) for params in parameter_combination]
         rects_transformed = [rotation_matrix @ rect + center for rect in rects]
         seed_lines = []
         segment_offsets = []
 
+        # Fill in masks and compute seed lines
         for i, boarder_segment_mask in enumerate(boarder_segment_masks):
+            # Get corner points for this segment
             pt1 = np.reshape(corner_pts[i], (2, 1))
             pt2 = np.reshape(corner_pts[(i + 1) % 4], (2, 1))
+            # Compute the center point of the line segment
             line_center = (pt2 - pt1) / 2 + pt1
             segment_offsets.append(line_center)
+            # Compute the rectangle points
             parallel_dir = line_center - center
             rect_pts = np.intp(rects_transformed[i] + parallel_dir)
+            # Compute seed line points slightly offset from the rectangle edge
             seed_line_pts = np.hstack(
                 (
                     rect_pts[:, (1 - i) % 4].reshape(2, 1),
@@ -561,7 +557,18 @@ class CameraNode(Node):
         channel: np.ndarray,
         seed: tuple[int, int] | list[tuple[int, int]],
         threshold: int,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, cv2.typing.Rect]:
+    ) -> tuple[np.ndarray, cv2.typing.Rect]:
+        """
+        Perform flood fill on the given channel starting from the seed point(s).
+
+        Args:
+            channel (np.ndarray): The image channel to perform flood fill on.
+            seed (tuple[int, int] | list[tuple[int, int]]): The seed point(s) for flood fill.
+            threshold (int): The threshold for flood fill.
+        Returns:
+            flood_mask (np.ndarray): The resulting flood fill mask.
+            rect (cv2.typing.Rect): The bounding rectangle of the flooded area.
+        """
         # Perform flood fill
         # flags: connectivity (4 or 8) + fill mask only option
         flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
@@ -571,7 +578,7 @@ class CameraNode(Node):
 
         flood_mask = None
         for single_seed in seed:
-            retval, image, flood_mask, rect = cv2.floodFill(
+            _, _, flood_mask, rect = cv2.floodFill(
                 channel,
                 flood_mask,
                 tuple(single_seed),
@@ -589,6 +596,8 @@ class CameraNode(Node):
     def _find_rotated_rect_from_flood_mask(
         self, flood_mask: np.ndarray, rect: cv2.typing.Rect
     ) -> cv2.RotatedRect:
+        """Find rotated rectangle from flood fill mask."""
+
         # Get all points where flood_mask is non-zero
         points = cv2.findNonZero(flood_mask)
 
@@ -640,7 +649,7 @@ class CameraNode(Node):
         # Translate to actual center position
         return (rotated_corners, rect_width, rect_height, rotation_matrix)
 
-    def compute_perspective_transform_from_corners(self, corners: np.ndarray) -> None:
+    def _compute_perspective_transform_from_corners(self, corners: np.ndarray) -> None:
         """Compute perspective transformation matrix from board corners."""
 
         # corners should be in order: [top-left, top-right, bottom-right, bottom-left]
@@ -680,61 +689,8 @@ class CameraNode(Node):
         # Undistort frame using calibration data
         rectified_frame = cv2.remap(frame, self.mapx, self.mapy, cv2.INTER_LINEAR)
 
-        # Detect AprilTags at specified frequency
-        current_time = time.time()
-        if (
-            current_time - self.last_apriltag_detection_time
-            >= self.apriltag_detection_interval
-        ):
-            self.detect_apriltags(rectified_frame)
-            self.last_apriltag_detection_time = current_time
-
         # Process frame
         self.process_frame(rectified_frame)
-
-    def detect_apriltags(self, undistorted_frame: np.ndarray) -> None:
-        """Detect and process AprilTags in the frame."""
-        gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
-        results = self.detector.detect(gray)
-
-        tag_corners: dict[int, np.ndarray | None] = {i: None for i in range(8)}
-
-        # Process detected tags with EMA smoothing
-        for r in results:
-            if r.tag_id not in self.previous_tag_corners:
-                continue
-
-            # Determine alpha based on tag type (gantry tags use no smoothing)
-            alpha = self.EMA_ALPHA_GANTRY if r.tag_id >= 6 else self.EMA_ALPHA_APRILTAG
-
-            smoothed_corners = []
-            for i, corner in enumerate(r.corners):
-                if self.previous_tag_corners[r.tag_id] is None:
-                    smoothed_corner = corner
-                else:
-                    smoothed_corner = apply_ema_filter(
-                        corner,
-                        self.previous_tag_corners[r.tag_id][i],
-                        alpha=alpha,
-                    )
-                smoothed_corners.append(smoothed_corner)
-
-            # Store smoothed corners
-            tag_corners[r.tag_id] = np.array(smoothed_corners, dtype="float32")
-            self.previous_tag_corners[r.tag_id] = np.array(
-                smoothed_corners, dtype="float32"
-            )
-
-        # Update goal coordinates and publish
-        self.update_goal_coordinates()
-
-        # Reset gantry tag corners if not detected
-        for gantry_tag_id in [6, 7]:
-            if tag_corners[gantry_tag_id] is None:
-                self.previous_tag_corners[gantry_tag_id] = None
-
-        # Update gantry and magnet positions and publish
-        self.update_gantry_coordinates()
 
     def process_frame(self, undistorted_frame: np.ndarray) -> None:
         """Process frame to create perspective-corrected view and publish."""
@@ -743,20 +699,10 @@ class CameraNode(Node):
         frame_hsv = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
 
-        (
-            _,
-            board_corners,
-        ) = self._fit_boarder_segment_lines(
-            s,
-            self.boarder_segment_masks,
-            self.line_samples,
-            self.segment_offsets,
-            self.segment_lengths,
-            self.rotation_matrix,
-        )
+        (_, board_corners) = self._fit_boarder_segment_lines(s)
 
         # Compute perspective transform from fitted line intersections
-        self.compute_perspective_transform_from_corners(board_corners)
+        self._compute_perspective_transform_from_corners(board_corners)
 
         # Apply perspective warp to get top-down view
         warped = cv2.warpPerspective(
@@ -778,35 +724,6 @@ class CameraNode(Node):
             self.image_publisher.publish(msg)
         except Exception as e:
             self.get_logger().error(f"Failed to publish board image: {e}")
-
-    def update_goal_coordinates(self) -> None:
-        """Update goal positions from AprilTag detections and publish."""
-        if self.M is None:
-            return
-
-        goals_updated = False
-
-        # Update right goal (tag 0)
-        if self.previous_tag_corners[0] is not None:
-            right_goal_centroid = np.mean(self.previous_tag_corners[0], axis=0)
-            right_goal_warped = cv2.perspectiveTransform(
-                np.array([[right_goal_centroid]], dtype="float32"), self.M
-            )[0][0]
-            self.right_goal = right_goal_warped.tolist()
-            goals_updated = True
-
-        # Update left goal (tag 1)
-        if self.previous_tag_corners[1] is not None:
-            left_goal_centroid = np.mean(self.previous_tag_corners[1], axis=0)
-            left_goal_warped = cv2.perspectiveTransform(
-                np.array([[left_goal_centroid]], dtype="float32"), self.M
-            )[0][0]
-            self.left_goal = left_goal_warped.tolist()
-            goals_updated = True
-
-        # Publish goal positions if both are available
-        if goals_updated and self.left_goal is not None and self.right_goal is not None:
-            self.publish_goal_positions()
 
     def publish_goal_positions(self) -> None:
         """Publish goal positions."""
@@ -832,71 +749,12 @@ class CameraNode(Node):
             stamped_polygon.header.stamp = self.get_clock().now().to_msg()
             self.goal_publisher.publish(stamped_polygon)
 
-    def update_gantry_coordinates(self) -> None:
-        """Update gantry positions from AprilTag detections and publish."""
-        if self.M is None:
-            return
-
-        # Update xy gantry position (tag 6)
-        if self.previous_tag_corners[6] is not None:
-            xy_gantry_centroid = np.mean(self.previous_tag_corners[6], axis=0)
-            xy_gantry_warped = cv2.perspectiveTransform(
-                np.array([[xy_gantry_centroid]], dtype="float32"), self.M
-            )[0][0]
-            self.xy_gantry = xy_gantry_warped.tolist()
-        else:
-            self.xy_gantry = None
-
-        # Update x gantry position (tag 7)
-        if self.previous_tag_corners[7] is not None:
-            x_gantry_centroid = np.mean(self.previous_tag_corners[7], axis=0)
-            x_gantry_warped = cv2.perspectiveTransform(
-                np.array([[x_gantry_centroid]], dtype="float32"), self.M
-            )[0][0]
-            self.x_gantry = x_gantry_warped.tolist()
-        else:
-            self.x_gantry = None
-
-        # Publish gantry positions
-        self.publish_gantry_positions()
-
-    def publish_gantry_positions(self) -> None:
-        """Publish gantry and magnet positions."""
-        XY_GANTRY_X_OFFSET = 112
-        X_GANTRY_X_OFFSET = 77
-
-        polygon = Polygon()
-
-        # Calculate magnet position
-        if self.xy_gantry is not None:
-            magnet_x = float(self.xy_gantry[0] - XY_GANTRY_X_OFFSET)
-            magnet_y = float(self.xy_gantry[1])
-
-            point = Point32()
-            point.x = magnet_x
-            point.y = magnet_y
-            point.z = 0.0
-            polygon.points.append(point)
-        elif self.x_gantry is not None:
-            magnet_x = float(self.x_gantry[0] - X_GANTRY_X_OFFSET)
-
-            point = Point32()
-            point.x = magnet_x
-            point.y = 0.0  # Y position unknown
-            point.z = 1.0  # Use z=1 to indicate y is unknown
-            polygon.points.append(point)
-
-        if len(polygon.points) > 0:
-            stamped_polygon = StampedPolygon()
-            stamped_polygon.polygon = polygon
-            stamped_polygon.header.stamp = self.get_clock().now().to_msg()
-            self.gantry_publisher.publish(stamped_polygon)
-
 
 def main(args=None):
     rclpy.init(args=args)
 
     camera_node = CameraNode()
+    camera_node.initial_board_detection()
 
     try:
         rclpy.spin(camera_node)
