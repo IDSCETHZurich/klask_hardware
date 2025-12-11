@@ -19,6 +19,7 @@ from .debug import (
     print_initial_debug_view,
     print_profiling_stats,
     show_final_output,
+    show_online_boarders,
 )
 
 
@@ -35,14 +36,18 @@ class CameraNode(Node):
         (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) + 50),
         (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) - 50),
     ]
-    FLOOD_THRESHOLD = 7
-    BOARDER_SEG_INSIDE_OFFSET = 50
+    FLOOD_THRESHOLD = 120
+    BOARDER_SEG_INSIDE_OFFSET = 30
     BOARDER_SEG_OUTSIDE_OFFSET = 20
     BOARDER_SEG_CORNER_DISTANCE = 100
 
     # Initial board detection settings
     USE_STORED_IMAGE = False  # Set to True to load image from data/ folder
     STORED_IMAGE_FILENAME = "debug_board_tilted_1.jpg"  # Filename in data/ folder
+
+    # Image processing settings
+    USE_SMOOTHING = True  # Apply smoothing to improve border detection stability
+    SMOOTHING_KERNEL = 5  # Kernel size for Gaussian blur (3, 5, 7, etc.)
 
     # Debug/Display settings
     DEBUG_VIEW = False  # Set to True to show debug views during processing
@@ -179,9 +184,15 @@ class CameraNode(Node):
         frame_hsv = cv2.cvtColor(frame_rec, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
 
+        # Apply smoothing to saturation channel for more stable border detection
+        if self.USE_SMOOTHING:
+            s_smooth = cv2.GaussianBlur(s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0)
+        else:
+            s_smooth = s
+
         # Perform flood fill to detect board boundaries
         flood_mask, rect = self._board_flood_fill(
-            s, self.FLOOD_SEED, self.FLOOD_THRESHOLD
+            s_smooth, self.FLOOD_SEED, self.FLOOD_THRESHOLD
         )
 
         # Find rotated rectangle from flood fill mask
@@ -215,7 +226,7 @@ class CameraNode(Node):
                 boarder_segment_edge_lines,
             ),
             board_corners,
-        ) = self._fit_boarder_segment_lines(s)
+        ) = self._fit_boarder_segment_lines(s_smooth)
 
         # Compute perspective transform from fitted line intersections
         self._compute_perspective_transform_from_corners(board_corners)
@@ -231,7 +242,7 @@ class CameraNode(Node):
         if self.DEBUG_VIEW:
             print_segment_debug_view(
                 frame_rec,
-                s,
+                s_smooth,
                 self.boarder_segment_masks,
                 seed_lines,
                 self.line_samples,
@@ -244,7 +255,7 @@ class CameraNode(Node):
             print_initial_debug_view(
                 frame_rec,
                 h,
-                s,
+                s_smooth,
                 v,
                 self.FLOOD_SEED,
                 flood_mask,
@@ -574,14 +585,14 @@ class CameraNode(Node):
         Args:
             channel (np.ndarray): The image channel to perform flood fill on.
             seed (tuple[int, int] | list[tuple[int, int]]): The seed point(s) for flood fill.
-            threshold (int): The threshold for flood fill.
+            threshold (int): Threshold relative to seed pixel value (loDiff=upDiff=threshold).
         Returns:
             flood_mask (np.ndarray): The resulting flood fill mask.
             rect (cv2.typing.Rect): The bounding rectangle of the flooded area.
         """
-        # Perform flood fill
-        # flags: connectivity (4 or 8) + fill mask only option
-        flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
+        # flags: connectivity (4) + fill mask only + fixed range (relative to seed)
+        # FLOODFILL_FIXED_RANGE makes loDiff/upDiff relative to seed pixel, not neighbors
+        flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY | cv2.FLOODFILL_FIXED_RANGE
 
         if isinstance(seed, list) is False:
             seed = [seed]
@@ -714,7 +725,21 @@ class CameraNode(Node):
         frame_hsv = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
 
-        (_, board_corners) = self._fit_boarder_segment_lines(s)
+        # Apply smoothing to saturation channel for more stable border detection
+        if self.USE_SMOOTHING:
+            s_smooth = cv2.GaussianBlur(s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0)
+        else:
+            s_smooth = s
+
+        (
+            (
+                _,
+                _,
+                boarder_segment_edge_points,
+                boarder_segment_edge_lines,
+            ),
+            board_corners,
+        ) = self._fit_boarder_segment_lines(s_smooth)
 
         # Compute perspective transform from fitted line intersections
         self._compute_perspective_transform_from_corners(board_corners)
@@ -736,7 +761,14 @@ class CameraNode(Node):
             if current_time - self.last_display_time >= 1.0 / self.SHOW_IMAGE_FPS:
                 self.last_display_time = current_time
 
-                show_final_output(warped, self.fps_display)
+                show_final_output(warped, self.fps_display, "Board View")
+                show_online_boarders(
+                    undistorted_frame,
+                    boarder_segment_edge_points,
+                    boarder_segment_edge_lines,
+                    self.fps_display,
+                    "Edge Points and Fitted Lines",
+                )
 
         # Publish the transformed image
         self.publish_board_image(warped)

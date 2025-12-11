@@ -78,7 +78,7 @@ def print_segment_debug_view(
 
     # Draw all border segment polygons on the original frame
     frame_with_polygons = frame_rec.copy()
-    frame_with_edges = frame_rec.copy()
+    
     merged_mask = np.zeros_like(s_channel, dtype=np.uint8)
     merged_flood_mask = np.zeros_like(s_channel, dtype=np.uint8)
     for i, (
@@ -123,23 +123,13 @@ def print_segment_debug_view(
         # Merge the current mask into the combined mask
         merged_mask = cv2.bitwise_or(merged_mask, mask)
         merged_flood_mask = cv2.bitwise_or(merged_flood_mask, flood_mask)
-        # Draw edge points and fitted line on original image
-        vx, vy, x0, y0 = line_params
-        # Draw the fitted line across the image
-        # Parametric line: p = p0 + t*v, calculate endpoints at image boundaries
-        lefty = int((-x0[0] * vy[0] / vx[0]) + y0[0])
-        righty = int(((frame_rec.shape[1] - x0[0]) * vy[0] / vx[0]) + y0[0])
-        cv2.line(
-            frame_with_edges,
-            (frame_rec.shape[1] - 1, righty),
-            (0, lefty),
-            (0, 255, 0),
-            2,
-        )
-        edge_points_int = edge_points_original.astype(np.int32)
-        frame_with_edges[edge_points_int[:, 1], edge_points_int[:, 0]] = [0, 0, 255]
+        
         # Display aligned flood mask
         cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
+
+    # Prepare frame with edge points and fitted lines
+    frame_with_edges = _prepare_frame_with_lines(
+        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
     cv2.imshow(
         f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
     )
@@ -151,6 +141,32 @@ def print_segment_debug_view(
     masked_image = cv2.bitwise_and(s_channel, s_channel, mask=merged_mask)
     plot_single_channel(masked_image, "Initial Board Analysis - Border Segments")
     cv2.imshow("Initial Board Analysis - Border Segments Overlay", frame_with_polygons)
+
+def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines):
+    frame_with_edges = frame_rec.copy()
+    for (
+        edge_points_original,
+        line_params,
+    ) in zip(
+        boarder_segment_edge_points,
+        boarder_segment_edge_lines,
+    ):
+    # Draw edge points and fitted line on original image
+        vx, vy, x0, y0 = line_params
+        # Draw the fitted line across the image
+        # Parametric line: p = p0 + t*v, calculate endpoints at image boundaries
+        left = int((-x0[0] * vy[0] / vx[0]) + y0[0])
+        right = int(((frame_rec.shape[1] - x0[0]) * vy[0] / vx[0]) + y0[0])
+        cv2.line(
+            frame_with_edges,
+            (frame_rec.shape[1] - 1, right),
+            (0, left),
+            (0, 255, 0),
+            2,
+        )
+        edge_points_int = edge_points_original.astype(np.int32)
+        frame_with_edges[edge_points_int[:, 1], edge_points_int[:, 0]] = [0, 0, 255]
+    return frame_with_edges
 
 
 def plot_single_channel(channel: np.ndarray, title: str) -> None:
@@ -185,8 +201,12 @@ def plot_single_channel(channel: np.ndarray, title: str) -> None:
 
     cv2.imshow(title, channel_with_scale)
 
+def show_online_boarders(frame_rec: np.ndarray, boarder_segment_edge_points, boarder_segment_edge_lines, fps_display, title) -> None:
+    frame_with_edges = _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
 
-def show_final_output(warped, fps_display) -> None:
+    show_final_output(frame_with_edges, fps_display, title)
+
+def show_final_output(warped, fps_display, title) -> None:
     """Display the final warped board view with FPS overlay."""
 
     # Draw FPS on image
@@ -203,7 +223,7 @@ def show_final_output(warped, fps_display) -> None:
         cv2.LINE_AA,
     )
 
-    cv2.imshow("Board View", display_image)
+    cv2.imshow(title, display_image)
     cv2.waitKey(1)
 
 
