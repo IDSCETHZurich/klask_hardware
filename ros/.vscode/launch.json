@@ -2,10 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug klask_state_estimation (ROS2)",
+            "name": "Debug state_estimator_node (ROS2)",
             "type": "debugpy",
             "request": "launch",
-            "module": "klask_state_estimation_pkg.klask_state_estimation",
+            "module": "klask_state_estimation_pkg.state_estimator_node",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug camera_node (ROS2)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "klask_imaging_pkg.camera_node",
             "console": "integratedTerminal"
         }
     ]

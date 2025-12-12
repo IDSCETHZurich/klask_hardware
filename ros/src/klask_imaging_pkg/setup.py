@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'klask_state_estimation_pkg'
+package_name = 'klask_imaging_pkg'
 
 setup(
     name=package_name,
@@ -14,8 +14,8 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='root',
-    maintainer_email='tobimeier@ethz.ch',
-    description='This package contains the state estimation node for the KLASK robotic platform.',
+    maintainer_email='tobimeier@student.ethz.ch',
+    description='The imaging package for Klask robot',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'state_estimator = klask_state_estimation_pkg.state_estimator_node:main'
+            'camera_node = klask_imaging_pkg.camera_node:main',
+            'image_viewer = klask_imaging_pkg.image_viewer:main'
         ],
     },
 )
