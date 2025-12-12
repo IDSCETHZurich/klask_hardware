@@ -5,12 +5,12 @@ import numpy as np
 
 class KalmanFilter:
     """Kalman Filter for tracking position and velocity in 2D space."""
-    
+
     # Collision noise constants
     COLLISION_POSITION_NOISE = 4.0
     COLLISION_VELOCITY_NOISE = 10000.0
     DEFAULT_VELOCITY_THRESHOLD = 1.0
-    
+
     def __init__(
         self,
         process_noise_position: float = 1.0,
@@ -21,7 +21,7 @@ class KalmanFilter:
     ):
         """
         Initialize Kalman Filter.
-        
+
         Args:
             process_noise_position: Process noise for position
             process_noise_velocity: Process noise for velocity
@@ -36,13 +36,15 @@ class KalmanFilter:
         self.previous_position = None
 
         # Process noise covariance matrix
-        self.Q = np.diag([
-            process_noise_position,
-            process_noise_position,
-            process_noise_velocity,
-            process_noise_velocity,
-        ])
-        
+        self.Q = np.diag(
+            [
+                process_noise_position,
+                process_noise_position,
+                process_noise_velocity,
+                process_noise_velocity,
+            ]
+        )
+
         # Measurement noise covariance matrix
         self.R = measurement_noise_position * np.eye(2)
 
@@ -51,33 +53,34 @@ class KalmanFilter:
 
         # Initial estimation error covariance
         self.P = np.eye(4)
-        
+
         # State transition matrix (will be updated with dt)
         self.F = np.eye(4)
 
-    def predict(self, dt: float, x_collision: bool = False, y_collision: bool = False) -> None:
+    def predict(
+        self, dt: float, x_collision: bool = False, y_collision: bool = False
+    ) -> None:
         """
         Predict the next state based on the motion model.
-        
+
         Args:
             dt: Time step since last prediction
             x_collision: Whether collision occurred in x-direction
             y_collision: Whether collision occurred in y-direction
         """
         # Update state transition matrix with time step
-        self.F = np.array([
-            [1, 0, dt, 0],
-            [0, 1, 0, dt],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
+        self.F = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]])
 
         # Adjust process noise for collisions
         Q = self.Q.copy()
         if x_collision:
-            Q += np.diag([self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE, 0.0])
+            Q += np.diag(
+                [self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE, 0.0]
+            )
         if y_collision:
-            Q += np.diag([0.0, self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE])
+            Q += np.diag(
+                [0.0, self.COLLISION_POSITION_NOISE, 0.0, self.COLLISION_VELOCITY_NOISE]
+            )
 
         # Prediction step
         self.state = self.F @ self.state
@@ -86,7 +89,7 @@ class KalmanFilter:
     def update(self, measurement: tuple[float, float]) -> None:
         """
         Update state with new measurement.
-        
+
         Args:
             measurement: Measured position (x, y)
         """
@@ -94,7 +97,7 @@ class KalmanFilter:
         y = z - (self.H @ self.state)
         S = self.H @ self.P @ self.H.T + self.R
         K = self.P @ self.H.T @ np.linalg.inv(S)
-        
+
         self.state = self.state + K @ y
         self.P = (np.eye(4) - K @ self.H) @ self.P
 
