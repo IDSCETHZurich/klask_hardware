@@ -11,7 +11,8 @@ from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 
 from .kalman_filter import KalmanFilter
-from .utils import resize_with_aspect_ratio
+from .utils import create_point32
+from .debug import draw_object_with_velocity, draw_goals, plot_image
 
 
 class StateEstimatorNode(Node):
@@ -38,6 +39,9 @@ class StateEstimatorNode(Node):
     CANVAS_WIDTH = 1280
     CANVAS_HEIGHT = 720
 
+    # State publishing frequency [Hz]
+    PUBLISH_FREQUENCY = 80.0
+
     # Display update rate
     DISPLAY_UPDATE_INTERVAL = 0.1  # 10Hz display update (100ms between frames)
 
@@ -52,13 +56,15 @@ class StateEstimatorNode(Node):
 
         # Subscribers
         self.image_subscription = self.create_subscription(
-            CompressedImage, "board_image/compressed", self.image_callback, 10
+            CompressedImage, "board_image/compressed", self._image_callback, 10
         )
         self.goal_subscription = self.create_subscription(
-            StampedPolygon, "goal_positions", self.goal_callback, 10
+            StampedPolygon, "goal_positions", self._goal_callback, 10
         )
-        self.gantry_subscription = self.create_subscription(
-            StampedPolygon, "gantry_positions", self.gantry_callback, 10
+
+        # Timer for state publishing
+        self.state_timer = self.create_timer(
+            1.0 / self.PUBLISH_FREQUENCY, self._publish_timer_callback
         )
 
         # CV Bridge for image conversion
@@ -107,9 +113,6 @@ class StateEstimatorNode(Node):
         # Playing field boundaries [x_min, x_max, y_min, y_max]
         self.edge = np.array([0.0, 530.0, 0.0, 370.0])
 
-        # Magnet position (from camera node)
-        self.magnet: list[float | None] | None = None
-
         # Goal detection counters
         self.ball_in_left_goal_counter = 0
         self.ball_in_right_goal_counter = 0
@@ -117,27 +120,15 @@ class StateEstimatorNode(Node):
         self.peg_in_right_goal_counter = 0
         self.outcome_published = False
 
-        # Detection state flags
-        self.goals_detected_once_printed = False
-
         self.get_logger().info("State estimator node started")
 
-    def goal_callback(self, msg: StampedPolygon) -> None:
+    def _goal_callback(self, msg: StampedPolygon) -> None:
         """Callback for receiving goal positions."""
         if len(msg.polygon.points) >= 2:
             self.left_goal = [msg.polygon.points[0].x, msg.polygon.points[0].y]
             self.right_goal = [msg.polygon.points[1].x, msg.polygon.points[1].y]
 
-    def gantry_callback(self, msg: StampedPolygon) -> None:
-        """Callback for receiving gantry/magnet positions."""
-        if len(msg.polygon.points) >= 1:
-            point = msg.polygon.points[0]
-            if point.z == 1.0:  # Y position unknown
-                self.magnet = [point.x, None]
-            else:
-                self.magnet = [point.x, point.y]
-
-    def image_callback(self, msg: CompressedImage) -> None:
+    def _image_callback(self, msg: CompressedImage) -> None:
         """Callback for receiving compressed board images."""
         try:
             # Convert ROS CompressedImage message to OpenCV image
@@ -160,25 +151,11 @@ class StateEstimatorNode(Node):
                 self.left_peg_position,
                 self.right_peg_position,
                 self.ball_position,
-            ) = self.detect_ball_peg(
+            ) = self._detect_ball_peg(
                 cv_image,
                 left_goal=self.left_goal,
                 right_goal=self.right_goal,
             )
-
-            # Display image at 10Hz to improve performance
-            if self.SHOW_IMAGE:
-                current_time = time.time()
-                if (
-                    current_time - self.last_display_time
-                    >= self.DISPLAY_UPDATE_INTERVAL
-                ):
-                    cv2.imshow("State Estimation", canvas)
-                    cv2.waitKey(1)
-                    self.last_display_time = current_time
-
-            # Publish states
-            self.publish_estimated_positions_and_velocities()
 
             # Check for goals if all objects are detected
             if all(
@@ -190,7 +167,7 @@ class StateEstimatorNode(Node):
                     self.right_goal,
                 ]
             ):
-                self.check_goal()
+                self._check_goal()
 
             # Increment frame counter
             self.frame_count += 1
@@ -198,14 +175,9 @@ class StateEstimatorNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
 
-    def _update_fps(self) -> None:
-        """Update FPS calculation (called every second by timer)."""
-        self.current_fps = float(self.frame_count)
-        self.frame_count = 0
-
-    def detect_ball_peg(
+    def _detect_ball_peg(
         self,
-        cropped: np.ndarray,
+        frame: np.ndarray,
         left_goal: list[float] | None = None,
         right_goal: list[float] | None = None,
     ) -> tuple[
@@ -221,7 +193,7 @@ class StateEstimatorNode(Node):
             Tuple of (canvas, left_peg_position, right_peg_position, ball_position)
         """
         # Convert to HSV and apply blur for noise reduction
-        frame_hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
+        frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         frame_hsv_blur = cv2.GaussianBlur(frame_hsv, (7, 7), 0)
 
         # Create masks for ball (orange) and pegs (black)
@@ -231,7 +203,7 @@ class StateEstimatorNode(Node):
         masked_peg = cv2.inRange(frame_hsv_blur, self.PEG_HSV_LOWER, self.PEG_HSV_UPPER)
 
         # Create visualization overlay
-        overlaid_frame = self._create_overlay(cropped, masked_peg, masked_ball)
+        overlaid_frame = self._create_overlay(frame, masked_peg, masked_ball)
 
         # Detect pegs in left and right halves
         height, width = masked_peg.shape
@@ -255,14 +227,22 @@ class StateEstimatorNode(Node):
             masked_ball, left_peg_position, right_peg_position, overlaid_frame
         )
 
-        # Draw goals and magnet visualization
+        # Display image at set rate
         if self.SHOW_IMAGE:
-            self._draw_goals(overlaid_frame, left_goal, right_goal)
+            current_time = time.time()
+            if current_time - self.last_display_time >= self.DISPLAY_UPDATE_INTERVAL:
+                plot_image(
+                    overlaid_frame,
+                    left_goal,
+                    right_goal,
+                    self.GOAL_RADIUS,
+                    self.CANVAS_WIDTH,
+                    self.CANVAS_HEIGHT,
+                    self.current_fps,
+                )
+                self.last_display_time = current_time
 
-        # Resize and center on canvas
-        canvas = self._create_canvas(overlaid_frame)
-
-        return canvas, left_peg_position, right_peg_position, ball_position
+        return left_peg_position, right_peg_position, ball_position
 
     def _create_overlay(
         self, frame: np.ndarray, masked_peg: np.ndarray, masked_ball: np.ndarray
@@ -308,7 +288,7 @@ class StateEstimatorNode(Node):
 
         if self.SHOW_IMAGE:
             velocity = kf.get_velocity()
-            self._draw_object_with_velocity(
+            draw_object_with_velocity(
                 overlaid_frame, position, velocity, color, velocity_color, 0.5
             )
 
@@ -352,7 +332,7 @@ class StateEstimatorNode(Node):
 
         if self.SHOW_IMAGE:
             velocity = self.ball_kf.get_velocity()
-            self._draw_object_with_velocity(
+            draw_object_with_velocity(
                 overlaid_frame, position, velocity, (0, 0, 255), (0, 165, 255), 0.2
             )
 
@@ -398,89 +378,16 @@ class StateEstimatorNode(Node):
         else:
             return False, False
 
-    def _draw_object_with_velocity(
-        self,
-        frame: np.ndarray,
-        position: np.ndarray,
-        velocity: list[float],
-        dot_color: tuple[int, int, int],
-        arrow_color: tuple[int, int, int],
-        velocity_scale: float,
-    ) -> None:
-        """Draw object position and velocity vector."""
-        pos_int = (int(position[0]), int(position[1]))
+    def _publish_timer_callback(self) -> None:
+        """Publish estimated positions/velocities and check for goals."""
+        # Publish states
+        self._publish_estimated_positions_and_velocities()
 
-        # Draw position
-        cv2.circle(frame, pos_int, 5, dot_color, -1)
-
-        # Draw velocity arrow
-        end_point = (
-            int(position[0] + velocity[0] * velocity_scale),
-            int(position[1] + velocity[1] * velocity_scale),
-        )
-        cv2.arrowedLine(frame, pos_int, end_point, arrow_color, 2, tipLength=0.3)
-
-    def _draw_goals(
-        self,
-        frame: np.ndarray,
-        left_goal: list[float] | None,
-        right_goal: list[float] | None,
-    ) -> None:
-        """Draw goal circles on the frame."""
-        goal_color = (140, 255, 0)
-
-        if left_goal is not None:
-            center = (int(left_goal[0]), int(left_goal[1]))
-            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
-            cv2.circle(frame, center, 5, goal_color, -1)
-
-        if right_goal is not None:
-            center = (int(right_goal[0]), int(right_goal[1]))
-            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
-            cv2.circle(frame, center, 5, goal_color, -1)
-
-    def _create_canvas(self, overlaid_frame: np.ndarray) -> np.ndarray:
-        """Resize frame and center it on a canvas."""
-        resized_image, new_w, new_h = resize_with_aspect_ratio(
-            overlaid_frame, self.CANVAS_WIDTH, self.CANVAS_HEIGHT
-        )
-
-        # Ensure dimensions are within bounds
-        if new_w > self.CANVAS_WIDTH or new_h > self.CANVAS_HEIGHT:
-            self.get_logger().warn(
-                f"Resized image ({new_w}x{new_h}) exceeds canvas ({self.CANVAS_WIDTH}x{self.CANVAS_HEIGHT})"
-            )
-            new_w = min(new_w, self.CANVAS_WIDTH)
-            new_h = min(new_h, self.CANVAS_HEIGHT)
-            resized_image = cv2.resize(
-                resized_image, (new_w, new_h), interpolation=cv2.INTER_AREA
-            )
-
-        # Center on black canvas
-        canvas = np.zeros((self.CANVAS_HEIGHT, self.CANVAS_WIDTH, 3), dtype=np.uint8)
-        x_offset = (self.CANVAS_WIDTH - new_w) // 2
-        y_offset = (self.CANVAS_HEIGHT - new_h) // 2
-        canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
-
-        # Draw FPS counter on canvas
-        if self.current_fps > 0:
-            fps_text = f"FPS: {self.current_fps:.1f}"
-            cv2.putText(
-                canvas,
-                fps_text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-
-        return canvas
-
-    def publish_estimated_positions_and_velocities(self) -> None:
-        """Publish ball and peg positions/velocities, goals, and magnet position."""
+    def _publish_estimated_positions_and_velocities(self) -> None:
+        """Publish ball and peg positions/velocities, goals"""
         polygon = Polygon()
+
+        # TODO: Change this to a propper message type
 
         # Add ball and peg data (position and velocity for each)
         vectors = [
@@ -494,45 +401,26 @@ class StateEstimatorNode(Node):
 
         for vector in vectors:
             if vector is not None:
-                polygon.points.append(self._create_point32(vector[0], vector[1]))
+                polygon.points.append(create_point32(vector[0], vector[1]))
 
         # Add goal coordinates
         if self.left_goal is not None and self.right_goal is not None:
+            polygon.points.append(create_point32(self.left_goal[0], self.left_goal[1]))
             polygon.points.append(
-                self._create_point32(self.left_goal[0], self.left_goal[1])
-            )
-            polygon.points.append(
-                self._create_point32(self.right_goal[0], self.right_goal[1])
+                create_point32(self.right_goal[0], self.right_goal[1])
             )
 
-        # Add magnet position
-        if self.magnet is not None:
-            magnet_y = self.magnet[1] if self.magnet[1] is not None else 0.0
-            polygon.points.append(self._create_point32(self.magnet[0], magnet_y))
-
-        # Publish only if we have all 9 points
-        if len(polygon.points) == 9:
+        # Publish only if we have all 8 points
+        if len(polygon.points) == 8:
             stamped_polygon = StampedPolygon()
             stamped_polygon.polygon = polygon
             stamped_polygon.header.stamp = self.get_clock().now().to_msg()
             self.state_publisher.publish(stamped_polygon)
 
-    def _create_point32(self, x: float, y: float, z: float = 0.0) -> Point32:
-        """Create a Point32 message from coordinates."""
-        point = Point32()
-        point.x = float(x)
-        point.y = float(y)
-        point.z = z
-        return point
-
-    def check_goal(self) -> None:
+    def _check_goal(self) -> None:
         """Check if ball or peg has scored and publish outcome."""
         if self.left_goal is None or self.right_goal is None:
             return
-
-        if not self.goals_detected_once_printed:
-            self.get_logger().info("Both goals detected: Ready to play!")
-            self.goals_detected_once_printed = True
 
         # Calculate distances
         distances = {
@@ -621,6 +509,11 @@ class StateEstimatorNode(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         self.outcome_publisher.publish(msg)
         self.outcome_published = True
+
+    def _update_fps(self) -> None:
+        """Update FPS calculation (called every second by timer)."""
+        self.current_fps = float(self.frame_count)
+        self.frame_count = 0
 
 
 def main(args=None):
