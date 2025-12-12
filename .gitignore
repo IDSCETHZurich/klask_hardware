@@ -61,3 +61,13 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# Solidworks files
+*.sldbak
+*.swp
+*.bak
+*.tmp
+
+# Common noise
+.DS_Store
+Thumbs.db
