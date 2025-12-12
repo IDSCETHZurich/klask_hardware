@@ -78,8 +78,10 @@ class CameraNode(Node):
         # CV Bridge for image conversion
         self.bridge = CvBridge()
 
-        # Timer for image acquisition
-        self.timer = self.create_timer(1.0 / 480.0, self._timer_callback)
+        # Timer for image acquisition (this is faster than the camera FPS to avoid frame drops)
+        self.timer = self.create_timer(
+            1.0 / (4.0 * self.CAMERA_FPS), self._timer_callback
+        )
 
         # Timer for goal publishing
         self.goal_timer = self.create_timer(1.0, self._publish_goal_positions)
