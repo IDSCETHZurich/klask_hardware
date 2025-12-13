@@ -14,8 +14,10 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MotorCommunication.msg"
+  "msg/ObjectState.msg"
   "msg/PolygonArray.msg"
   "msg/Rewards.msg"
+  "msg/State.msg"
   "msg/StampedInt32.msg"
   "msg/StampedPolygon.msg"
   "msg/StampedPolygonArray.msg"

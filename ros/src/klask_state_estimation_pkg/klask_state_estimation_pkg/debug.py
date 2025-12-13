@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
 
-from klask_state_estimation_pkg.utils import resize_with_aspect_ratio
-
 
 def draw_object_with_velocity(
     frame: np.ndarray,

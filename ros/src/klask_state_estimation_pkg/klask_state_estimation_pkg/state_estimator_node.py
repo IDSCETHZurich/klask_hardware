@@ -5,14 +5,14 @@ import time
 import rclpy
 import numpy as np
 from rclpy.node import Node
-from geometry_msgs.msg import Polygon, Point32
-from klask_interfaces.msg import StampedPolygon, StampedInt32
+from std_msgs.msg import UInt8
+from klask_interfaces.msg import StampedPolygon, StampedInt32, State
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 
 from .kalman_filter import KalmanFilter
-from .utils import create_point32
-from .debug import draw_object_with_velocity, draw_goals, plot_image
+from .utils import create_point_from_list
+from .debug import draw_object_with_velocity, plot_image
 
 
 class StateEstimatorNode(Node):
@@ -49,10 +49,7 @@ class StateEstimatorNode(Node):
         super().__init__("state_estimator")
 
         # Publishers
-        self.state_publisher = self.create_publisher(
-            StampedPolygon, "ball_peg_states", 10
-        )
-        self.outcome_publisher = self.create_publisher(StampedInt32, "outcome", 10)
+        self.state_publisher = self.create_publisher(State, "board_state", 10)
 
         # Subscribers
         self.image_subscription = self.create_subscription(
@@ -120,6 +117,9 @@ class StateEstimatorNode(Node):
         self.peg_in_right_goal_counter = 0
         self.outcome_published = False
 
+        # Board Status
+        self.board_status: int | None = None
+
         self.get_logger().info("State estimator node started")
 
     def _goal_callback(self, msg: StampedPolygon) -> None:
@@ -147,7 +147,6 @@ class StateEstimatorNode(Node):
 
             # Detect ball and pegs
             (
-                canvas,
                 self.left_peg_position,
                 self.right_peg_position,
                 self.ball_position,
@@ -384,38 +383,35 @@ class StateEstimatorNode(Node):
         self._publish_estimated_positions_and_velocities()
 
     def _publish_estimated_positions_and_velocities(self) -> None:
-        """Publish ball and peg positions/velocities, goals"""
-        polygon = Polygon()
 
-        # TODO: Change this to a propper message type
+        if (
+            self.ball_kf is None
+            or self.left_peg_kf is None
+            or self.right_peg_kf is None
+            or self.left_goal is None
+            or self.right_goal is None
+            or self.board_status is None
+        ):
+            return
 
-        # Add ball and peg data (position and velocity for each)
-        vectors = [
-            self.ball_position,
-            self.ball_kf.get_velocity(),
-            self.left_peg_kf.get_position(),
-            self.left_peg_kf.get_velocity(),
-            self.right_peg_kf.get_position(),
-            self.right_peg_kf.get_velocity(),
-        ]
+        msg = State()
+        msg.ball.position = create_point_from_list(self.ball_kf.get_position())
+        msg.ball.velocity = create_point_from_list(self.ball_kf.get_velocity())
+        msg.left_peg.position = create_point_from_list(self.left_peg_kf.get_position())
+        msg.left_peg.velocity = create_point_from_list(self.left_peg_kf.get_velocity())
+        msg.right_peg.position = create_point_from_list(
+            self.right_peg_kf.get_position()
+        )
+        msg.right_peg.velocity = create_point_from_list(
+            self.right_peg_kf.get_velocity()
+        )
+        msg.left_goal_pos = create_point_from_list(self.left_goal)
+        msg.right_goal_pos = create_point_from_list(self.right_goal)
 
-        for vector in vectors:
-            if vector is not None:
-                polygon.points.append(create_point32(vector[0], vector[1]))
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.status = UInt8(data=self.board_status)
 
-        # Add goal coordinates
-        if self.left_goal is not None and self.right_goal is not None:
-            polygon.points.append(create_point32(self.left_goal[0], self.left_goal[1]))
-            polygon.points.append(
-                create_point32(self.right_goal[0], self.right_goal[1])
-            )
-
-        # Publish only if we have all 8 points
-        if len(polygon.points) == 8:
-            stamped_polygon = StampedPolygon()
-            stamped_polygon.polygon = polygon
-            stamped_polygon.header.stamp = self.get_clock().now().to_msg()
-            self.state_publisher.publish(stamped_polygon)
+        self.state_publisher.publish(msg)
 
     def _check_goal(self) -> None:
         """Check if ball or peg has scored and publish outcome."""
