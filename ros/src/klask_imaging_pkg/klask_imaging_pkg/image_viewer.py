@@ -14,16 +14,20 @@ class ImageViewer(Node):
     def __init__(self):
         super().__init__("image_viewer")
 
+        # Declare and get parameters
+        self.declare_parameter("board_image_topic", "board_image/compressed")
+        self.board_image_topic = str(self.get_parameter("board_image_topic").value)
+
         # CV Bridge for image conversion
         self.bridge = CvBridge()
 
         # Subscribe to compressed image topic
         self.image_subscription = self.create_subscription(
-            CompressedImage, "board_image/compressed", self.image_callback, 10
+            CompressedImage, self.board_image_topic, self.image_callback, 10
         )
 
         self.get_logger().info(
-            "Image viewer node started. Subscribing to 'board_image/compressed'"
+            f"Image viewer node started. Subscribing to '{self.board_image_topic}'"
         )
 
         # Window name
