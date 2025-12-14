@@ -1,0 +1,106 @@
+/**:
+  ros__parameters:
+    # ============================================
+    # Camera Configuration Parameters
+    # ============================================
+    # These parameters control the camera hardware settings
+    
+    camera_fps: 120                 # Camera frames per second (default: 120)
+    camera_width: 1280              # Camera resolution width in pixels (default: 1280)
+    camera_height: 720              # Camera resolution height in pixels (default: 720)
+    
+    
+    # ============================================
+    # Detection Threshold Parameters
+    # ============================================
+    # These parameters control the sensitivity of board and goal detection
+    
+    flood_threshold: 120            # Threshold for board boundary flood fill (default: 120)
+                                    # Lower values = more sensitive detection
+                                    # Higher values = less sensitive detection
+    
+    goal_flood_threshold: 20        # Threshold for goal detection flood fill (default: 20)
+                                    # Lower values detect darker goals
+    
+    
+    # ============================================
+    # Border Segment Parameters
+    # ============================================
+    # These parameters control the border detection region geometry
+    
+    boarder_seg_inside_offset: 30   # Distance inside the board edge for border detection (pixels) (default: 30)
+    boarder_seg_outside_offset: 20  # Distance outside the board edge for border detection (pixels) (default: 20)
+    boarder_seg_corner_distance: 100 # Distance from corners to start border segments (pixels) (default: 100)
+                                     # Increase to exclude rounded corners
+    
+    
+    # ============================================
+    # Goal Detection Parameters
+    # ============================================
+    # These parameters control goal position and size detection
+    
+    goal_h_factor: 0.085            # Horizontal position factor for goal seeds (0.0-1.0) (default: 0.085)
+                                    # Percentage of width from left/right border
+    
+    goal_o_factor: 0.01             # Offset factor for goal seed positioning (0.0-1.0) (default: 0.01)
+                                    # Creates multiple seed points around estimated position
+    
+    goal_e_factor: 1.2              # Ellipse scaling factor for goal size (default: 1.2)
+                                    # Multiplier to expand detected goal region
+    
+    
+    # ============================================
+    # Image Processing Parameters
+    # ============================================
+    # These parameters control image preprocessing for better detection
+    
+    use_smoothing: true             # Enable Gaussian blur smoothing (default: true)
+                                    # Improves border detection stability
+    
+    smoothing_kernel: 5             # Kernel size for Gaussian blur (default: 5)
+                                    # Must be odd number (3, 5, 7, 9, etc.)
+                                    # Larger values = more smoothing
+    
+    
+    # ============================================
+    # Line Validation Parameters
+    # ============================================
+    # These parameters control outlier detection for border line tracking
+    
+    line_angle_threshold: 10.0      # Maximum angle change between frames (degrees) (default: 10.0)
+                                    # Helps reject outlier border detections
+    
+    line_position_threshold: 50.0   # Maximum position change between frames (pixels) (default: 50.0)
+                                    # Perpendicular distance threshold
+    
+    min_edge_points: 10             # Minimum points required for line fitting (default: 10)
+                                    # Ensures robust line fitting
+    
+    
+    # ============================================
+    # Debug and Display Parameters
+    # ============================================
+    # These parameters control visualization and debugging output
+    
+    debug_view: false               # Enable extensive debug visualizations (default: false)
+                                    # Shows intermediate processing steps
+                                    # WARNING: Blocks execution until windows closed
+    
+    show_image: false               # Display final output image (default: false)
+                                    # Shows perspective-corrected board view
+    
+    show_image_fps: 10              # Display update frequency in Hz (default: 10)
+                                    # Lower values reduce CPU load
+    
+    
+    # ============================================
+    # Profiling Parameters
+    # ============================================
+    # These parameters control performance profiling
+    
+    enable_profiling: false         # Enable cProfile profiling (default: false)
+                                    # Measures function execution times
+    
+    profiling_duration: 100.0       # Profiling duration in seconds (default: 100.0)
+    
+    profiling_top_functions: 30     # Number of top functions to show in stats (default: 30)
