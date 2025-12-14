@@ -36,6 +36,13 @@ class CameraNode(Node):
         self.declare_parameter("camera_width", 1280)
         self.declare_parameter("camera_height", 720)
 
+        # Topic + calibration settings
+        self.declare_parameter("board_image_topic", "board_image/compressed")
+        self.declare_parameter("goal_positions_topic", "goal_positions")
+        self.declare_parameter(
+            "calibration_file", "klask_imaging_pkg/data/calibration_data.npz"
+        )
+
         # Detection thresholds
         self.declare_parameter("flood_threshold", 120)
         self.declare_parameter("goal_flood_threshold", 20)
@@ -89,6 +96,9 @@ class CameraNode(Node):
         self.camera_fps = self.get_parameter("camera_fps").value
         self.camera_width = self.get_parameter("camera_width").value
         self.camera_height = self.get_parameter("camera_height").value
+        self.board_image_topic = self.get_parameter("board_image_topic").value
+        self.goal_positions_topic = self.get_parameter("goal_positions_topic").value
+        self.calibration_file = self.get_parameter("calibration_file").value
         self.flood_threshold = self.get_parameter("flood_threshold").value
         self.goal_flood_threshold = self.get_parameter("goal_flood_threshold").value
         self.boarder_seg_inside_offset = self.get_parameter(
@@ -129,10 +139,10 @@ class CameraNode(Node):
 
         # Publishers
         self.image_publisher = self.create_publisher(
-            CompressedImage, "board_image/compressed", 10
+            CompressedImage, self.board_image_topic, 10
         )
         self.goal_publisher = self.create_publisher(
-            StampedPolygon, "goal_positions", 10
+            StampedPolygon, self.goal_positions_topic, 10
         )
 
         # CV Bridge for image conversion
@@ -150,7 +160,7 @@ class CameraNode(Node):
         self._setup_camera()
 
         # Load camera calibration
-        mtx, dist = load_calibration_data("calibration_data.npz")
+        mtx, dist = load_calibration_data(self.calibration_file)
         newcameramtx, _ = cv2.getOptimalNewCameraMatrix(
             mtx,
             dist,
@@ -331,7 +341,7 @@ class CameraNode(Node):
                 h,
                 s_smooth,
                 v,
-                self.FLOOD_SEED,
+                self.flood_seed,
                 flood_mask,
                 rotated_rect,
                 warped_v_channel,
@@ -434,7 +444,7 @@ class CameraNode(Node):
             # Compute offset for affine transform
             offset = -diff_rotation @ rotation_matrix.T @ segment_offset.reshape(
                 (2, 1)
-            ) + np.array([[int(length // 2)], [self.BOARDER_SEG_INSIDE_OFFSET]])
+            ) + np.array([[int(length // 2)], [self.boarder_seg_inside_offset]])
 
             # Compute affine matrix
             affine_matrix = np.hstack([diff_rotation @ rotation_matrix.T, offset])
@@ -451,7 +461,7 @@ class CameraNode(Node):
             # Store warp size
             warp_size = (
                 length,
-                self.BOARDER_SEG_INSIDE_OFFSET + self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.boarder_seg_inside_offset + self.boarder_seg_outside_offset,
             )
             self.warp_sizes.append(warp_size)
 
@@ -915,7 +925,7 @@ class CameraNode(Node):
         if self.profiler is not None:
             self.profiler.disable()
             self.get_logger().info("Profiling complete. Generating stats...")
-            print_profiling_stats(self.profiler, self.PROFILING_TOP_FUNCTIONS)
+            print_profiling_stats(self.profiler, self.profiling_top_functions)
             self.profiler = None
             # Cancel the timer so it doesn't fire again
             self.profiling_timer.cancel()
@@ -945,7 +955,7 @@ class CameraNode(Node):
         # Apply smoothing to saturation channel for more stable border detection
         if self.use_smoothing:
             s_smooth = cv2.GaussianBlur(
-                s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0
+                s, (self.smoothing_kernel, self.smoothing_kernel), 0
             )
         else:
             s_smooth = s
@@ -981,7 +991,7 @@ class CameraNode(Node):
             self.frame_count += 1
 
             current_time = time.time()
-            if current_time - self.last_display_time >= 1.0 / self.SHOW_IMAGE_FPS:
+            if current_time - self.last_display_time >= 1.0 / self.show_image_fps:
                 self.last_display_time = current_time
 
                 show_final_output(

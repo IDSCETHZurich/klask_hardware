@@ -1,4 +1,4 @@
-/**:
+/camera_node:
   ros__parameters:
     # ============================================
     # Camera Configuration Parameters
@@ -8,9 +8,10 @@
     camera_width: 1280 # Camera resolution width in pixels (default: 1280)
     camera_height: 720 # Camera resolution height in pixels (default: 720)
 
-    # ============================================
-    # Detection Threshold Parameters
-    # ============================================
+    board_image_topic: "board_image/compressed" # Topic for publishing board images (default: "board_image/compressed")
+    goal_positions_topic: "goal_positions" # Topic for publishing goal positions (default: "goal_positions")
+
+    calibration_file: "klask_imaging_pkg/data/calibration_data.npz" # Path to calibration file - relative to package folder or absolute (default: "klask_imaging_pkg/data/calibration_data.npz")
 
     # ============================================
     # Border Segment Parameters
