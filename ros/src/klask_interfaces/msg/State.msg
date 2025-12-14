@@ -7,4 +7,4 @@ klask_interfaces/ObjectState right_peg
 geometry_msgs/Point left_goal_pos
 geometry_msgs/Point right_goal_pos
 
-std_msgs/UInt8 status
+std_msgs/UInt64 status

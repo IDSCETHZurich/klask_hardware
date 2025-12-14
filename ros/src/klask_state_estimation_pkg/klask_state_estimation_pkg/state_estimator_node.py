@@ -5,7 +5,7 @@ import time
 import rclpy
 import numpy as np
 from rclpy.node import Node
-from std_msgs.msg import UInt8
+from std_msgs.msg import UInt64
 from klask_interfaces.msg import StampedPolygon, StampedInt32, State
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
@@ -13,6 +13,7 @@ from cv_bridge import CvBridge
 from .kalman_filter import KalmanFilter
 from .utils import create_point_from_list
 from .debug import draw_object_with_velocity, plot_image
+from .board_state import BoardState
 
 
 class StateEstimatorNode(Node):
@@ -24,7 +25,7 @@ class StateEstimatorNode(Node):
 
     # Goal detection constants
     GOAL_RADIUS = 22
-    MAX_GOAL_COUNTER = 30  # Frames required before confirming goal
+    GOAL_HYST_COUNTER = 30  # Frames required before confirming goal
 
     # Collision detection constants
     COLLISION_DISTANCE = 35.0  # Distance threshold for collision detection
@@ -115,10 +116,9 @@ class StateEstimatorNode(Node):
         self.ball_in_right_goal_counter = 0
         self.peg_in_left_goal_counter = 0
         self.peg_in_right_goal_counter = 0
-        self.outcome_published = False
 
         # Board Status
-        self.board_status: int | None = None
+        self.board_state: BoardState = BoardState.UNKNOWN
 
         self.get_logger().info("State estimator node started")
 
@@ -166,6 +166,7 @@ class StateEstimatorNode(Node):
                     self.right_goal,
                 ]
             ):
+                self.board_state |= BoardState.READY
                 self._check_goal()
 
             # Increment frame counter
@@ -377,21 +378,61 @@ class StateEstimatorNode(Node):
         else:
             return False, False
 
+    def _check_goal(self) -> None:
+        """Check if ball or peg has scored and publish outcome."""
+
+        data = [
+            (self.ball_position, self.left_goal, self.ball_in_left_goal_counter),
+            (self.ball_position, self.right_goal, self.ball_in_right_goal_counter),
+            (self.left_peg_position, self.left_goal, self.peg_in_left_goal_counter),
+            (self.right_peg_position, self.right_goal, self.peg_in_right_goal_counter),
+        ]
+        (
+            self.ball_in_left_goal_counter,
+            self.ball_in_right_goal_counter,
+            self.peg_in_left_goal_counter,
+            self.peg_in_right_goal_counter,
+        ) = [
+            self._update_goal_counter(
+                np.array(obj_pos),
+                np.array(goal_pos),
+                counter,
+            )
+            for obj_pos, goal_pos, counter in data
+        ]
+
+        for counter, flag in [
+            (self.ball_in_left_goal_counter, BoardState.BALL_IN_LEFT_GOAL),
+            (self.ball_in_right_goal_counter, BoardState.BALL_IN_RIGHT_GOAL),
+            (self.peg_in_left_goal_counter, BoardState.PEG_IN_LEFT_GOAL),
+            (self.peg_in_right_goal_counter, BoardState.PEG_IN_RIGHT_GOAL),
+        ]:
+            if counter == self.GOAL_HYST_COUNTER:
+                self.board_state |= flag
+            elif counter == 0:
+                self.board_state &= ~flag
+
+    def _update_goal_counter(
+        self, object_pos: np.ndarray, goal_pos: np.ndarray, counter: int
+    ) -> int:
+        """Update goal counter based on distance."""
+
+        distance = np.linalg.norm(object_pos - goal_pos)
+        if distance < self.GOAL_RADIUS:
+            return min(counter + 1, self.GOAL_HYST_COUNTER)
+        elif counter > 0:
+            return counter - 1
+        return counter
+
+    def _update_fps(self) -> None:
+        """Update FPS calculation (called every second by timer)."""
+        self.current_fps = float(self.frame_count)
+        self.frame_count = 0
+
     def _publish_timer_callback(self) -> None:
         """Publish estimated positions/velocities and check for goals."""
-        # Publish states
-        self._publish_estimated_positions_and_velocities()
 
-    def _publish_estimated_positions_and_velocities(self) -> None:
-
-        if (
-            self.ball_kf is None
-            or self.left_peg_kf is None
-            or self.right_peg_kf is None
-            or self.left_goal is None
-            or self.right_goal is None
-            or self.board_status is None
-        ):
+        if not (self.board_state & BoardState.READY):
             return
 
         msg = State()
@@ -409,107 +450,9 @@ class StateEstimatorNode(Node):
         msg.right_goal_pos = create_point_from_list(self.right_goal)
 
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.status = UInt8(data=self.board_status)
+        msg.status = UInt64(data=int(self.board_state))
 
         self.state_publisher.publish(msg)
-
-    def _check_goal(self) -> None:
-        """Check if ball or peg has scored and publish outcome."""
-        if self.left_goal is None or self.right_goal is None:
-            return
-
-        # Calculate distances
-        distances = {
-            "ball_left": np.linalg.norm(np.array(self.ball_position) - self.left_goal),
-            "ball_right": np.linalg.norm(
-                np.array(self.ball_position) - self.right_goal
-            ),
-            "peg_left": np.linalg.norm(
-                np.array(self.left_peg_position) - self.left_goal
-            ),
-            "peg_right": np.linalg.norm(
-                np.array(self.right_peg_position) - self.right_goal
-            ),
-        }
-
-        # Update counters
-        self.ball_in_left_goal_counter = self._update_goal_counter(
-            distances["ball_left"], self.ball_in_left_goal_counter
-        )
-        self.ball_in_right_goal_counter = self._update_goal_counter(
-            distances["ball_right"], self.ball_in_right_goal_counter
-        )
-        self.peg_in_left_goal_counter = self._update_goal_counter(
-            distances["peg_left"], self.peg_in_left_goal_counter
-        )
-        self.peg_in_right_goal_counter = self._update_goal_counter(
-            distances["peg_right"], self.peg_in_right_goal_counter
-        )
-
-        # Check and publish outcomes
-        self.ball_in_left_goal_counter = self._check_and_publish_goal_outcome(
-            self.ball_in_left_goal_counter, "Ball in left goal!", 0
-        )
-        self.ball_in_right_goal_counter = self._check_and_publish_goal_outcome(
-            self.ball_in_right_goal_counter, "Ball in right goal!", 1
-        )
-        self.peg_in_left_goal_counter = self._check_and_publish_goal_outcome(
-            self.peg_in_left_goal_counter, "Peg in left goal!", 2
-        )
-        self.peg_in_right_goal_counter = self._check_and_publish_goal_outcome(
-            self.peg_in_right_goal_counter, "Peg in right goal!", 3
-        )
-
-        # Reset outcome flag when all clear
-        if all(
-            counter == 0
-            for counter in [
-                self.ball_in_left_goal_counter,
-                self.ball_in_right_goal_counter,
-                self.peg_in_left_goal_counter,
-                self.peg_in_right_goal_counter,
-            ]
-        ):
-            if self.outcome_published:
-                self.get_logger().info("Goals cleared: Ready to play again!")
-                self.outcome_published = False
-
-    def _update_goal_counter(self, distance: float, counter: int) -> int:
-        """Update goal counter based on distance."""
-        if distance < self.GOAL_RADIUS:
-            return min(counter + 1, self.MAX_GOAL_COUNTER)
-        elif counter > 0:
-            return counter - 1
-        return counter
-
-    def _check_and_publish_goal_outcome(
-        self, counter: int, message: str, outcome_number: int
-    ) -> int:
-        """Check if goal threshold reached and publish outcome."""
-        if counter == self.MAX_GOAL_COUNTER:
-            if self.PRINT_OUTCOME:
-                self.get_logger().info(message)
-
-            # Reset counter to avoid repeated triggers
-            counter = 5
-
-            if not self.outcome_published:
-                self._publish_outcome(outcome_number)
-
-        return counter
-
-    def _publish_outcome(self, outcome_number: int) -> None:
-        """Publish goal outcome message."""
-        msg = StampedInt32()
-        msg.data.data = outcome_number
-        msg.header.stamp = self.get_clock().now().to_msg()
-        self.outcome_publisher.publish(msg)
-        self.outcome_published = True
-
-    def _update_fps(self) -> None:
-        """Update FPS calculation (called every second by timer)."""
-        self.current_fps = float(self.frame_count)
-        self.frame_count = 0
 
 
 def main(args=None):
