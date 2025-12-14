@@ -19,50 +19,156 @@ from .board_state import BoardState
 class StateEstimatorNode(Node):
     """ROS2 node for estimating ball and peg positions from camera images."""
 
-    # Debug/Display settings
-    SHOW_IMAGE = True
-    PRINT_OUTCOME = False
-
-    # Goal detection constants
-    GOAL_RADIUS = 22
-    GOAL_HYST_COUNTER = 30  # Frames required before confirming goal
-
-    # Collision detection constants
-    COLLISION_DISTANCE = 35.0  # Distance threshold for collision detection
-
-    # HSV color range constants for object detection
-    BALL_HSV_LOWER = (10, 60, 200)  # Orange ball lower bound
-    BALL_HSV_UPPER = (45, 160, 255)  # Orange ball upper bound
-    PEG_HSV_LOWER = (90, 150, 0)  # Black peg lower bound
-    PEG_HSV_UPPER = (130, 255, 45)  # Black peg upper bound
-
-    # Visualization canvas size
-    CANVAS_WIDTH = 1280
-    CANVAS_HEIGHT = 720
-
-    # State publishing frequency [Hz]
-    PUBLISH_FREQUENCY = 80.0
-
-    # Display update rate
-    DISPLAY_UPDATE_INTERVAL = 0.1  # 10Hz display update (100ms between frames)
-
     def __init__(self):
         super().__init__("state_estimator")
 
+        # =============================
+        # Parameters
+        # =============================
+
+        # Enable visualization windows (default: false)
+        self.declare_parameter("show_image", True)
+        self.show_image = bool(self.get_parameter("show_image").value)
+
+        # Radius around goal center to count as "in goal" (pixels) (default: 22)
+        self.declare_parameter("goal_radius", 22)
+        self.goal_radius = int(self.get_parameter("goal_radius").value)
+
+        # Frames required before confirming goal (default: 30)
+        self.declare_parameter("goal_hyst_counter", 30)
+        self.goal_hyst_counter = int(self.get_parameter("goal_hyst_counter").value)
+
+        # Distance threshold for edge/peg collision logic (pixels) (default: 35.0)
+        self.declare_parameter("collision_distance", 35.0)
+        self.collision_distance = float(self.get_parameter("collision_distance").value)
+
+        # Orange ball lower bound
+        self.declare_parameter("ball_hsv_lower", [10, 60, 200])
+        self.ball_hsv_lower = self._hsv_param("ball_hsv_lower", (10, 60, 200))
+
+        # Orange ball upper bound
+        self.declare_parameter("ball_hsv_upper", [45, 160, 255])
+        self.ball_hsv_upper = self._hsv_param("ball_hsv_upper", (45, 160, 255))
+
+        # Black peg lower bound
+        self.declare_parameter("peg_hsv_lower", [90, 150, 0])
+        self.peg_hsv_lower = self._hsv_param("peg_hsv_lower", (90, 150, 0))
+
+        # Black peg upper bound
+        self.declare_parameter("peg_hsv_upper", [130, 255, 45])
+        self.peg_hsv_upper = self._hsv_param("peg_hsv_upper", (130, 255, 45))
+
+        # Visualization canvas width in pixels (default: 1280)
+        self.declare_parameter("canvas_width", 1280)
+        self.canvas_width = int(self.get_parameter("canvas_width").value)
+
+        # Visualization canvas height in pixels (default: 720)
+        self.declare_parameter("canvas_height", 720)
+        self.canvas_height = int(self.get_parameter("canvas_height").value)
+
+        # State publishing frequency in Hz (default: 80.0)
+        self.declare_parameter("publish_frequency", 80.0)
+        self.publish_frequency = float(self.get_parameter("publish_frequency").value)
+
+        # Seconds between display updates (default: 0.1)
+        self.declare_parameter("display_update_interval", 0.1)
+        self.display_update_interval = float(
+            self.get_parameter("display_update_interval").value
+        )
+
+        # Topic names
+        self.declare_parameter("board_state_topic", "board_state")
+        self.board_state_topic = str(self.get_parameter("board_state_topic").value)
+
+        self.declare_parameter("board_image_topic", "board_image/compressed")
+        self.board_image_topic = str(self.get_parameter("board_image_topic").value)
+
+        self.declare_parameter("goal_positions_topic", "goal_positions")
+        self.goal_positions_topic = str(
+            self.get_parameter("goal_positions_topic").value
+        )
+
+        # Ball KF
+        self.declare_parameter("ball_kf_process_noise_position", 2.0)
+        self.declare_parameter("ball_kf_process_noise_velocity", 30.0)
+        self.declare_parameter("ball_kf_measurement_noise_position", 1.0)
+
+        self.ball_kf_process_noise_position = float(
+            self.get_parameter("ball_kf_process_noise_position").value
+        )
+        self.ball_kf_process_noise_velocity = float(
+            self.get_parameter("ball_kf_process_noise_velocity").value
+        )
+        self.ball_kf_measurement_noise_position = float(
+            self.get_parameter("ball_kf_measurement_noise_position").value
+        )
+
+        # Left peg KF
+        self.declare_parameter("left_peg_kf_process_noise_position", 2.0)
+        self.declare_parameter("left_peg_kf_process_noise_velocity", 800.0)
+        self.declare_parameter("left_peg_kf_measurement_noise_position", 12.0)
+        self.declare_parameter("left_peg_kf_stop_threshold", 0.3)
+
+        self.left_peg_kf_process_noise_position = float(
+            self.get_parameter("left_peg_kf_process_noise_position").value
+        )
+        self.left_peg_kf_process_noise_velocity = float(
+            self.get_parameter("left_peg_kf_process_noise_velocity").value
+        )
+        self.left_peg_kf_measurement_noise_position = float(
+            self.get_parameter("left_peg_kf_measurement_noise_position").value
+        )
+        self.left_peg_kf_stop_threshold = float(
+            self.get_parameter("left_peg_kf_stop_threshold").value
+        )
+
+        # Right peg KF
+        self.declare_parameter("right_peg_kf_process_noise_position", 2.0)
+        self.declare_parameter("right_peg_kf_process_noise_velocity", 800.0)
+        self.declare_parameter("right_peg_kf_measurement_noise_position", 12.0)
+        self.declare_parameter("right_peg_kf_stop_threshold", 0.3)
+
+        self.right_peg_kf_process_noise_position = float(
+            self.get_parameter("right_peg_kf_process_noise_position").value
+        )
+        self.right_peg_kf_process_noise_velocity = float(
+            self.get_parameter("right_peg_kf_process_noise_velocity").value
+        )
+        self.right_peg_kf_measurement_noise_position = float(
+            self.get_parameter("right_peg_kf_measurement_noise_position").value
+        )
+        self.right_peg_kf_stop_threshold = float(
+            self.get_parameter("right_peg_kf_stop_threshold").value
+        )
+
+        # ============================================
+        # Playing Field Boundaries
+        # ============================================
+
+        self.declare_parameter("edge_x_min", 0.0)
+        self.declare_parameter("edge_x_max", 530.0)
+        self.declare_parameter("edge_y_min", 0.0)
+        self.declare_parameter("edge_y_max", 370.0)
+
+        self.edge_x_min = float(self.get_parameter("edge_x_min").value)
+        self.edge_x_max = float(self.get_parameter("edge_x_max").value)
+        self.edge_y_min = float(self.get_parameter("edge_y_min").value)
+        self.edge_y_max = float(self.get_parameter("edge_y_max").value)
+
         # Publishers
-        self.state_publisher = self.create_publisher(State, "board_state", 10)
+        self.state_publisher = self.create_publisher(State, self.board_state_topic, 10)
 
         # Subscribers
         self.image_subscription = self.create_subscription(
-            CompressedImage, "board_image/compressed", self._image_callback, 10
+            CompressedImage, self.board_image_topic, self._image_callback, 10
         )
         self.goal_subscription = self.create_subscription(
-            StampedPolygon, "goal_positions", self._goal_callback, 10
+            StampedPolygon, self.goal_positions_topic, self._goal_callback, 10
         )
 
         # Timer for state publishing
         self.state_timer = self.create_timer(
-            1.0 / self.PUBLISH_FREQUENCY, self._publish_timer_callback
+            1.0 / self.publish_frequency, self._publish_timer_callback
         )
 
         # CV Bridge for image conversion
@@ -70,21 +176,21 @@ class StateEstimatorNode(Node):
 
         # Kalman Filters
         self.ball_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=30.0,
-            measurement_noise_position=1.0,
+            process_noise_position=self.ball_kf_process_noise_position,
+            process_noise_velocity=self.ball_kf_process_noise_velocity,
+            measurement_noise_position=self.ball_kf_measurement_noise_position,
         )
         self.left_peg_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=800.0,
-            measurement_noise_position=12.0,
-            stop_threshold=0.3,
+            process_noise_position=self.left_peg_kf_process_noise_position,
+            process_noise_velocity=self.left_peg_kf_process_noise_velocity,
+            measurement_noise_position=self.left_peg_kf_measurement_noise_position,
+            stop_threshold=self.left_peg_kf_stop_threshold,
         )
         self.right_peg_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=800.0,
-            measurement_noise_position=12.0,
-            stop_threshold=0.3,
+            process_noise_position=self.right_peg_kf_process_noise_position,
+            process_noise_velocity=self.right_peg_kf_process_noise_velocity,
+            measurement_noise_position=self.right_peg_kf_measurement_noise_position,
+            stop_threshold=self.right_peg_kf_stop_threshold,
         )
 
         # Timing
@@ -109,7 +215,9 @@ class StateEstimatorNode(Node):
         self.right_goal: list[float] | None = None
 
         # Playing field boundaries [x_min, x_max, y_min, y_max]
-        self.edge = np.array([0.0, 530.0, 0.0, 370.0])
+        self.edge = np.array(
+            [self.edge_x_min, self.edge_x_max, self.edge_y_min, self.edge_y_max]
+        )
 
         # Goal detection counters
         self.ball_in_left_goal_counter = 0
@@ -121,6 +229,26 @@ class StateEstimatorNode(Node):
         self.board_state: BoardState = BoardState.UNKNOWN
 
         self.get_logger().info("State estimator node started")
+
+    def _hsv_param(
+        self, name: str, default_value: tuple[int, int, int]
+    ) -> tuple[int, int, int]:
+        value = self.get_parameter(name).value
+        try:
+            values = [int(v) for v in value]
+        except Exception:
+            self.get_logger().warn(
+                f"Parameter '{name}' must be a list of 3 ints; using default {list(default_value)}"
+            )
+            return default_value
+
+        if len(values) != 3:
+            self.get_logger().warn(
+                f"Parameter '{name}' must have length 3; got {len(values)}. Using default {list(default_value)}"
+            )
+            return default_value
+
+        return (values[0], values[1], values[2])
 
     def _goal_callback(self, msg: StampedPolygon) -> None:
         """Callback for receiving goal positions."""
@@ -198,9 +326,9 @@ class StateEstimatorNode(Node):
 
         # Create masks for ball (orange) and pegs (black)
         masked_ball = cv2.inRange(
-            frame_hsv_blur, self.BALL_HSV_LOWER, self.BALL_HSV_UPPER
+            frame_hsv_blur, self.ball_hsv_lower, self.ball_hsv_upper
         )
-        masked_peg = cv2.inRange(frame_hsv_blur, self.PEG_HSV_LOWER, self.PEG_HSV_UPPER)
+        masked_peg = cv2.inRange(frame_hsv_blur, self.peg_hsv_lower, self.peg_hsv_upper)
 
         # Create visualization overlay
         overlaid_frame = self._create_overlay(frame, masked_peg, masked_ball)
@@ -228,16 +356,16 @@ class StateEstimatorNode(Node):
         )
 
         # Display image at set rate
-        if self.SHOW_IMAGE:
+        if self.show_image:
             current_time = time.time()
-            if current_time - self.last_display_time >= self.DISPLAY_UPDATE_INTERVAL:
+            if current_time - self.last_display_time >= self.display_update_interval:
                 plot_image(
                     overlaid_frame,
                     left_goal,
                     right_goal,
-                    self.GOAL_RADIUS,
-                    self.CANVAS_WIDTH,
-                    self.CANVAS_HEIGHT,
+                    self.goal_radius,
+                    self.canvas_width,
+                    self.canvas_height,
                     self.current_fps,
                 )
                 self.last_display_time = current_time
@@ -286,7 +414,7 @@ class StateEstimatorNode(Node):
 
         position = kf.get_position()
 
-        if self.SHOW_IMAGE:
+        if self.show_image:
             velocity = kf.get_velocity()
             draw_object_with_velocity(
                 overlaid_frame, position, velocity, color, velocity_color, 0.5
@@ -330,7 +458,7 @@ class StateEstimatorNode(Node):
 
         position = self.ball_kf.get_position()
 
-        if self.SHOW_IMAGE:
+        if self.show_image:
             velocity = self.ball_kf.get_velocity()
             draw_object_with_velocity(
                 overlaid_frame, position, velocity, (0, 0, 255), (0, 165, 255), 0.2
@@ -347,12 +475,12 @@ class StateEstimatorNode(Node):
     ) -> tuple[bool, bool]:
         """Detect if ball is near edges or pegs (potential collision)."""
         at_x_edge = (
-            ball_x < self.edge[0] + self.COLLISION_DISTANCE
-            or ball_x + self.COLLISION_DISTANCE > self.edge[1]
+            ball_x < self.edge[0] + self.collision_distance
+            or ball_x + self.collision_distance > self.edge[1]
         )
         at_y_edge = (
-            ball_y < self.edge[2] + self.COLLISION_DISTANCE
-            or ball_y + self.COLLISION_DISTANCE > self.edge[3]
+            ball_y < self.edge[2] + self.collision_distance
+            or ball_y + self.collision_distance > self.edge[3]
         )
 
         close_to_peg = False
@@ -364,8 +492,8 @@ class StateEstimatorNode(Node):
                 np.array([ball_x, ball_y]) - np.array(right_peg_position)
             )
             close_to_peg = (
-                dist_left < self.COLLISION_DISTANCE
-                or dist_right < self.COLLISION_DISTANCE
+                dist_left < self.collision_distance
+                or dist_right < self.collision_distance
             )
 
         # Determine collision type
@@ -407,7 +535,7 @@ class StateEstimatorNode(Node):
             (self.peg_in_left_goal_counter, BoardState.PEG_IN_LEFT_GOAL),
             (self.peg_in_right_goal_counter, BoardState.PEG_IN_RIGHT_GOAL),
         ]:
-            if counter == self.GOAL_HYST_COUNTER:
+            if counter == self.goal_hyst_counter:
                 self.board_state |= flag
             elif counter == 0:
                 self.board_state &= ~flag
@@ -418,8 +546,8 @@ class StateEstimatorNode(Node):
         """Update goal counter based on distance."""
 
         distance = np.linalg.norm(object_pos - goal_pos)
-        if distance < self.GOAL_RADIUS:
-            return min(counter + 1, self.GOAL_HYST_COUNTER)
+        if distance < self.goal_radius:
+            return min(counter + 1, self.goal_hyst_counter)
         elif counter > 0:
             return counter - 1
         return counter
