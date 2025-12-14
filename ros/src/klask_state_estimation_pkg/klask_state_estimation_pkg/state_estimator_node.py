@@ -27,7 +27,7 @@ class StateEstimatorNode(Node):
         # =============================
 
         # Enable visualization windows (default: false)
-        self.declare_parameter("show_image", True)
+        self.declare_parameter("show_image", False)
         self.show_image = bool(self.get_parameter("show_image").value)
 
         # Radius around goal center to count as "in goal" (pixels) (default: 22)
