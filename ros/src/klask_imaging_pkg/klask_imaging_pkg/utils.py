@@ -5,13 +5,13 @@ import numpy as np
 
 
 def load_calibration_data(
-    filename: str = "calibration_data.npz",
+    filename: str = "klask_imaging_pkg/data/calibration_data.npz",
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Load camera calibration data from file.
 
     Args:
-        filename: Name of the calibration file
+        filename: Name of the calibration file relative or absolute path
 
     Returns:
         Tuple of (camera_matrix, distortion_coefficients)
@@ -19,18 +19,14 @@ def load_calibration_data(
     Raises:
         FileNotFoundError: If calibration file or ros2_ws not found
     """
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    ros2_ws_index = current_dir.find("ros2_ws")
-
-    if ros2_ws_index == -1:
-        raise FileNotFoundError("ROS2 workspace not found in the path")
-
-    ros2_ws_path = current_dir[: ros2_ws_index + len("ros2_ws")]
-    filepath = os.path.join(
-        ros2_ws_path,
-        "src/klask_imaging_pkg/klask_imaging_pkg/data",
-        filename,
-    )
+    # Check if filename is an absolute path
+    if os.path.isabs(filename):
+        filepath = filename
+    else:
+        # Relative path - relative to the package directory
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        package_dir = os.path.dirname(current_dir)
+        filepath = os.path.join(package_dir, filename)
 
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Calibration file not found at: {filepath}")
@@ -56,4 +52,3 @@ def apply_ema_filter(
     if previous_value is None:
         return current_value
     return alpha * current_value + (1 - alpha) * previous_value
-

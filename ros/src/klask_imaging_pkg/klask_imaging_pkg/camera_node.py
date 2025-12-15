@@ -6,8 +6,6 @@ import time
 import rclpy
 import numpy as np
 import cProfile
-import os
-from pathlib import Path
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Polygon, Point32
@@ -27,59 +25,133 @@ from .debug import (
 class CameraNode(Node):
     """ROS2 node for acquiring camera images and publishing transformed board view."""
 
-    # Constants
-    CAMERA_FPS = 120
-    CAMERA_WIDTH = 1280
-    CAMERA_HEIGHT = 720
-    FLOOD_SEED = [
-        (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) + 50),
-        (int(CAMERA_WIDTH // 2) + 50, int(CAMERA_HEIGHT // 2) - 50),
-        (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) + 50),
-        (int(CAMERA_WIDTH // 2) - 50, int(CAMERA_HEIGHT // 2) - 50),
-    ]
-    FLOOD_THRESHOLD = 120
-    BOARDER_SEG_INSIDE_OFFSET = 30
-    BOARDER_SEG_OUTSIDE_OFFSET = 20
-    BOARDER_SEG_CORNER_DISTANCE = 100
-
-    # Goal detection settings
-    GOAL_FLOOD_THRESHOLD = 20
-    GOAL_H_FACTOR = 0.085  # Horizontal factor for goal seed positioning (percentage of width from border)
-    GOAL_O_FACTOR = (
-        0.01  # Offset factor for goal seed positioning (percentage of width/height)
-    )
-    GOAL_E_FACTOR = 1.2  # Ellipse scaling factor for goal size
-
-    # Image processing settings
-    USE_SMOOTHING = True  # Apply smoothing to improve border detection stability
-    SMOOTHING_KERNEL = 5  # Kernel size for Gaussian blur (3, 5, 7, etc.)
-
-    # Debug/Display settings
-    DEBUG_VIEW = False  # Set to True to enable extensive debug views of the initial board detection
-    SHOW_IMAGE = False  # Set to True to display final output image
-    SHOW_IMAGE_FPS = 10  # Display update frequency in Hz
-
-    # Profiling settings
-    ENABLE_PROFILING = False
-    PROFILING_DURATION = 100.0  # Run profiler for N seconds
-    PROFILING_TOP_FUNCTIONS = 30  # Show top N functions in stats
-
     def __init__(self):
         super().__init__("camera_node")
 
+        # Declare ROS parameters with default values
+        # A detailed description of each parameter is provided in the config YAML file.
+
+        # Camera settings
+        self.declare_parameter("camera_fps", 120)
+        self.declare_parameter("camera_width", 1280)
+        self.declare_parameter("camera_height", 720)
+
+        # Topic + calibration settings
+        self.declare_parameter("board_image_topic", "board_image/compressed")
+        self.declare_parameter("goal_positions_topic", "goal_positions")
+        self.declare_parameter(
+            "calibration_file", "klask_imaging_pkg/data/calibration_data.npz"
+        )
+
+        # Detection thresholds
+        self.declare_parameter("flood_threshold", 120)
+        self.declare_parameter("goal_flood_threshold", 20)
+
+        # Border segment settings
+        self.declare_parameter("boarder_seg_inside_offset", 30)
+        self.declare_parameter("boarder_seg_outside_offset", 20)
+        self.declare_parameter("boarder_seg_corner_distance", 100)
+
+        # Goal detection settings
+        self.declare_parameter(
+            "goal_h_factor", 0.085
+        )  # Horizontal factor for goal seed positioning
+        self.declare_parameter(
+            "goal_o_factor", 0.01
+        )  # Offset factor for goal seed positioning
+        self.declare_parameter(
+            "goal_e_factor", 1.2
+        )  # Ellipse scaling factor for goal size
+
+        # Image processing settings
+        self.declare_parameter(
+            "use_smoothing", True
+        )  # Apply smoothing to improve border detection stability
+        self.declare_parameter(
+            "smoothing_kernel", 5
+        )  # Kernel size for Gaussian blur (3, 5, 7, etc.)
+
+        # Line validation settings
+        self.declare_parameter("line_angle_threshold", 10.0)  # degrees
+        self.declare_parameter("line_position_threshold", 50.0)  # pixels
+        self.declare_parameter("min_edge_points", 10)  # minimum points for line fitting
+
+        # Debug/Display settings
+        self.declare_parameter(
+            "debug_view", False
+        )  # Enable extensive debug views of initial board detection
+        self.declare_parameter("show_image", False)  # Display final output image
+        self.declare_parameter("show_image_fps", 10)  # Display update frequency in Hz
+
+        # Profiling settings
+        self.declare_parameter("enable_profiling", False)
+        self.declare_parameter(
+            "profiling_duration", 100.0
+        )  # Run profiler for N seconds
+        self.declare_parameter(
+            "profiling_top_functions", 30
+        )  # Show top N functions in stats
+
+        # Get parameter values
+        self.camera_fps = self.get_parameter("camera_fps").value
+        self.camera_width = self.get_parameter("camera_width").value
+        self.camera_height = self.get_parameter("camera_height").value
+        self.board_image_topic = self.get_parameter("board_image_topic").value
+        self.goal_positions_topic = self.get_parameter("goal_positions_topic").value
+        self.calibration_file = self.get_parameter("calibration_file").value
+        self.flood_threshold = self.get_parameter("flood_threshold").value
+        self.goal_flood_threshold = self.get_parameter("goal_flood_threshold").value
+        self.boarder_seg_inside_offset = self.get_parameter(
+            "boarder_seg_inside_offset"
+        ).value
+        self.boarder_seg_outside_offset = self.get_parameter(
+            "boarder_seg_outside_offset"
+        ).value
+        self.boarder_seg_corner_distance = self.get_parameter(
+            "boarder_seg_corner_distance"
+        ).value
+        self.goal_h_factor = self.get_parameter("goal_h_factor").value
+        self.goal_o_factor = self.get_parameter("goal_o_factor").value
+        self.goal_e_factor = self.get_parameter("goal_e_factor").value
+        self.use_smoothing = self.get_parameter("use_smoothing").value
+        self.smoothing_kernel = self.get_parameter("smoothing_kernel").value
+        self.line_angle_threshold = self.get_parameter("line_angle_threshold").value
+        self.line_position_threshold = self.get_parameter(
+            "line_position_threshold"
+        ).value
+        self.min_edge_points = self.get_parameter("min_edge_points").value
+        self.debug_view = self.get_parameter("debug_view").value
+        self.show_image = self.get_parameter("show_image").value
+        self.show_image_fps = self.get_parameter("show_image_fps").value
+        self.enable_profiling = self.get_parameter("enable_profiling").value
+        self.profiling_duration = self.get_parameter("profiling_duration").value
+        self.profiling_top_functions = self.get_parameter(
+            "profiling_top_functions"
+        ).value
+
+        # Compute flood seed points based on camera dimensions
+        self.flood_seed = [
+            (int(self.camera_width // 2) + 50, int(self.camera_height // 2) + 50),
+            (int(self.camera_width // 2) + 50, int(self.camera_height // 2) - 50),
+            (int(self.camera_width // 2) - 50, int(self.camera_height // 2) + 50),
+            (int(self.camera_width // 2) - 50, int(self.camera_height // 2) - 50),
+        ]
+
         # Publishers
         self.image_publisher = self.create_publisher(
-            CompressedImage, "board_image/compressed", 10
+            CompressedImage, self.board_image_topic, 10
         )
         self.goal_publisher = self.create_publisher(
-            StampedPolygon, "goal_positions", 10
+            StampedPolygon, self.goal_positions_topic, 10
         )
 
         # CV Bridge for image conversion
         self.bridge = CvBridge()
 
-        # Timer for image acquisition
-        self.timer = self.create_timer(1.0 / 480.0, self._timer_callback)
+        # Timer for image acquisition (this is faster than the camera FPS to avoid frame drops)
+        self.timer = self.create_timer(
+            1.0 / (4.0 * self.camera_fps), self._timer_callback
+        )
 
         # Timer for goal publishing
         self.goal_timer = self.create_timer(1.0, self._publish_goal_positions)
@@ -88,20 +160,20 @@ class CameraNode(Node):
         self._setup_camera()
 
         # Load camera calibration
-        mtx, dist = load_calibration_data("calibration_data.npz")
+        mtx, dist = load_calibration_data(self.calibration_file)
         newcameramtx, _ = cv2.getOptimalNewCameraMatrix(
             mtx,
             dist,
-            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+            (self.camera_width, self.camera_height),
             0,
-            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+            (self.camera_width, self.camera_height),
         )
         self.mapx, self.mapy = cv2.initUndistortRectifyMap(
             mtx,
             dist,
             None,
             newcameramtx,
-            (self.CAMERA_WIDTH, self.CAMERA_HEIGHT),
+            (self.camera_width, self.camera_height),
             5,
         )
 
@@ -111,16 +183,13 @@ class CameraNode(Node):
 
         # Border line tracking for outlier detection
         self.previous_boarder_lines: list[np.ndarray] | None = None
-        self.line_angle_threshold = 10.0  # degrees
-        self.line_position_threshold = 50.0  # pixels
-        self.min_edge_points = 10  # minimum points needed for line fitting
 
         # Goal positions
         self.left_goal: list[float] | None = None
         self.right_goal: list[float] | None = None
 
         # Image display tracking
-        if self.SHOW_IMAGE:
+        if self.show_image:
             self.last_display_time = 0.0
             self.frame_count = 0
             self.fps_display = 0.0
@@ -128,15 +197,15 @@ class CameraNode(Node):
 
         # Profiling setup
         self.profiler = None
-        if self.ENABLE_PROFILING:
+        if self.enable_profiling:
             self.profiler = cProfile.Profile()
             self.profiler.enable()
             self.get_logger().info(
-                f"cProfile profiling enabled for {self.PROFILING_DURATION} seconds"
+                f"cProfile profiling enabled for {self.profiling_duration} seconds"
             )
             # Create one-shot timer to stop profiling after duration
             self.profiling_timer = self.create_timer(
-                self.PROFILING_DURATION, self._stop_profiling
+                self.profiling_duration, self._stop_profiling
             )
 
     def _setup_camera(self) -> None:
@@ -149,16 +218,16 @@ class CameraNode(Node):
 
         # Configure camera properties
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("U", "Y", "V", "Y"))
-        self.cap.set(cv2.CAP_PROP_FPS, self.CAMERA_FPS)
+        self.cap.set(cv2.CAP_PROP_FPS, self.camera_fps)
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         self.cap.set(cv2.CAP_PROP_EXPOSURE, 0.01)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.camera_width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.camera_height)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.get_logger().info(
-            f"Camera configured: Target {self.CAMERA_FPS} FPS, Actual {actual_fps} FPS"
+            f"Camera configured: Target {self.camera_fps} FPS, Actual {actual_fps} FPS"
         )
 
     def initial_board_detection(self) -> None:
@@ -182,16 +251,16 @@ class CameraNode(Node):
         h, s, v = cv2.split(frame_hsv)
 
         # Apply smoothing to saturation channel for more stable border detection
-        if self.USE_SMOOTHING:
+        if self.use_smoothing:
             s_smooth = cv2.GaussianBlur(
-                s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0
+                s, (self.smoothing_kernel, self.smoothing_kernel), 0
             )
         else:
             s_smooth = s
 
         # Perform flood fill to detect board boundaries
         flood_mask, rect = self._board_flood_fill(
-            s_smooth, self.FLOOD_SEED, self.FLOOD_THRESHOLD
+            s_smooth, self.flood_seed, self.flood_threshold
         )
 
         # Find rotated rectangle from flood fill mask
@@ -248,13 +317,13 @@ class CameraNode(Node):
 
         self.left_goal, self.right_goal = self._find_goal_positions(
             warped_v_channel,
-            self.GOAL_H_FACTOR,
-            self.GOAL_O_FACTOR,
-            self.GOAL_E_FACTOR,
+            self.goal_h_factor,
+            self.goal_o_factor,
+            self.goal_e_factor,
         )
 
         # Display debug views if enabled
-        if self.DEBUG_VIEW:
+        if self.debug_view:
             print_segment_debug_view(
                 frame_rec,
                 s_smooth,
@@ -272,7 +341,7 @@ class CameraNode(Node):
                 h,
                 s_smooth,
                 v,
-                self.FLOOD_SEED,
+                self.flood_seed,
                 flood_mask,
                 rotated_rect,
                 warped_v_channel,
@@ -316,7 +385,7 @@ class CameraNode(Node):
             ]
 
             goal_mask, rect = self._board_flood_fill(
-                warped_v_channel, goal_seed, self.GOAL_FLOOD_THRESHOLD
+                warped_v_channel, goal_seed, self.goal_flood_threshold
             )
 
             # Get all points where flood_mask is non-zero
@@ -329,7 +398,7 @@ class CameraNode(Node):
 
             goals.append(goal_ellipse)
 
-            if self.DEBUG_VIEW:
+            if self.debug_view:
                 cv2.ellipse(warped_v_channel, goal_ellipse, (0, 255, 0), 2)
                 for x, y in goal_seed:
                     cv2.circle(
@@ -361,7 +430,7 @@ class CameraNode(Node):
             np.array([[0, 1], [-1, 0]]),
         )
 
-        # Aliasing crop size (constant)
+        # Aliasing crop size
         self.aliasing_crop_size = 2
 
         # Precompute affine matrices and inverse affine matrices for each segment
@@ -375,7 +444,7 @@ class CameraNode(Node):
             # Compute offset for affine transform
             offset = -diff_rotation @ rotation_matrix.T @ segment_offset.reshape(
                 (2, 1)
-            ) + np.array([[int(length // 2)], [self.BOARDER_SEG_INSIDE_OFFSET]])
+            ) + np.array([[int(length // 2)], [self.boarder_seg_inside_offset]])
 
             # Compute affine matrix
             affine_matrix = np.hstack([diff_rotation @ rotation_matrix.T, offset])
@@ -392,7 +461,7 @@ class CameraNode(Node):
             # Store warp size
             warp_size = (
                 length,
-                self.BOARDER_SEG_INSIDE_OFFSET + self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.boarder_seg_inside_offset + self.boarder_seg_outside_offset,
             )
             self.warp_sizes.append(warp_size)
 
@@ -426,7 +495,7 @@ class CameraNode(Node):
 
             # Perform flood fill on the masked image with the seed line sample points
             boarder_segment_flood_mask, _ = self._board_flood_fill(
-                masked_image, line_sample_points, self.FLOOD_THRESHOLD
+                masked_image, line_sample_points, self.flood_threshold
             )
             boarder_segment_flood_masks.append(boarder_segment_flood_mask)
 
@@ -634,8 +703,8 @@ class CameraNode(Node):
         boarder_segment_masks = [np.zeros(shape, dtype=np.uint8) for _ in range(4)]
 
         # Compute segment dimensions
-        long_side_length = rect_width - 2 * self.BOARDER_SEG_CORNER_DISTANCE
-        short_side_length = rect_height - 2 * self.BOARDER_SEG_CORNER_DISTANCE
+        long_side_length = rect_width - 2 * self.boarder_seg_corner_distance
+        short_side_length = rect_height - 2 * self.boarder_seg_corner_distance
         center = np.reshape(rotated_rect[0], (2, 1))
 
         # Helper to create rectangle points from offsets
@@ -654,28 +723,28 @@ class CameraNode(Node):
         # Define parameter combinations for each border segment
         parameter_combination = [
             (
-                self.BOARDER_SEG_INSIDE_OFFSET,
-                self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.boarder_seg_inside_offset,
+                self.boarder_seg_outside_offset,
                 int(long_side_length // 2),
                 int(long_side_length // 2),
             ),
             (
                 int(short_side_length // 2),
                 int(short_side_length // 2),
-                self.BOARDER_SEG_INSIDE_OFFSET,
-                self.BOARDER_SEG_OUTSIDE_OFFSET,
+                self.boarder_seg_inside_offset,
+                self.boarder_seg_outside_offset,
             ),
             (
-                self.BOARDER_SEG_OUTSIDE_OFFSET,
-                self.BOARDER_SEG_INSIDE_OFFSET,
+                self.boarder_seg_outside_offset,
+                self.boarder_seg_inside_offset,
                 int(long_side_length // 2),
                 int(long_side_length // 2),
             ),
             (
                 int(short_side_length // 2),
                 int(short_side_length // 2),
-                self.BOARDER_SEG_OUTSIDE_OFFSET,
-                self.BOARDER_SEG_INSIDE_OFFSET,
+                self.boarder_seg_outside_offset,
+                self.boarder_seg_inside_offset,
             ),
         ]
         # Lengths of each border segment rectangle
@@ -856,7 +925,7 @@ class CameraNode(Node):
         if self.profiler is not None:
             self.profiler.disable()
             self.get_logger().info("Profiling complete. Generating stats...")
-            print_profiling_stats(self.profiler, self.PROFILING_TOP_FUNCTIONS)
+            print_profiling_stats(self.profiler, self.profiling_top_functions)
             self.profiler = None
             # Cancel the timer so it doesn't fire again
             self.profiling_timer.cancel()
@@ -884,9 +953,9 @@ class CameraNode(Node):
         h, s, v = cv2.split(frame_hsv)
 
         # Apply smoothing to saturation channel for more stable border detection
-        if self.USE_SMOOTHING:
+        if self.use_smoothing:
             s_smooth = cv2.GaussianBlur(
-                s, (self.SMOOTHING_KERNEL, self.SMOOTHING_KERNEL), 0
+                s, (self.smoothing_kernel, self.smoothing_kernel), 0
             )
         else:
             s_smooth = s
@@ -916,13 +985,13 @@ class CameraNode(Node):
         )
 
         # Display image if enabled and enough time has elapsed
-        if self.SHOW_IMAGE:
+        if self.show_image:
 
             # Increment frame counter
             self.frame_count += 1
 
             current_time = time.time()
-            if current_time - self.last_display_time >= 1.0 / self.SHOW_IMAGE_FPS:
+            if current_time - self.last_display_time >= 1.0 / self.show_image_fps:
                 self.last_display_time = current_time
 
                 show_final_output(

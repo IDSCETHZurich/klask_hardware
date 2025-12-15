@@ -5,60 +5,170 @@ import time
 import rclpy
 import numpy as np
 from rclpy.node import Node
-from geometry_msgs.msg import Polygon, Point32
-from klask_interfaces.msg import StampedPolygon, StampedInt32
+from std_msgs.msg import UInt64
+from klask_interfaces.msg import StampedPolygon, StampedInt32, State
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 
 from .kalman_filter import KalmanFilter
-from .utils import resize_with_aspect_ratio
+from .utils import create_point_from_list
+from .debug import draw_object_with_velocity, plot_image
+from .board_state import BoardState
 
 
 class StateEstimatorNode(Node):
     """ROS2 node for estimating ball and peg positions from camera images."""
 
-    # Debug/Display settings
-    SHOW_IMAGE = True
-    PRINT_OUTCOME = False
-
-    # Goal detection constants
-    GOAL_RADIUS = 22
-    MAX_GOAL_COUNTER = 30  # Frames required before confirming goal
-
-    # Collision detection constants
-    COLLISION_DISTANCE = 35.0  # Distance threshold for collision detection
-
-    # HSV color range constants for object detection
-    BALL_HSV_LOWER = (10, 60, 200)  # Orange ball lower bound
-    BALL_HSV_UPPER = (45, 160, 255)  # Orange ball upper bound
-    PEG_HSV_LOWER = (90, 150, 0)  # Black peg lower bound
-    PEG_HSV_UPPER = (130, 255, 45)  # Black peg upper bound
-
-    # Visualization canvas size
-    CANVAS_WIDTH = 1280
-    CANVAS_HEIGHT = 720
-
-    # Display update rate
-    DISPLAY_UPDATE_INTERVAL = 0.1  # 10Hz display update (100ms between frames)
-
     def __init__(self):
         super().__init__("state_estimator")
 
-        # Publishers
-        self.state_publisher = self.create_publisher(
-            StampedPolygon, "ball_peg_states", 10
+        # =============================
+        # Parameters
+        # =============================
+
+        # Enable visualization windows (default: false)
+        self.declare_parameter("show_image", False)
+        self.show_image = bool(self.get_parameter("show_image").value)
+
+        # Radius around goal center to count as "in goal" (pixels) (default: 22)
+        self.declare_parameter("goal_radius", 22)
+        self.goal_radius = int(self.get_parameter("goal_radius").value)
+
+        # Frames required before confirming goal (default: 30)
+        self.declare_parameter("goal_hyst_counter", 30)
+        self.goal_hyst_counter = int(self.get_parameter("goal_hyst_counter").value)
+
+        # Distance threshold for edge/peg collision logic (pixels) (default: 35.0)
+        self.declare_parameter("collision_distance", 35.0)
+        self.collision_distance = float(self.get_parameter("collision_distance").value)
+
+        # Orange ball lower bound
+        self.declare_parameter("ball_hsv_lower", [10, 60, 200])
+        self.ball_hsv_lower = self._hsv_param("ball_hsv_lower", (10, 60, 200))
+
+        # Orange ball upper bound
+        self.declare_parameter("ball_hsv_upper", [45, 160, 255])
+        self.ball_hsv_upper = self._hsv_param("ball_hsv_upper", (45, 160, 255))
+
+        # Black peg lower bound
+        self.declare_parameter("peg_hsv_lower", [90, 150, 0])
+        self.peg_hsv_lower = self._hsv_param("peg_hsv_lower", (90, 150, 0))
+
+        # Black peg upper bound
+        self.declare_parameter("peg_hsv_upper", [130, 255, 45])
+        self.peg_hsv_upper = self._hsv_param("peg_hsv_upper", (130, 255, 45))
+
+        # Visualization canvas width in pixels (default: 1280)
+        self.declare_parameter("canvas_width", 1280)
+        self.canvas_width = int(self.get_parameter("canvas_width").value)
+
+        # Visualization canvas height in pixels (default: 720)
+        self.declare_parameter("canvas_height", 720)
+        self.canvas_height = int(self.get_parameter("canvas_height").value)
+
+        # State publishing frequency in Hz (default: 80.0)
+        self.declare_parameter("publish_frequency", 80.0)
+        self.publish_frequency = float(self.get_parameter("publish_frequency").value)
+
+        # Seconds between display updates (default: 0.1)
+        self.declare_parameter("display_update_interval", 0.1)
+        self.display_update_interval = float(
+            self.get_parameter("display_update_interval").value
         )
-        self.outcome_publisher = self.create_publisher(StampedInt32, "outcome", 10)
+
+        # Topic names
+        self.declare_parameter("board_state_topic", "board_state")
+        self.board_state_topic = str(self.get_parameter("board_state_topic").value)
+
+        self.declare_parameter("board_image_topic", "board_image/compressed")
+        self.board_image_topic = str(self.get_parameter("board_image_topic").value)
+
+        self.declare_parameter("goal_positions_topic", "goal_positions")
+        self.goal_positions_topic = str(
+            self.get_parameter("goal_positions_topic").value
+        )
+
+        # Ball KF
+        self.declare_parameter("ball_kf_process_noise_position", 2.0)
+        self.declare_parameter("ball_kf_process_noise_velocity", 30.0)
+        self.declare_parameter("ball_kf_measurement_noise_position", 1.0)
+
+        self.ball_kf_process_noise_position = float(
+            self.get_parameter("ball_kf_process_noise_position").value
+        )
+        self.ball_kf_process_noise_velocity = float(
+            self.get_parameter("ball_kf_process_noise_velocity").value
+        )
+        self.ball_kf_measurement_noise_position = float(
+            self.get_parameter("ball_kf_measurement_noise_position").value
+        )
+
+        # Left peg KF
+        self.declare_parameter("left_peg_kf_process_noise_position", 2.0)
+        self.declare_parameter("left_peg_kf_process_noise_velocity", 800.0)
+        self.declare_parameter("left_peg_kf_measurement_noise_position", 12.0)
+        self.declare_parameter("left_peg_kf_stop_threshold", 0.3)
+
+        self.left_peg_kf_process_noise_position = float(
+            self.get_parameter("left_peg_kf_process_noise_position").value
+        )
+        self.left_peg_kf_process_noise_velocity = float(
+            self.get_parameter("left_peg_kf_process_noise_velocity").value
+        )
+        self.left_peg_kf_measurement_noise_position = float(
+            self.get_parameter("left_peg_kf_measurement_noise_position").value
+        )
+        self.left_peg_kf_stop_threshold = float(
+            self.get_parameter("left_peg_kf_stop_threshold").value
+        )
+
+        # Right peg KF
+        self.declare_parameter("right_peg_kf_process_noise_position", 2.0)
+        self.declare_parameter("right_peg_kf_process_noise_velocity", 800.0)
+        self.declare_parameter("right_peg_kf_measurement_noise_position", 12.0)
+        self.declare_parameter("right_peg_kf_stop_threshold", 0.3)
+
+        self.right_peg_kf_process_noise_position = float(
+            self.get_parameter("right_peg_kf_process_noise_position").value
+        )
+        self.right_peg_kf_process_noise_velocity = float(
+            self.get_parameter("right_peg_kf_process_noise_velocity").value
+        )
+        self.right_peg_kf_measurement_noise_position = float(
+            self.get_parameter("right_peg_kf_measurement_noise_position").value
+        )
+        self.right_peg_kf_stop_threshold = float(
+            self.get_parameter("right_peg_kf_stop_threshold").value
+        )
+
+        # ============================================
+        # Playing Field Boundaries
+        # ============================================
+
+        self.declare_parameter("edge_x_min", 0.0)
+        self.declare_parameter("edge_x_max", 530.0)
+        self.declare_parameter("edge_y_min", 0.0)
+        self.declare_parameter("edge_y_max", 370.0)
+
+        self.edge_x_min = float(self.get_parameter("edge_x_min").value)
+        self.edge_x_max = float(self.get_parameter("edge_x_max").value)
+        self.edge_y_min = float(self.get_parameter("edge_y_min").value)
+        self.edge_y_max = float(self.get_parameter("edge_y_max").value)
+
+        # Publishers
+        self.state_publisher = self.create_publisher(State, self.board_state_topic, 10)
 
         # Subscribers
         self.image_subscription = self.create_subscription(
-            CompressedImage, "board_image/compressed", self.image_callback, 10
+            CompressedImage, self.board_image_topic, self._image_callback, 10
         )
         self.goal_subscription = self.create_subscription(
-            StampedPolygon, "goal_positions", self.goal_callback, 10
+            StampedPolygon, self.goal_positions_topic, self._goal_callback, 10
         )
-        self.gantry_subscription = self.create_subscription(
-            StampedPolygon, "gantry_positions", self.gantry_callback, 10
+
+        # Timer for state publishing
+        self.state_timer = self.create_timer(
+            1.0 / self.publish_frequency, self._publish_timer_callback
         )
 
         # CV Bridge for image conversion
@@ -66,21 +176,21 @@ class StateEstimatorNode(Node):
 
         # Kalman Filters
         self.ball_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=30.0,
-            measurement_noise_position=1.0,
+            process_noise_position=self.ball_kf_process_noise_position,
+            process_noise_velocity=self.ball_kf_process_noise_velocity,
+            measurement_noise_position=self.ball_kf_measurement_noise_position,
         )
         self.left_peg_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=800.0,
-            measurement_noise_position=12.0,
-            stop_threshold=0.3,
+            process_noise_position=self.left_peg_kf_process_noise_position,
+            process_noise_velocity=self.left_peg_kf_process_noise_velocity,
+            measurement_noise_position=self.left_peg_kf_measurement_noise_position,
+            stop_threshold=self.left_peg_kf_stop_threshold,
         )
         self.right_peg_kf = KalmanFilter(
-            process_noise_position=2.0,
-            process_noise_velocity=800.0,
-            measurement_noise_position=12.0,
-            stop_threshold=0.3,
+            process_noise_position=self.right_peg_kf_process_noise_position,
+            process_noise_velocity=self.right_peg_kf_process_noise_velocity,
+            measurement_noise_position=self.right_peg_kf_measurement_noise_position,
+            stop_threshold=self.right_peg_kf_stop_threshold,
         )
 
         # Timing
@@ -105,39 +215,48 @@ class StateEstimatorNode(Node):
         self.right_goal: list[float] | None = None
 
         # Playing field boundaries [x_min, x_max, y_min, y_max]
-        self.edge = np.array([0.0, 530.0, 0.0, 370.0])
-
-        # Magnet position (from camera node)
-        self.magnet: list[float | None] | None = None
+        self.edge = np.array(
+            [self.edge_x_min, self.edge_x_max, self.edge_y_min, self.edge_y_max]
+        )
 
         # Goal detection counters
         self.ball_in_left_goal_counter = 0
         self.ball_in_right_goal_counter = 0
         self.peg_in_left_goal_counter = 0
         self.peg_in_right_goal_counter = 0
-        self.outcome_published = False
 
-        # Detection state flags
-        self.goals_detected_once_printed = False
+        # Board Status
+        self.board_state: BoardState = BoardState.UNKNOWN
 
         self.get_logger().info("State estimator node started")
 
-    def goal_callback(self, msg: StampedPolygon) -> None:
+    def _hsv_param(
+        self, name: str, default_value: tuple[int, int, int]
+    ) -> tuple[int, int, int]:
+        value = self.get_parameter(name).value
+        try:
+            values = [int(v) for v in value]
+        except Exception:
+            self.get_logger().warn(
+                f"Parameter '{name}' must be a list of 3 ints; using default {list(default_value)}"
+            )
+            return default_value
+
+        if len(values) != 3:
+            self.get_logger().warn(
+                f"Parameter '{name}' must have length 3; got {len(values)}. Using default {list(default_value)}"
+            )
+            return default_value
+
+        return (values[0], values[1], values[2])
+
+    def _goal_callback(self, msg: StampedPolygon) -> None:
         """Callback for receiving goal positions."""
         if len(msg.polygon.points) >= 2:
             self.left_goal = [msg.polygon.points[0].x, msg.polygon.points[0].y]
             self.right_goal = [msg.polygon.points[1].x, msg.polygon.points[1].y]
 
-    def gantry_callback(self, msg: StampedPolygon) -> None:
-        """Callback for receiving gantry/magnet positions."""
-        if len(msg.polygon.points) >= 1:
-            point = msg.polygon.points[0]
-            if point.z == 1.0:  # Y position unknown
-                self.magnet = [point.x, None]
-            else:
-                self.magnet = [point.x, point.y]
-
-    def image_callback(self, msg: CompressedImage) -> None:
+    def _image_callback(self, msg: CompressedImage) -> None:
         """Callback for receiving compressed board images."""
         try:
             # Convert ROS CompressedImage message to OpenCV image
@@ -156,29 +275,14 @@ class StateEstimatorNode(Node):
 
             # Detect ball and pegs
             (
-                canvas,
                 self.left_peg_position,
                 self.right_peg_position,
                 self.ball_position,
-            ) = self.detect_ball_peg(
+            ) = self._detect_ball_peg(
                 cv_image,
                 left_goal=self.left_goal,
                 right_goal=self.right_goal,
             )
-
-            # Display image at 10Hz to improve performance
-            if self.SHOW_IMAGE:
-                current_time = time.time()
-                if (
-                    current_time - self.last_display_time
-                    >= self.DISPLAY_UPDATE_INTERVAL
-                ):
-                    cv2.imshow("State Estimation", canvas)
-                    cv2.waitKey(1)
-                    self.last_display_time = current_time
-
-            # Publish states
-            self.publish_estimated_positions_and_velocities()
 
             # Check for goals if all objects are detected
             if all(
@@ -190,7 +294,8 @@ class StateEstimatorNode(Node):
                     self.right_goal,
                 ]
             ):
-                self.check_goal()
+                self.board_state |= BoardState.READY
+                self._check_goal()
 
             # Increment frame counter
             self.frame_count += 1
@@ -198,14 +303,9 @@ class StateEstimatorNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
 
-    def _update_fps(self) -> None:
-        """Update FPS calculation (called every second by timer)."""
-        self.current_fps = float(self.frame_count)
-        self.frame_count = 0
-
-    def detect_ball_peg(
+    def _detect_ball_peg(
         self,
-        cropped: np.ndarray,
+        frame: np.ndarray,
         left_goal: list[float] | None = None,
         right_goal: list[float] | None = None,
     ) -> tuple[
@@ -221,17 +321,17 @@ class StateEstimatorNode(Node):
             Tuple of (canvas, left_peg_position, right_peg_position, ball_position)
         """
         # Convert to HSV and apply blur for noise reduction
-        frame_hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
+        frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         frame_hsv_blur = cv2.GaussianBlur(frame_hsv, (7, 7), 0)
 
         # Create masks for ball (orange) and pegs (black)
         masked_ball = cv2.inRange(
-            frame_hsv_blur, self.BALL_HSV_LOWER, self.BALL_HSV_UPPER
+            frame_hsv_blur, self.ball_hsv_lower, self.ball_hsv_upper
         )
-        masked_peg = cv2.inRange(frame_hsv_blur, self.PEG_HSV_LOWER, self.PEG_HSV_UPPER)
+        masked_peg = cv2.inRange(frame_hsv_blur, self.peg_hsv_lower, self.peg_hsv_upper)
 
         # Create visualization overlay
-        overlaid_frame = self._create_overlay(cropped, masked_peg, masked_ball)
+        overlaid_frame = self._create_overlay(frame, masked_peg, masked_ball)
 
         # Detect pegs in left and right halves
         height, width = masked_peg.shape
@@ -255,14 +355,22 @@ class StateEstimatorNode(Node):
             masked_ball, left_peg_position, right_peg_position, overlaid_frame
         )
 
-        # Draw goals and magnet visualization
-        if self.SHOW_IMAGE:
-            self._draw_goals(overlaid_frame, left_goal, right_goal)
+        # Display image at set rate
+        if self.show_image:
+            current_time = time.time()
+            if current_time - self.last_display_time >= self.display_update_interval:
+                plot_image(
+                    overlaid_frame,
+                    left_goal,
+                    right_goal,
+                    self.goal_radius,
+                    self.canvas_width,
+                    self.canvas_height,
+                    self.current_fps,
+                )
+                self.last_display_time = current_time
 
-        # Resize and center on canvas
-        canvas = self._create_canvas(overlaid_frame)
-
-        return canvas, left_peg_position, right_peg_position, ball_position
+        return left_peg_position, right_peg_position, ball_position
 
     def _create_overlay(
         self, frame: np.ndarray, masked_peg: np.ndarray, masked_ball: np.ndarray
@@ -306,9 +414,9 @@ class StateEstimatorNode(Node):
 
         position = kf.get_position()
 
-        if self.SHOW_IMAGE:
+        if self.show_image:
             velocity = kf.get_velocity()
-            self._draw_object_with_velocity(
+            draw_object_with_velocity(
                 overlaid_frame, position, velocity, color, velocity_color, 0.5
             )
 
@@ -350,9 +458,9 @@ class StateEstimatorNode(Node):
 
         position = self.ball_kf.get_position()
 
-        if self.SHOW_IMAGE:
+        if self.show_image:
             velocity = self.ball_kf.get_velocity()
-            self._draw_object_with_velocity(
+            draw_object_with_velocity(
                 overlaid_frame, position, velocity, (0, 0, 255), (0, 165, 255), 0.2
             )
 
@@ -367,12 +475,12 @@ class StateEstimatorNode(Node):
     ) -> tuple[bool, bool]:
         """Detect if ball is near edges or pegs (potential collision)."""
         at_x_edge = (
-            ball_x < self.edge[0] + self.COLLISION_DISTANCE
-            or ball_x + self.COLLISION_DISTANCE > self.edge[1]
+            ball_x < self.edge[0] + self.collision_distance
+            or ball_x + self.collision_distance > self.edge[1]
         )
         at_y_edge = (
-            ball_y < self.edge[2] + self.COLLISION_DISTANCE
-            or ball_y + self.COLLISION_DISTANCE > self.edge[3]
+            ball_y < self.edge[2] + self.collision_distance
+            or ball_y + self.collision_distance > self.edge[3]
         )
 
         close_to_peg = False
@@ -384,8 +492,8 @@ class StateEstimatorNode(Node):
                 np.array([ball_x, ball_y]) - np.array(right_peg_position)
             )
             close_to_peg = (
-                dist_left < self.COLLISION_DISTANCE
-                or dist_right < self.COLLISION_DISTANCE
+                dist_left < self.collision_distance
+                or dist_right < self.collision_distance
             )
 
         # Determine collision type
@@ -398,229 +506,81 @@ class StateEstimatorNode(Node):
         else:
             return False, False
 
-    def _draw_object_with_velocity(
-        self,
-        frame: np.ndarray,
-        position: np.ndarray,
-        velocity: list[float],
-        dot_color: tuple[int, int, int],
-        arrow_color: tuple[int, int, int],
-        velocity_scale: float,
-    ) -> None:
-        """Draw object position and velocity vector."""
-        pos_int = (int(position[0]), int(position[1]))
+    def _check_goal(self) -> None:
+        """Check if ball or peg has scored and publish outcome."""
 
-        # Draw position
-        cv2.circle(frame, pos_int, 5, dot_color, -1)
-
-        # Draw velocity arrow
-        end_point = (
-            int(position[0] + velocity[0] * velocity_scale),
-            int(position[1] + velocity[1] * velocity_scale),
-        )
-        cv2.arrowedLine(frame, pos_int, end_point, arrow_color, 2, tipLength=0.3)
-
-    def _draw_goals(
-        self,
-        frame: np.ndarray,
-        left_goal: list[float] | None,
-        right_goal: list[float] | None,
-    ) -> None:
-        """Draw goal circles on the frame."""
-        goal_color = (140, 255, 0)
-
-        if left_goal is not None:
-            center = (int(left_goal[0]), int(left_goal[1]))
-            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
-            cv2.circle(frame, center, 5, goal_color, -1)
-
-        if right_goal is not None:
-            center = (int(right_goal[0]), int(right_goal[1]))
-            cv2.circle(frame, center, self.GOAL_RADIUS, goal_color, 2)
-            cv2.circle(frame, center, 5, goal_color, -1)
-
-    def _create_canvas(self, overlaid_frame: np.ndarray) -> np.ndarray:
-        """Resize frame and center it on a canvas."""
-        resized_image, new_w, new_h = resize_with_aspect_ratio(
-            overlaid_frame, self.CANVAS_WIDTH, self.CANVAS_HEIGHT
-        )
-
-        # Ensure dimensions are within bounds
-        if new_w > self.CANVAS_WIDTH or new_h > self.CANVAS_HEIGHT:
-            self.get_logger().warn(
-                f"Resized image ({new_w}x{new_h}) exceeds canvas ({self.CANVAS_WIDTH}x{self.CANVAS_HEIGHT})"
+        data = [
+            (self.ball_position, self.left_goal, self.ball_in_left_goal_counter),
+            (self.ball_position, self.right_goal, self.ball_in_right_goal_counter),
+            (self.left_peg_position, self.left_goal, self.peg_in_left_goal_counter),
+            (self.right_peg_position, self.right_goal, self.peg_in_right_goal_counter),
+        ]
+        (
+            self.ball_in_left_goal_counter,
+            self.ball_in_right_goal_counter,
+            self.peg_in_left_goal_counter,
+            self.peg_in_right_goal_counter,
+        ) = [
+            self._update_goal_counter(
+                np.array(obj_pos),
+                np.array(goal_pos),
+                counter,
             )
-            new_w = min(new_w, self.CANVAS_WIDTH)
-            new_h = min(new_h, self.CANVAS_HEIGHT)
-            resized_image = cv2.resize(
-                resized_image, (new_w, new_h), interpolation=cv2.INTER_AREA
-            )
-
-        # Center on black canvas
-        canvas = np.zeros((self.CANVAS_HEIGHT, self.CANVAS_WIDTH, 3), dtype=np.uint8)
-        x_offset = (self.CANVAS_WIDTH - new_w) // 2
-        y_offset = (self.CANVAS_HEIGHT - new_h) // 2
-        canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
-
-        # Draw FPS counter on canvas
-        if self.current_fps > 0:
-            fps_text = f"FPS: {self.current_fps:.1f}"
-            cv2.putText(
-                canvas,
-                fps_text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-
-        return canvas
-
-    def publish_estimated_positions_and_velocities(self) -> None:
-        """Publish ball and peg positions/velocities, goals, and magnet position."""
-        polygon = Polygon()
-
-        # Add ball and peg data (position and velocity for each)
-        vectors = [
-            self.ball_position,
-            self.ball_kf.get_velocity(),
-            self.left_peg_kf.get_position(),
-            self.left_peg_kf.get_velocity(),
-            self.right_peg_kf.get_position(),
-            self.right_peg_kf.get_velocity(),
+            for obj_pos, goal_pos, counter in data
         ]
 
-        for vector in vectors:
-            if vector is not None:
-                polygon.points.append(self._create_point32(vector[0], vector[1]))
+        for counter, flag in [
+            (self.ball_in_left_goal_counter, BoardState.BALL_IN_LEFT_GOAL),
+            (self.ball_in_right_goal_counter, BoardState.BALL_IN_RIGHT_GOAL),
+            (self.peg_in_left_goal_counter, BoardState.PEG_IN_LEFT_GOAL),
+            (self.peg_in_right_goal_counter, BoardState.PEG_IN_RIGHT_GOAL),
+        ]:
+            if counter == self.goal_hyst_counter:
+                self.board_state |= flag
+            elif counter == 0:
+                self.board_state &= ~flag
 
-        # Add goal coordinates
-        if self.left_goal is not None and self.right_goal is not None:
-            polygon.points.append(
-                self._create_point32(self.left_goal[0], self.left_goal[1])
-            )
-            polygon.points.append(
-                self._create_point32(self.right_goal[0], self.right_goal[1])
-            )
-
-        # Add magnet position
-        if self.magnet is not None:
-            magnet_y = self.magnet[1] if self.magnet[1] is not None else 0.0
-            polygon.points.append(self._create_point32(self.magnet[0], magnet_y))
-
-        # Publish only if we have all 9 points
-        if len(polygon.points) == 9:
-            stamped_polygon = StampedPolygon()
-            stamped_polygon.polygon = polygon
-            stamped_polygon.header.stamp = self.get_clock().now().to_msg()
-            self.state_publisher.publish(stamped_polygon)
-
-    def _create_point32(self, x: float, y: float, z: float = 0.0) -> Point32:
-        """Create a Point32 message from coordinates."""
-        point = Point32()
-        point.x = float(x)
-        point.y = float(y)
-        point.z = z
-        return point
-
-    def check_goal(self) -> None:
-        """Check if ball or peg has scored and publish outcome."""
-        if self.left_goal is None or self.right_goal is None:
-            return
-
-        if not self.goals_detected_once_printed:
-            self.get_logger().info("Both goals detected: Ready to play!")
-            self.goals_detected_once_printed = True
-
-        # Calculate distances
-        distances = {
-            "ball_left": np.linalg.norm(np.array(self.ball_position) - self.left_goal),
-            "ball_right": np.linalg.norm(
-                np.array(self.ball_position) - self.right_goal
-            ),
-            "peg_left": np.linalg.norm(
-                np.array(self.left_peg_position) - self.left_goal
-            ),
-            "peg_right": np.linalg.norm(
-                np.array(self.right_peg_position) - self.right_goal
-            ),
-        }
-
-        # Update counters
-        self.ball_in_left_goal_counter = self._update_goal_counter(
-            distances["ball_left"], self.ball_in_left_goal_counter
-        )
-        self.ball_in_right_goal_counter = self._update_goal_counter(
-            distances["ball_right"], self.ball_in_right_goal_counter
-        )
-        self.peg_in_left_goal_counter = self._update_goal_counter(
-            distances["peg_left"], self.peg_in_left_goal_counter
-        )
-        self.peg_in_right_goal_counter = self._update_goal_counter(
-            distances["peg_right"], self.peg_in_right_goal_counter
-        )
-
-        # Check and publish outcomes
-        self.ball_in_left_goal_counter = self._check_and_publish_goal_outcome(
-            self.ball_in_left_goal_counter, "Ball in left goal!", 0
-        )
-        self.ball_in_right_goal_counter = self._check_and_publish_goal_outcome(
-            self.ball_in_right_goal_counter, "Ball in right goal!", 1
-        )
-        self.peg_in_left_goal_counter = self._check_and_publish_goal_outcome(
-            self.peg_in_left_goal_counter, "Peg in left goal!", 2
-        )
-        self.peg_in_right_goal_counter = self._check_and_publish_goal_outcome(
-            self.peg_in_right_goal_counter, "Peg in right goal!", 3
-        )
-
-        # Reset outcome flag when all clear
-        if all(
-            counter == 0
-            for counter in [
-                self.ball_in_left_goal_counter,
-                self.ball_in_right_goal_counter,
-                self.peg_in_left_goal_counter,
-                self.peg_in_right_goal_counter,
-            ]
-        ):
-            if self.outcome_published:
-                self.get_logger().info("Goals cleared: Ready to play again!")
-                self.outcome_published = False
-
-    def _update_goal_counter(self, distance: float, counter: int) -> int:
+    def _update_goal_counter(
+        self, object_pos: np.ndarray, goal_pos: np.ndarray, counter: int
+    ) -> int:
         """Update goal counter based on distance."""
-        if distance < self.GOAL_RADIUS:
-            return min(counter + 1, self.MAX_GOAL_COUNTER)
+
+        distance = np.linalg.norm(object_pos - goal_pos)
+        if distance < self.goal_radius:
+            return min(counter + 1, self.goal_hyst_counter)
         elif counter > 0:
             return counter - 1
         return counter
 
-    def _check_and_publish_goal_outcome(
-        self, counter: int, message: str, outcome_number: int
-    ) -> int:
-        """Check if goal threshold reached and publish outcome."""
-        if counter == self.MAX_GOAL_COUNTER:
-            if self.PRINT_OUTCOME:
-                self.get_logger().info(message)
+    def _update_fps(self) -> None:
+        """Update FPS calculation (called every second by timer)."""
+        self.current_fps = float(self.frame_count)
+        self.frame_count = 0
 
-            # Reset counter to avoid repeated triggers
-            counter = 5
+    def _publish_timer_callback(self) -> None:
+        """Publish estimated positions/velocities and check for goals."""
 
-            if not self.outcome_published:
-                self._publish_outcome(outcome_number)
+        if not (self.board_state & BoardState.READY):
+            return
 
-        return counter
+        msg = State()
+        msg.ball.position = create_point_from_list(self.ball_kf.get_position())
+        msg.ball.velocity = create_point_from_list(self.ball_kf.get_velocity())
+        msg.left_peg.position = create_point_from_list(self.left_peg_kf.get_position())
+        msg.left_peg.velocity = create_point_from_list(self.left_peg_kf.get_velocity())
+        msg.right_peg.position = create_point_from_list(
+            self.right_peg_kf.get_position()
+        )
+        msg.right_peg.velocity = create_point_from_list(
+            self.right_peg_kf.get_velocity()
+        )
+        msg.left_goal_pos = create_point_from_list(self.left_goal)
+        msg.right_goal_pos = create_point_from_list(self.right_goal)
 
-    def _publish_outcome(self, outcome_number: int) -> None:
-        """Publish goal outcome message."""
-        msg = StampedInt32()
-        msg.data.data = outcome_number
         msg.header.stamp = self.get_clock().now().to_msg()
-        self.outcome_publisher.publish(msg)
-        self.outcome_published = True
+        msg.status = UInt64(data=int(self.board_state))
+
+        self.state_publisher.publish(msg)
 
 
 def main(args=None):

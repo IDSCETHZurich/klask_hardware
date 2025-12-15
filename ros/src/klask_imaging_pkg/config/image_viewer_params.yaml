@@ -1,0 +1,33 @@
+image_viewer:
+  ros__parameters:
+    board_image_topic: board_image/compressed # Topic to subscribe for board images (default: board_image/compressed)
+    board_state_topic: board_state # Topic to subscribe for estimated state (default: board_state)
+
+    # Toggle overlay of estimated state on the image
+    show_state_overlay: true
+
+    # Goal overlay
+    goal_radius: 22
+    overlay_goal_color: [140, 255, 0] # BGR
+    overlay_goal_center_radius: 5
+    overlay_goal_circle_thickness: 2
+
+    # Object overlay
+    overlay_dot_radius: 5
+    overlay_arrow_thickness: 2
+    overlay_arrow_tip_length: 0.3
+
+    # Left peg (BGR)
+    overlay_left_peg_dot_color: [255, 0, 0]
+    overlay_left_peg_arrow_color: [248, 193, 110]
+    overlay_left_peg_velocity_scale: 0.5
+
+    # Right peg (BGR)
+    overlay_right_peg_dot_color: [0, 100, 0]
+    overlay_right_peg_arrow_color: [144, 238, 144]
+    overlay_right_peg_velocity_scale: 0.5
+
+    # Ball (BGR)
+    overlay_ball_dot_color: [0, 0, 255]
+    overlay_ball_arrow_color: [0, 165, 255]
+    overlay_ball_velocity_scale: 0.2
