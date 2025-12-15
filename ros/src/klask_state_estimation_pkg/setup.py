@@ -14,6 +14,8 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # Include config files
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        # Include launch files
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

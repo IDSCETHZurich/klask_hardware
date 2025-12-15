@@ -146,6 +146,5 @@ RUN echo "source $OVERLAY_WS/install/setup.bash\n" >> ~/.bashrc
 
 WORKDIR $OVERLAY_WS
 
-# Default command - can be overridden
-# Example: docker run <image> ros2 launch klask_imaging_pkg camera_launch.py
-CMD ["bash"]
+# Default command: launch state estimator
+CMD ["ros2", "launch", "klask_state_estimation_pkg", "state_estimation_launch.py"]
