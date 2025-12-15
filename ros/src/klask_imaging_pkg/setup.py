@@ -16,6 +16,9 @@ setup(
         # Include config files
         (os.path.join("share", package_name, "config"), glob("config/*.yaml")),
     ],
+    package_data={
+        package_name: ["data/*.npz"],
+    },
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="root",
