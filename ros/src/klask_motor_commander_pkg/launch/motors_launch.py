@@ -81,11 +81,11 @@ def launch_setup(context, *args, **kwargs):
     # Motor commander node
     nodes_to_launch.append(
         Node(
-            package="motor_commander_pkg", executable="motor_commander", output="screen"
+            package="klask_motor_commander_pkg", executable="klask_motor_commander", output="screen"
         )
     )
 
-    # Foxglove bridge (commented out by default)
+    # Foxglove bridge
     nodes_to_launch.append(
         ExecuteProcess(
             cmd=["ros2", "launch", "foxglove_bridge", "foxglove_bridge_launch.xml"],

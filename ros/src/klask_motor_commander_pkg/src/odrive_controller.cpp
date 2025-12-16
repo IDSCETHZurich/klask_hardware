@@ -1,4 +1,4 @@
-#include "motor_commander_pkg/odrive_controller.hpp"
+#include "klask_motor_commander_pkg/odrive_controller.hpp"
 
 ODriveController::ODriveController() : Node("odrive_controller") {
     RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node...");
@@ -17,12 +17,12 @@ ODriveController::ODriveController() : Node("odrive_controller") {
 
     // Create subscription for ball/peg states with reliable QoS
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
-    states_subscriber_ = this->create_subscription<klask_interfaces::msg::StampedPolygon>(
-        "/ball_peg_states", 
+    states_subscriber_ = this->create_subscription<klask_interfaces::msg::State>(
+        "/board_state", 
         qos_reliable,
         std::bind(&ODriveController::state_callback, this, std::placeholders::_1), 
         sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to /ball_peg_states");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to /board_state");
 
     // Create subscription for velocity commands with reliable QoS
     velocity_subscriber_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -43,25 +43,15 @@ Player::SharedPtr ODriveController::get_opponent_node() const {
     return this->opponent_;
 }
 
-void ODriveController::state_callback(const klask_interfaces::msg::StampedPolygon::SharedPtr msg) {
-    // Validate message has sufficient points
-    if (msg->polygon.points.size() < 6) {
-        RCLCPP_ERROR_THROTTLE(
-            this->get_logger(),
-            *this->get_clock(),
-            5000,  // Log at most once every 5 seconds
-            "Invalid state message: expected at least 6 points, got %zu",
-            msg->polygon.points.size());
-        return;
-    }
+void ODriveController::state_callback(const klask_interfaces::msg::State::SharedPtr msg) {
     
     // Update opponent position and velocity (points 2 and 3)
-    opponent_->position = {msg->polygon.points[2].x, msg->polygon.points[2].y};
-    opponent_->velocity = {msg->polygon.points[3].x, msg->polygon.points[3].y};
+    opponent_->position = {static_cast<float>(msg->left_peg.position.x), static_cast<float>(msg->left_peg.position.y)};
+    opponent_->velocity = {static_cast<float>(msg->left_peg.velocity.x), static_cast<float>(msg->left_peg.velocity.y)};
     
     // Update player position and velocity (points 4 and 5)
-    player_->position = {msg->polygon.points[4].x, msg->polygon.points[4].y};
-    player_->velocity = {msg->polygon.points[5].x, msg->polygon.points[5].y};
+    player_->position = {static_cast<float>(msg->right_peg.position.x), static_cast<float>(msg->right_peg.position.y)};
+    player_->velocity = {static_cast<float>(msg->right_peg.velocity.x), static_cast<float>(msg->right_peg.velocity.y)};
     
     // Check synchronization for player if already synchronized once
     if (player_->synchronized_once) {

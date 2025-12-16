@@ -7,6 +7,8 @@
 # or execute it in your shell for to have it for the current session:
 #     source /path/to/klask_docker.sh --completion
 
+NS="hardware"
+
 # Bash completion support
 if [[ "$1" == "--completion" ]]; then
     _klask_docker_completions() {
@@ -37,11 +39,11 @@ fi
 
 # Configuration based on mode
 if [[ "$MODE" == "runtime" ]]; then
-    IMAGE_NAME="klask_ros_runtime"
+    IMAGE_NAME="klask_ros_${NS}_runtime"
     DOCKERFILE="Runtime.Dockerfile"
     MODE_DISPLAY="Runtime"
 else
-    IMAGE_NAME="klask_ros_sdk"
+    IMAGE_NAME="klask_ros_${NS}_sdk"
     DOCKERFILE="SDK.Dockerfile"
     MODE_DISPLAY="SDK"
 fi

@@ -1,10 +1,10 @@
-#ifndef MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
-#define MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#ifndef KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#define KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
-#include <klask_interfaces/msg/stamped_polygon.hpp>
-#include "motor_commander_pkg/player.hpp"
+#include <klask_interfaces/msg/state.hpp>
+#include "klask_motor_commander_pkg/player.hpp"
 #include <memory>
 
 /**
@@ -53,7 +53,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr velocity_subscriber_;
     
     /// Subscription for ball and peg state information
-    rclcpp::Subscription<klask_interfaces::msg::StampedPolygon>::SharedPtr states_subscriber_;
+    rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
     /**
      * @brief Callback for processing ball and peg state updates.
@@ -61,9 +61,9 @@ private:
      * Updates position and velocity for both player and opponent pegs,
      * checks synchronization state, and updates synchronized state if needed.
      * 
-     * @param msg Shared pointer to StampedPolygon message containing state data.
+     * @param msg Shared pointer to State message containing state data.
      */
-    void state_callback(const klask_interfaces::msg::StampedPolygon::SharedPtr msg);
+    void state_callback(const klask_interfaces::msg::State::SharedPtr msg);
     
     /**
      * @brief Callback for processing velocity command requests.
@@ -76,4 +76,4 @@ private:
     void velocity_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 };
 
-#endif  // MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#endif  // KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
