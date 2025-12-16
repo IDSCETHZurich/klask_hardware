@@ -5,6 +5,7 @@
 .idea/
 # The only exception are the launch configurations and the recommened extensions
 !/ros/.vscode/launch.json
+!/ros/.vscode/c_cpp_properties.json
 !/.vscode/extensions.json
 
 # Ignore ROS stuff
