@@ -1,10 +1,10 @@
-#ifndef MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
-#define MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#ifndef KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#define KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <klask_interfaces/msg/stamped_polygon.hpp>
-#include "motor_commander_pkg/player.hpp"
+#include "klask_motor_commander_pkg/player.hpp"
 #include <memory>
 
 /**
@@ -76,4 +76,4 @@ private:
     void velocity_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 };
 
-#endif  // MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
+#endif  // KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_

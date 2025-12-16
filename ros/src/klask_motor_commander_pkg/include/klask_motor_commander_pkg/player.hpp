@@ -1,5 +1,5 @@
-#ifndef MOTOR_COMMANDER_PKG__PLAYER_HPP_
-#define MOTOR_COMMANDER_PKG__PLAYER_HPP_
+#ifndef KLASK_MOTOR_COMMANDER_PKG__PLAYER_HPP_
+#define KLASK_MOTOR_COMMANDER_PKG__PLAYER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
@@ -286,4 +286,4 @@ private:
     void handle_torque_limits(float total_torque);
 };
 
-#endif  // MOTOR_COMMANDER_PKG__PLAYER_HPP_
+#endif  // KLASK_MOTOR_COMMANDER_PKG__PLAYER_HPP_

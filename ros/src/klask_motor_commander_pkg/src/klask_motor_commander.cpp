@@ -1,5 +1,5 @@
 /**
- * @file motor_commander.cpp
+ * @file klask_motor_commander.cpp
  * @brief Main entry point for the motor commander node.
  * 
  * This file initializes the ODriveController node and executes it with a
@@ -7,11 +7,11 @@
  * opponent motor control.
  */
 
-#include "motor_commander_pkg/odrive_controller.hpp"
+#include "klask_motor_commander_pkg/odrive_controller.hpp"
 #include <memory>
 
 /**
- * @brief Main function for motor_commander_pkg.
+ * @brief Main function for klask_motor_commander_pkg.
  * 
  * Initializes ROS2, creates the ODriveController node along with its
  * associated Player nodes, and spins them in a multi-threaded executor
