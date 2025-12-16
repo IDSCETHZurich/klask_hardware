@@ -85,7 +85,7 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    # Foxglove bridge (commented out by default)
+    # Foxglove bridge
     nodes_to_launch.append(
         ExecuteProcess(
             cmd=["ros2", "launch", "foxglove_bridge", "foxglove_bridge_launch.xml"],
