@@ -50,15 +50,15 @@ Player::Player(const std::string& name)
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = group_;
     
-    // Use best-effort QoS for motor commands (real-time priority)
-    auto qos_best_effort = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort();
+    // Use reliable QoS with KeepAll to match odrive_can_node expectations
+    auto qos_control = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     // Use reliable QoS for status updates (ensure delivery)
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
 
     motor_left_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
-        "/odrive_axis" + motor_ind_l + "/control_message", qos_best_effort, pub_options);  
+        "/odrive_axis" + motor_ind_l + "/control_message", qos_control, pub_options);  
     motor_right_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
-        "/odrive_axis" + motor_ind_r + "/control_message", qos_best_effort, pub_options);  
+        "/odrive_axis" + motor_ind_r + "/control_message", qos_control, pub_options);  
     
     position_magnet_publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
         "/" + name + "_magnet_position", qos_reliable, pub_options);
@@ -438,11 +438,16 @@ void Player::set_motor_state(int state) {
     auto request_l = std::make_shared<odrive_can::srv::AxisState::Request>();
     request_l->axis_requested_state = state;
     
-    while (!request_axis_r_state_client_->wait_for_service(std::chrono::seconds(1))) {
+    while (rclcpp::ok() && !request_axis_r_state_client_->wait_for_service(std::chrono::seconds(1))) {
         RCLCPP_WARN(this->get_logger(), "Waiting for service /odrive_axis0/request_axis_state...");
     }
-    while (!request_axis_l_state_client_->wait_for_service(std::chrono::seconds(1))) {
+    while (rclcpp::ok() && !request_axis_l_state_client_->wait_for_service(std::chrono::seconds(1))) {
         RCLCPP_WARN(this->get_logger(), "Waiting for service /odrive_axis1/request_axis_state...");
+    }
+    
+    // If node is shutting down, don't send requests
+    if (!rclcpp::ok()) {
+        return;
     }
     
     auto future_r = request_axis_r_state_client_->async_send_request(request_r);
