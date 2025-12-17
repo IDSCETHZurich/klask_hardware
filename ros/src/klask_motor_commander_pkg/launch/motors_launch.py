@@ -7,6 +7,7 @@ from launch.substitutions import LaunchConfiguration
 def launch_setup(context, *args, **kwargs):
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
+    start_commander = LaunchConfiguration("start_commander").perform(context)
 
     nodes_to_launch = []
 
@@ -78,12 +79,13 @@ def launch_setup(context, *args, **kwargs):
             )
         )
 
-    # Motor commander node
-    nodes_to_launch.append(
-        Node(
-            package="klask_motor_commander_pkg", executable="klask_motor_commander", output="screen"
+    # Motor commander node (optional, controlled by start_commander parameter)
+    if start_commander == "true":
+        nodes_to_launch.append(
+            Node(
+                package="klask_motor_commander_pkg", executable="klask_motor_commander", output="screen"
+            )
         )
-    )
 
     # Foxglove bridge
     nodes_to_launch.append(
@@ -103,5 +105,11 @@ def generate_launch_description():
         default_value="both",
         description='Which player to launch: "left", "right", or "both" (default)',
     )
+    
+    start_commander_arg = DeclareLaunchArgument(
+        "start_commander",
+        default_value="true",
+        description='Whether to start the motor commander node: "true" (default) or "false"',
+    )
 
-    return LaunchDescription([player_arg, OpaqueFunction(function=launch_setup)])
+    return LaunchDescription([player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)])

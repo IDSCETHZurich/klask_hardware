@@ -7,6 +7,7 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-rqt-common-plugins \
     ros-${ROS_DISTRO}-foxglove-bridge \
     ros-${ROS_DISTRO}-teleop-twist-keyboard \
+    gdb \
     python3-pip \
     python3-opencv \
     iproute2 \
