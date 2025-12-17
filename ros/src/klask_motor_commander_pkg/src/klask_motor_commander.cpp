@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
     
     // Add all nodes to the executor
     executor.add_node(controller_node);
-    executor.add_node(controller_node->get_player_node());
-    executor.add_node(controller_node->get_opponent_node());
+    executor.add_node(controller_node->get_right_player_node());
+    executor.add_node(controller_node->get_left_player_node());
     
     RCLCPP_INFO(controller_node->get_logger(), "Motor commander system initialized. Spinning...");
     

@@ -16,9 +16,17 @@
 #include <sstream>
 
 /**
+ * @brief Enum to identify which side of the table the player controls.
+ */
+enum class PlayerSide {
+    RIGHT_PLAYER,  ///< Right side player (motors 0 and 1)
+    LEFT_PLAYER    ///< Left side player (motors 2 and 3)
+};
+
+/**
  * @brief Controls a single player's peg movement using two ODrive motors.
  * 
- * This class manages the motor control for one player (either 'player' or 'opponent'),
+ * This class manages the motor control for one player (either right_player or left_player),
  * handling peg synchronization, wall collision detection, velocity profiling, and
  * coordinated movement between two motors in a differential drive configuration.
  * 
@@ -33,10 +41,10 @@ public:
     /**
      * @brief Construct a new Player object.
      * 
-     * @param name Player identifier ("player" or "opponent").
+     * @param side Player side identifier (RIGHT_PLAYER or LEFT_PLAYER).
      *             Determines motor indices, home position, and field boundaries.
      */
-    Player(const std::string& name);
+    Player(PlayerSide side);
 
     /**
      * @brief Process velocity command targets.
@@ -82,8 +90,8 @@ public:
 private:
     // === Node Configuration ===
     
-    /// Node name ("player" or "opponent")
-    std::string name_;
+    /// Player side (RIGHT_PLAYER or LEFT_PLAYER)
+    PlayerSide side_;
     
     /// Direction multiplier (+1 for player, -1 for opponent)
     float sign;

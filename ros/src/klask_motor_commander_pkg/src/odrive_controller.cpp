@@ -7,9 +7,9 @@ ODriveController::ODriveController() : Node("odrive_controller") {
     group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
     // Initialize player nodes
-    RCLCPP_INFO(this->get_logger(), "Creating player and opponent nodes...");
-    player_ = std::make_shared<Player>("player");
-    opponent_ = std::make_shared<Player>("opponent");
+    RCLCPP_INFO(this->get_logger(), "Creating left_player and right_player nodes...");
+    right_player_ = std::make_shared<Player>(PlayerSide::RIGHT_PLAYER);
+    left_player_ = std::make_shared<Player>(PlayerSide::LEFT_PLAYER);
 
     // Setup subscription options with callback group
     rclcpp::SubscriptionOptions sub_options;
@@ -24,78 +24,79 @@ ODriveController::ODriveController() : Node("odrive_controller") {
         sub_options);
     RCLCPP_INFO(this->get_logger(), "Subscribed to /board_state");
 
-    // Create subscription for velocity commands with reliable QoS
-    velocity_subscriber_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "velocity_requests_checked", 
+    // Create subscriptions for velocity commands with reliable QoS
+    right_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "cmd_vel/right_player_checked", 
         qos_reliable,
-        std::bind(&ODriveController::velocity_callback, this, std::placeholders::_1), 
+        std::bind(&ODriveController::right_player_velocity_callback, this, std::placeholders::_1), 
         sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to velocity_requests_checked");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/right_player_checked");
+    
+    left_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "cmd_vel/left_player_checked", 
+        qos_reliable,
+        std::bind(&ODriveController::left_player_velocity_callback, this, std::placeholders::_1), 
+        sub_options);
+    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/left_player_checked");
     
     RCLCPP_INFO(this->get_logger(), "ODriveController initialization complete");
 }
 
-Player::SharedPtr ODriveController::get_player_node() const {
-    return this->player_;
+Player::SharedPtr ODriveController::get_right_player_node() const {
+    return this->right_player_;
 }
 
-Player::SharedPtr ODriveController::get_opponent_node() const {
-    return this->opponent_;
+Player::SharedPtr ODriveController::get_left_player_node() const {
+    return this->left_player_;
 }
 
 void ODriveController::state_callback(const klask_interfaces::msg::State::SharedPtr msg) {
     
-    // Update opponent position and velocity (points 2 and 3)
-    opponent_->position = {static_cast<float>(msg->left_peg.position.x), static_cast<float>(msg->left_peg.position.y)};
-    opponent_->velocity = {static_cast<float>(msg->left_peg.velocity.x), static_cast<float>(msg->left_peg.velocity.y)};
+    // Update left player position and velocity
+    left_player_->position = {static_cast<float>(msg->left_peg.position.x), static_cast<float>(msg->left_peg.position.y)};
+    left_player_->velocity = {static_cast<float>(msg->left_peg.velocity.x), static_cast<float>(msg->left_peg.velocity.y)};
     
-    // Update player position and velocity (points 4 and 5)
-    player_->position = {static_cast<float>(msg->right_peg.position.x), static_cast<float>(msg->right_peg.position.y)};
-    player_->velocity = {static_cast<float>(msg->right_peg.velocity.x), static_cast<float>(msg->right_peg.velocity.y)};
+    // Update right player position and velocity
+    right_player_->position = {static_cast<float>(msg->right_peg.position.x), static_cast<float>(msg->right_peg.position.y)};
+    right_player_->velocity = {static_cast<float>(msg->right_peg.velocity.x), static_cast<float>(msg->right_peg.velocity.y)};
     
-    // Check synchronization for player if already synchronized once
-    if (player_->synchronized_once) {
-        player_->is_synchronized();
+    // Check synchronization for right player if already synchronized once
+    if (right_player_->synchronized_once) {
+        right_player_->is_synchronized();
     }
     
-    // Check synchronization for opponent if already synchronized once
-    if (opponent_->synchronized_once) {
-        opponent_->is_synchronized();
+    // Check synchronization for left player if already synchronized once
+    if (left_player_->synchronized_once) {
+        left_player_->is_synchronized();
     }
     
-    // Update player synchronized state if peg is synchronized
-    if (player_->peg_mag_synchronized && !player_->synchronized_state.empty()) {
-        player_->synchronized_state[0] = player_->encoder_values[0];
-        player_->synchronized_state[1] = player_->encoder_values[1];
-        player_->synchronized_state[2] = player_->position[0];
-        player_->synchronized_state[3] = player_->position[1];
+    // Update right player synchronized state if peg is synchronized
+    if (right_player_->peg_mag_synchronized && !right_player_->synchronized_state.empty()) {
+        right_player_->synchronized_state[0] = right_player_->encoder_values[0];
+        right_player_->synchronized_state[1] = right_player_->encoder_values[1];
+        right_player_->synchronized_state[2] = right_player_->position[0];
+        right_player_->synchronized_state[3] = right_player_->position[1];
     }
     
-    // Update opponent synchronized state if peg is synchronized
-    if (opponent_->peg_mag_synchronized && !opponent_->synchronized_state.empty()) {
-        opponent_->synchronized_state[0] = opponent_->encoder_values[0];
-        opponent_->synchronized_state[1] = opponent_->encoder_values[1];
-        opponent_->synchronized_state[2] = opponent_->position[0];
-        opponent_->synchronized_state[3] = opponent_->position[1];
+    // Update left player synchronized state if peg is synchronized
+    if (left_player_->peg_mag_synchronized && !left_player_->synchronized_state.empty()) {
+        left_player_->synchronized_state[0] = left_player_->encoder_values[0];
+        left_player_->synchronized_state[1] = left_player_->encoder_values[1];
+        left_player_->synchronized_state[2] = left_player_->position[0];
+        left_player_->synchronized_state[3] = left_player_->position[1];
     }
 }
 
-void ODriveController::velocity_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-    // Validate message has expected number of velocity commands
-    // Expected format: [opponent_vx, opponent_vy, player_vx, player_vy]
-    if (msg->data.size() < 4) {
-        RCLCPP_ERROR_THROTTLE(
-            this->get_logger(),
-            *this->get_clock(),
-            5000,  // Log at most once every 5 seconds
-            "Invalid velocity message: expected 4 values, got %zu",
-            msg->data.size());
-        return;
-    }
-    
-    // Dispatch velocity commands to respective nodes
-    // Indices 0, 1: opponent (vx, vy)
-    // Indices 2, 3: player (vx, vy)
-    opponent_->velocity_targets(msg->data[0], msg->data[1]);
-    player_->velocity_targets(msg->data[2], msg->data[3]);
+void ODriveController::right_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+    // Extract linear x and y velocities from Twist message
+    // Twist.linear.x corresponds to forward/backward velocity
+    // Twist.linear.y corresponds to left/right velocity
+    right_player_->velocity_targets(static_cast<float>(msg->linear.x), static_cast<float>(msg->linear.y));
+}
+
+void ODriveController::left_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+    // Extract linear x and y velocities from Twist message
+    // Twist.linear.x corresponds to forward/backward velocity
+    // Twist.linear.y corresponds to left/right velocity
+    left_player_->velocity_targets(static_cast<float>(msg->linear.x), static_cast<float>(msg->linear.y));
 }

@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 find_package(klask_interfaces REQUIRED)
 
@@ -18,7 +19,7 @@ add_executable(klask_motor_commander
   src/odrive_controller.cpp
 )
 
-ament_target_dependencies(klask_motor_commander rclcpp std_msgs odrive_can klask_interfaces)
+ament_target_dependencies(klask_motor_commander rclcpp std_msgs geometry_msgs odrive_can klask_interfaces)
 
 target_include_directories(klask_motor_commander PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

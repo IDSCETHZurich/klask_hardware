@@ -1,7 +1,7 @@
 #include "klask_motor_commander_pkg/player.hpp"
 
-Player::Player(const std::string& name)
-    : Node(name),
+Player::Player(PlayerSide side)
+    : Node(side == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player"),
       finding_peg(false),
       peg_mag_synchronized(false),
       synchronized_once(false),
@@ -9,7 +9,7 @@ Player::Player(const std::string& name)
       velocity({0.0f, 0.0f}),
       synchronized_state({0.0f, 0.0f, 0.0f, 0.0f}),
       encoder_values({0.0f, 0.0f, 0.0f, 0.0f}),
-      name_(name),
+      side_(side),
       synch_buffer(100, false),
       sync_elements_to_check(0.0f),
       motor_at_wall(false),
@@ -24,17 +24,19 @@ Player::Player(const std::string& name)
       magnet_position({0.0f, 0.0f}),
       magnet_velocity({0.0f, 0.0f})
 {   
-    RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", name.c_str());
+    const char* side_name = (side == PlayerSide::RIGHT_PLAYER) ? "right_player" : "left_player";
+    RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", side_name);
     
     std::string motor_ind_r;
     std::string motor_ind_l;
-    if (name == "player") {
+    
+    if (side == PlayerSide::RIGHT_PLAYER) {
         motor_ind_r = "0";
         motor_ind_l = "1";
         home = {410.0f, 175.0f};
         EDGE = {283.0f, 528.0f, 5.0f, 367.0f};
         sign = 1.0f;
-    } else {
+    } else {  // LEFT_PLAYER
         motor_ind_r = "2";
         motor_ind_l = "3";
         home = {110.0f, 175.0f};
@@ -60,8 +62,9 @@ Player::Player(const std::string& name)
     motor_right_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
         "/odrive_axis" + motor_ind_r + "/control_message", qos_control, pub_options);  
     
+    std::string topic_prefix = (side == PlayerSide::RIGHT_PLAYER) ? "right_player" : "left_player";
     position_magnet_publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
-        "/" + name + "_magnet_position", qos_reliable, pub_options);
+        "/" + topic_prefix + "_magnet_position", qos_reliable, pub_options);
     
     RCLCPP_INFO(this->get_logger(), "Created publishers for motors %s and %s", 
                 motor_ind_r.c_str(), motor_ind_l.c_str());
@@ -87,7 +90,7 @@ Player::Player(const std::string& name)
         "/odrive_axis" + motor_ind_l + "/controller_status", qos_reliable, 
         std::bind(&Player::controller_status_callback_left, this, std::placeholders::_1), sub_options);
     
-    RCLCPP_INFO(this->get_logger(), "Player node %s initialization complete", name.c_str());
+    RCLCPP_INFO(this->get_logger(), "Player node %s initialization complete", side_name);
 }
 
 void Player::velocity_targets(float v_x, float v_y) {
@@ -164,8 +167,10 @@ void Player::move_to_corner() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             send_commands(0.0f, 0.0f);
             
-            magnet_position[0] = (name_ == "player") ? 530.0f : 0.0f;
-            magnet_position[1] = (name_ == "opponent") ? 370.0f : 0.0f;
+            // Set corner position: right_player at x=530, left_player at x=0
+            magnet_position[0] = (side_ == PlayerSide::RIGHT_PLAYER) ? 530.0f : 0.0f;
+            // Set corner position: left_player at y=370, right_player at y=0
+            magnet_position[1] = (side_ == PlayerSide::LEFT_PLAYER) ? 370.0f : 0.0f;
             synchronized_state = {encoder_values[0], encoder_values[1], 
                                   magnet_position[0], magnet_position[1]};
             RCLCPP_INFO(this->get_logger(), "Peg in corner");
@@ -188,14 +193,14 @@ void Player::move_pattern() {
     float x_target;
     float y_target;
 
-    if (name_ == "player") {
+    if (side_ == PlayerSide::RIGHT_PLAYER) {
         moving_in_x = true;
         moving_in_y = false;
         moving_in_pos_x = false;
         moving_in_pos_y = false;
         x_target = magnet_position[0] - 200.0f;
         y_target = magnet_position[1] - 30.0f;
-    } else {
+    } else {  // LEFT_PLAYER
         moving_in_x = true;
         moving_in_y = false;
         moving_in_pos_x = true;
