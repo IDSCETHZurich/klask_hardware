@@ -137,8 +137,8 @@ void Player::is_synchronized()
         interpolate_elements(sync_elements_to_check));
 
     if (std::all_of(synch_buffer.begin(), synch_buffer.begin() + elements_to_check,
-                    [](float val)
-                    { return val == false; }))
+                    [](bool val)
+                    { return !val; }))
     {
         if (peg_mag_synchronized)
         {
@@ -147,8 +147,8 @@ void Player::is_synchronized()
         peg_mag_synchronized = false;
     }
     else if (std::all_of(synch_buffer.begin(), synch_buffer.begin() + 3,
-                         [](float val)
-                         { return val == true; }))
+                         [](bool val)
+                         { return val; }))
     {
         if (!peg_mag_synchronized)
         {
