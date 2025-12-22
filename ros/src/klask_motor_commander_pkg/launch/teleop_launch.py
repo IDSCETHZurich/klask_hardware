@@ -21,6 +21,7 @@ def launch_setup(context, *args, **kwargs):
         executable="teleop_twist_keyboard",
         name=node_name,
         output="screen",
+        prefix="xterm -e",
         remappings=[("/cmd_vel", topic)],
     )
 
@@ -30,7 +31,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     player_arg = DeclareLaunchArgument(
         "player",
-        default_value="right",
+        default_value="left",
         description='Which player to control: "left" or "right" (default)',
     )
 
