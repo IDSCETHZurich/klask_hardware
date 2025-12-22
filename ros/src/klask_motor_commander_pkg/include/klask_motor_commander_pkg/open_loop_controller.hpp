@@ -64,7 +64,7 @@ private:
     // Movement validation parameters
     static constexpr float HOMING_VELOCITY = 0.01f;         ///< Slow velocity for homing (m/s)
     static constexpr float VALIDATION_DURATION = 2.0f;      ///< Duration for movement validation (s)
-    static constexpr float POSITION_TOLERANCE = 0.005f;     ///< Tolerance for goal reaching (m)
+    static constexpr float POSITION_TOLERANCE = 0.03f;      ///< Tolerance for goal reaching (m)
     static constexpr float MOVEMENT_THRESHOLD = 0.01f;      ///< Minimum expected movement (m)
     static constexpr float EXPECTED_DISTANCE_FACTOR = 0.5f; ///< Factor of expected vs actual movement
 

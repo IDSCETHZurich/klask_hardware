@@ -2,7 +2,7 @@
 
 Player::Player(PlayerSide side)
     : Node(side == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player"),
-      synchronized_state({0.0f, 0.0f, 0.0f, 0.0f}),
+      synchronized_state({}),
       magnet_position({0.0f, 0.0f}),
       side_(side),
       encoder_right(0.0f),
@@ -21,14 +21,14 @@ Player::Player(PlayerSide side)
     {
         motor_ind_r = "0";
         motor_ind_l = "1";
-        EDGE = {0.23f, 0.42f, 0.0f, 0.32f};
+        EDGE = {0.23f, 0.42f, 0.32f, 0.0f}; // [left, right, bottom, top] in image coords (y=0 is top)
         sign = 1.0f;
     }
     else
     { // LEFT_PLAYER
         motor_ind_r = "2";
         motor_ind_l = "3";
-        EDGE = {0.0f, 0.19f, 0.0f, 0.32f};
+        EDGE = {0.0f, 0.19f, 0.32f, 0.0f}; // [left, right, bottom, top] in image coords (y=0 is top)
         sign = -1.0f;
     }
 
@@ -154,28 +154,31 @@ void Player::deacceleration_profile(float &v_x, float &v_y)
     };
 
     const float safe_zone = DEACCELERATION_DISTANCE + PEG_RADIUS;
-    const float min_clearance = PEG_RADIUS;
+    const float min_clearance = PEG_RADIUS * 1.5f;
 
     // X-axis boundary checks
     const float dist_from_left = magnet_position[0] - EDGE[0];
     const float dist_from_right = EDGE[1] - magnet_position[0];
 
+    // Near left boundary - limit leftward motion
     if (dist_from_left <= safe_zone)
     {
         if (dist_from_left <= min_clearance)
         {
-            v_x = std::max(v_x, 0.0f); // Stop or move away from left edge
+            v_x = std::max(v_x, 0.0f); // Block leftward motion
         }
         else
         {
             v_x = std::max(v_x, -linear_decel(dist_from_left - min_clearance));
         }
     }
-    else if (dist_from_right <= safe_zone)
+
+    // Near right boundary - limit rightward motion
+    if (dist_from_right <= safe_zone)
     {
         if (dist_from_right <= min_clearance)
         {
-            v_x = std::min(v_x, 0.0f); // Stop or move away from right edge
+            v_x = std::min(v_x, 0.0f); // Block rightward motion
         }
         else
         {
@@ -183,30 +186,33 @@ void Player::deacceleration_profile(float &v_x, float &v_y)
         }
     }
 
-    // Y-axis boundary checks
-    const float dist_from_bottom = magnet_position[1] - EDGE[2];
-    const float dist_from_top = EDGE[3] - magnet_position[1];
+    // Y-axis boundary checks (image coordinates: y=0 is top, y increases downward)
+    const float dist_from_top = magnet_position[1] - EDGE[3];
+    const float dist_from_bottom = EDGE[2] - magnet_position[1];
 
-    if (dist_from_bottom <= safe_zone)
-    {
-        if (dist_from_bottom <= min_clearance)
-        {
-            v_y = std::max(v_y, 0.0f);
-        }
-        else
-        {
-            v_y = std::max(v_y, -linear_decel(dist_from_bottom - min_clearance));
-        }
-    }
-    else if (dist_from_top <= safe_zone)
+    // Near top boundary - limit upward motion (negative y velocity)
+    if (dist_from_top <= safe_zone)
     {
         if (dist_from_top <= min_clearance)
         {
-            v_y = std::min(v_y, 0.0f);
+            v_y = std::max(v_y, 0.0f); // Block upward motion
         }
         else
         {
-            v_y = std::min(v_y, linear_decel(dist_from_top - min_clearance));
+            v_y = std::max(v_y, -linear_decel(dist_from_top - min_clearance));
+        }
+    }
+    // Near bottom boundary - limit downward motion (positive y velocity)
+    if (dist_from_bottom <= safe_zone)
+    {
+
+        if (dist_from_bottom <= min_clearance)
+        {
+            v_y = std::min(v_y, 0.0f); // Block downward motion
+        }
+        else
+        {
+            v_y = std::min(v_y, linear_decel(dist_from_bottom - min_clearance));
         }
     }
 
