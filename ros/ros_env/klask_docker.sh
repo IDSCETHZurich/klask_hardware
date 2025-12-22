@@ -101,6 +101,7 @@ cmd_run() {
         docker run -it -d --rm \
             --env="DISPLAY" \
             --env="QT_X11_NO_MITSHM=1" \
+            --env="ROS_DOMAIN_ID=0" \
             --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
             --device="$VIDEO_DEVICE:/dev/video0" \
             --network=host \
@@ -113,6 +114,7 @@ cmd_run() {
         docker run -it -d --rm \
             --env="DISPLAY" \
             --env="QT_X11_NO_MITSHM=1" \
+            --env="ROS_DOMAIN_ID=0" \
             --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
             --volume="$SCRIPT_DIR/../src:/opt/ros/klask_ws/src:rw" \
             --volume="$SCRIPT_DIR/../.vscode:/opt/ros/klask_ws/.vscode:rw" \
