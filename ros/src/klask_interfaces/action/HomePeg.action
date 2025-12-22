@@ -1,0 +1,11 @@
+# Goal: Initiate homing of a peg to home position
+geometry_msgs/Point home_position
+---
+# Result: Final position after homing
+geometry_msgs/Point final_position
+bool success
+string message
+---
+# Feedback: Current position during homing
+geometry_msgs/Point current_position
+float32 distance_remaining

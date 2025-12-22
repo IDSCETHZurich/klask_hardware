@@ -45,6 +45,13 @@ public:
     Player(PlayerSide side);
 
     /**
+     * @brief Get the player side.
+     *
+     * @return PlayerSide The side this player controls.
+     */
+    PlayerSide get_side() const { return side_; }
+
+    /**
      * @brief Send velocity commands to motors.
      *
      * @param v_x Target velocity in x-direction (m/s).

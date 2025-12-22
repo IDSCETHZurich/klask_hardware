@@ -1,0 +1,5 @@
+# Service to calibrate encoder positions with camera peg positions from State message
+klask_interfaces/State state  # State message containing peg positions
+---
+bool success                   # True if calibration successful
+string message                 # Status message

@@ -19,8 +19,18 @@ ODriveController::ODriveController() : Node("odrive_controller")
     // Create subscription for ball/peg states with reliable QoS
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
 
-    motor_communication_sub_ = this->create_subscription<klask_interfaces::msg::MotorCommunication>(
-        "/motor_communication", 1, std::bind(&ODriveController::env_callback, this, std::placeholders::_1));
+    // Create service servers for calibration and motor state control
+    calibrate_encoders_service_ = this->create_service<klask_interfaces::srv::CalibrateEncoders>(
+        "calibrate_encoders",
+        std::bind(&ODriveController::calibrate_encoders_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: calibrate_encoders");
+
+    set_motor_state_service_ = this->create_service<klask_interfaces::srv::SetMotorState>(
+        "set_motor_state",
+        std::bind(&ODriveController::set_motor_state_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: set_motor_state");
 
     // Create subscriptions for velocity commands with reliable QoS
     right_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
@@ -50,18 +60,61 @@ Player::SharedPtr ODriveController::get_left_player_node() const
     return this->left_player_;
 }
 
-void ODriveController::env_callback(const klask_interfaces::msg::MotorCommunication::SharedPtr msg)
+void ODriveController::calibrate_encoders_callback(
+    const std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Request> request,
+    std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Response> response)
 {
-    if (msg->calibration_flag.data == true)
+    try
     {
-        right_player_->calibrate(msg->player_peg_pos);
-        left_player_->calibrate(msg->opponent_peg_pos);
+        // Extract peg positions from State message
+        const auto& right_peg_pos = request->state.right_peg.position;
+        const auto& left_peg_pos = request->state.left_peg.position;
+
+        right_player_->calibrate(right_peg_pos);
+        left_player_->calibrate(left_peg_pos);
+
+        response->success = true;
+        response->message = "Encoders calibrated successfully for both players";
+        RCLCPP_INFO(this->get_logger(), "Encoders calibrated: right=[%.3f, %.3f], left=[%.3f, %.3f]",
+                    right_peg_pos.x, right_peg_pos.y,
+                    left_peg_pos.x, left_peg_pos.y);
     }
-    if (motor_state != msg->desired_motor_state.data)
+    catch (const std::exception &e)
     {
-        right_player_->change_motor_state(msg->desired_motor_state.data);
-        left_player_->change_motor_state(msg->desired_motor_state.data);
-        motor_state = msg->desired_motor_state.data;
+        response->success = false;
+        response->message = std::string("Calibration failed: ") + e.what();
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+    }
+}
+
+void ODriveController::set_motor_state_callback(
+    const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
+    std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response)
+{
+    try
+    {
+        if (motor_state != request->desired_state)
+        {
+            right_player_->change_motor_state(request->desired_state);
+            left_player_->change_motor_state(request->desired_state);
+            motor_state = request->desired_state;
+
+            response->success = true;
+            response->message = "Motor state changed to " + std::to_string(request->desired_state);
+            RCLCPP_INFO(this->get_logger(), "Motor state changed to: %d", request->desired_state);
+        }
+        else
+        {
+            response->success = true;
+            response->message = "Motor already in state " + std::to_string(request->desired_state);
+            RCLCPP_DEBUG(this->get_logger(), "Motor already in state: %d", request->desired_state);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        response->success = false;
+        response->message = std::string("Motor state change failed: ") + e.what();
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
     }
 }
 

@@ -4,7 +4,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <klask_interfaces/msg/state.hpp>
-#include <klask_interfaces/msg/motor_communication.hpp>
+#include <klask_interfaces/srv/calibrate_encoders.hpp>
+#include <klask_interfaces/srv/set_motor_state.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
 #include <memory>
 
@@ -68,19 +69,40 @@ private:
     /// Subscription for left player velocity commands
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr left_player_velocity_subscriber_;
 
-    /// Subscription for motor communication messages
-    rclcpp::Subscription<klask_interfaces::msg::MotorCommunication>::SharedPtr motor_communication_sub_;
+    /// Service server for encoder calibration
+    rclcpp::Service<klask_interfaces::srv::CalibrateEncoders>::SharedPtr calibrate_encoders_service_;
+
+    /// Service server for motor state changes
+    rclcpp::Service<klask_interfaces::srv::SetMotorState>::SharedPtr set_motor_state_service_;
 
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
-    // TODO: Remove this once estimator is correct
-    const float REAL_TO_CAM_FACTOR_X = 1.0f / 0.0008285f;
-    const float REAL_TO_CAM_FACTOR_Y = 1150.0f;
-
     int motor_state = 8;
 
-    void env_callback(const klask_interfaces::msg::MotorCommunication::SharedPtr msg);
+    /**
+     * @brief Service callback for encoder calibration.
+     *
+     * Calibrates both player encoders with camera peg positions.
+     *
+     * @param request Shared pointer to request containing peg positions.
+     * @param response Shared pointer to response with success status.
+     */
+    void calibrate_encoders_callback(
+        const std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Request> request,
+        std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Response> response);
+
+    /**
+     * @brief Service callback for motor state change.
+     *
+     * Changes the state of all motors (both players).
+     *
+     * @param request Shared pointer to request containing desired state.
+     * @param response Shared pointer to response with success status.
+     */
+    void set_motor_state_callback(
+        const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
+        std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
 
     /**
      * @brief Callback for processing right player velocity commands.
