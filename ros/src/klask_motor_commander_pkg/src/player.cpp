@@ -2,29 +2,16 @@
 
 Player::Player(PlayerSide side)
     : Node(side == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player"),
-      finding_peg(false),
-      peg_mag_synchronized(false),
-      synchronized_once(false),
-      position({0.0f, 0.0f}),
-      velocity({0.0f, 0.0f}),
       synchronized_state({0.0f, 0.0f, 0.0f, 0.0f}),
-      encoder_values({0.0f, 0.0f, 0.0f, 0.0f}),
-      side_(side),
-      synch_buffer(100, false),
-      sync_elements_to_check(0.0f),
-      motor_at_wall(false),
-      motor_at_wall_calib(false),
-      motor_at_wall_buffer(4, std::vector<bool>(7, false)),
-      wall_prot_activated(4, false),
-      torque_left_motor(0.0f),
-      torque_right_motor(0.0f),
-      home(4, 0.0f),
-      EDGE(4, 0.0f),
-      at_home(false),
       magnet_position({0.0f, 0.0f}),
-      magnet_velocity({0.0f, 0.0f})
+      side_(side),
+      encoder_right(0.0f),
+      encoder_left(0.0f),
+      EDGE(4, 0.0f),
+      callback_count(0),
+      last_time(this->now())
 {
-    const char *side_name = (side == PlayerSide::RIGHT_PLAYER) ? "right_player" : "left_player";
+    const char *side_name = this->get_name();
     RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", side_name);
 
     std::string motor_ind_r;
@@ -34,16 +21,14 @@ Player::Player(PlayerSide side)
     {
         motor_ind_r = "0";
         motor_ind_l = "1";
-        home = {410.0f, 175.0f};
-        EDGE = {283.0f, 528.0f, 5.0f, 367.0f};
+        EDGE = {0.23f, 0.42f, 0.0f, 0.32f};
         sign = 1.0f;
     }
     else
     { // LEFT_PLAYER
         motor_ind_r = "2";
         motor_ind_l = "3";
-        home = {110.0f, 175.0f};
-        EDGE = {5.0f, 250.0f, 5.0f, 367.0f};
+        EDGE = {0.0f, 0.19f, 0.0f, 0.32f};
         sign = -1.0f;
     }
 
@@ -96,429 +81,212 @@ Player::Player(PlayerSide side)
     RCLCPP_INFO(this->get_logger(), "Player node %s initialization complete", side_name);
 }
 
-void Player::velocity_targets(float v_x, float v_y)
-{
-    if (peg_mag_synchronized && !finding_peg)
-    {
-        publish_velocity(v_x, v_y);
-    }
-    else if (!finding_peg)
-    {
-        find_peg();
-    }
-}
-
-void Player::is_synchronized()
-{
-    float delta = 7.0f;
-
-    std::copy_backward(synch_buffer.begin(), synch_buffer.end() - 1, synch_buffer.end());
-    if (velocity[0] < delta && velocity[1] < delta)
-    {
-        if (magnet_velocity[0] < delta && magnet_velocity[1] < delta && peg_mag_synchronized)
-        {
-            synch_buffer[0] = true;
-        }
-        else
-        {
-            synch_buffer[0] = false;
-        }
-    }
-    else
-    {
-        synch_buffer[0] = true;
-    }
-
-    float mag_vel = std::sqrt(magnet_velocity[0] * magnet_velocity[0] +
-                              magnet_velocity[1] * magnet_velocity[1]);
-    sync_elements_to_check = 0.4 * mag_vel + 0.6 * sync_elements_to_check;
-    unsigned int elements_to_check = std::min(
-        static_cast<unsigned int>(synch_buffer.size()) - 1,
-        interpolate_elements(sync_elements_to_check));
-
-    if (std::all_of(synch_buffer.begin(), synch_buffer.begin() + elements_to_check,
-                    [](bool val)
-                    { return !val; }))
-    {
-        if (peg_mag_synchronized)
-        {
-            RCLCPP_INFO(this->get_logger(), "Peg and magnet desynchronized");
-        }
-        peg_mag_synchronized = false;
-    }
-    else if (std::all_of(synch_buffer.begin(), synch_buffer.begin() + 3,
-                         [](bool val)
-                         { return val; }))
-    {
-        if (!peg_mag_synchronized)
-        {
-            RCLCPP_INFO(this->get_logger(), "Peg and magnet synchronized");
-        }
-        peg_mag_synchronized = true;
-    }
-}
-
-void Player::find_peg()
-{
-    finding_peg = true;
-    RCLCPP_INFO(this->get_logger(), "In Function");
-    while (!peg_mag_synchronized)
-    {
-        move_to_corner();
-        move_pattern();
-    }
-    synchronized_once = true;
-    find_home();
-    finding_peg = false;
-}
-
-void Player::move_to_corner()
-{
-    bool in_corner = false;
-    bool at_edge = false;
-
-    rclcpp::Rate loop_rate(50);
-
-    while (rclcpp::ok() && (!in_corner && !peg_mag_synchronized))
-    {
-        if (motor_at_wall_calib && !at_edge)
-        {
-            at_edge = true;
-            send_commands(-sign * 0.008f, 0.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        }
-        else if (!motor_at_wall_calib && at_edge)
-        {
-            send_commands(0.0f, sign * 0.008f);
-        }
-        else if (motor_at_wall_calib && at_edge)
-        {
-            send_commands(0.0f, -sign * 0.008f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            send_commands(0.0f, 0.0f);
-
-            // Set corner position: right_player at x=530, left_player at x=0
-            magnet_position[0] = (side_ == PlayerSide::RIGHT_PLAYER) ? 530.0f : 0.0f;
-            // Set corner position: left_player at y=370, right_player at y=0
-            magnet_position[1] = (side_ == PlayerSide::LEFT_PLAYER) ? 370.0f : 0.0f;
-            synchronized_state = {encoder_values[0], encoder_values[1],
-                                  magnet_position[0], magnet_position[1]};
-            RCLCPP_INFO(this->get_logger(), "Peg in corner");
-
-            in_corner = true;
-        }
-        else
-        {
-            send_commands(sign * 0.008f, 0.0f);
-        }
-
-        is_synchronized();
-        loop_rate.sleep();
-    }
-}
-
-void Player::move_pattern()
-{
-    bool moving_in_x;
-    bool moving_in_y;
-    bool moving_in_pos_x;
-    bool moving_in_pos_y;
-    float x_target;
-    float y_target;
-
-    if (side_ == PlayerSide::RIGHT_PLAYER)
-    {
-        moving_in_x = true;
-        moving_in_y = false;
-        moving_in_pos_x = false;
-        moving_in_pos_y = false;
-        x_target = magnet_position[0] - 200.0f;
-        y_target = magnet_position[1] - 30.0f;
-    }
-    else
-    { // LEFT_PLAYER
-        moving_in_x = true;
-        moving_in_y = false;
-        moving_in_pos_x = true;
-        moving_in_pos_y = true;
-        x_target = magnet_position[0] + 200.0f;
-        y_target = magnet_position[1] + 30.0f;
-    }
-
-    rclcpp::Rate loop_rate(50);
-    while (rclcpp::ok() && !peg_mag_synchronized)
-    {
-        float v_x = moving_in_x ? (moving_in_pos_x ? 0.02f : -0.02f) : 0.0f;
-        float v_y = moving_in_y ? (moving_in_pos_y ? 0.02f : -0.02f) : 0.0f;
-
-        publish_velocity(v_x, v_y);
-
-        if (moving_in_x && std::fabs(magnet_position[0] - x_target) < 10.0f)
-        {
-            moving_in_pos_x = !moving_in_pos_x;
-            moving_in_y = true;
-            moving_in_x = false;
-            x_target = magnet_position[0] + 190.0f * (moving_in_pos_x ? 1.0f : -1.0f);
-        }
-        else if (moving_in_y && magnet_position[1] - y_target < 5.0f)
-        {
-            moving_in_y = false;
-            moving_in_x = true;
-            y_target = magnet_position[1] - 30.0f;
-            if (y_target < 0.0f)
-            {
-                break;
-            }
-        }
-        is_synchronized();
-        loop_rate.sleep();
-    }
-}
-
-void Player::find_home()
-{
-    const float epsilon = 4;
-    float v_x = 0.0;
-    float v_y = 0.0;
-    rclcpp::Rate loop_rate(20);
-    while (!at_home && peg_mag_synchronized)
-    {
-        if (std::abs(position[0] - home[0]) > epsilon)
-        {
-            v_x = std::copysign(0.005f, home[0] - position[0]);
-        }
-        else
-        {
-            v_x = 0.0;
-        }
-        if (std::abs(position[1] - home[1]) > epsilon)
-        {
-            v_y = std::copysign(0.005f, home[1] - position[1]);
-        }
-        else
-        {
-            v_y = 0.0;
-        }
-        publish_velocity(v_x, v_y);
-        loop_rate.sleep();
-        if (v_x == 0.0 && v_y == 0.0)
-        {
-            publish_velocity(0.0f, 0.0f);
-            RCLCPP_INFO(this->get_logger(), "Peg is at home");
-            at_home = true;
-            synchronized_state = {0.0f, 0.0f, 0.0f, 0.0f};
-            synchronized_state[0] = encoder_values[0];
-            synchronized_state[1] = encoder_values[1];
-            synchronized_state[2] = position[0];
-            synchronized_state[3] = position[1];
-        }
-    }
-}
-
-unsigned int Player::interpolate_elements(float x) const
-{
-    static float x1 = 5.875f;
-    static float x2 = 235.0f;
-    static float y1 = 50.0f;
-    static float y2 = 7.0f;
-    unsigned int y = std::ceil(((y2 - y1) / (x2 - x1)) * x + y1 - x1 * ((y2 - y1) / (x2 - x1)));
-    return y;
-}
-
-void Player::publish_velocity(float v_x, float v_y)
-{
-    float mag_pos = 0.0f;
-    int counter = 0;
-    for (auto &row : motor_at_wall_buffer)
-    {
-        std::copy_backward(row.begin(), row.end() - 1, row.end());
-        row[0] = false;
-        if (counter > 1)
-        {
-            mag_pos = magnet_position[1];
-        }
-        else
-        {
-            mag_pos = magnet_position[0];
-        }
-        if (motor_at_wall && std::fabs(mag_pos - EDGE[counter]) < 15.0f)
-        {
-            row[0] = true;
-        }
-        else if (std::fabs(mag_pos - EDGE[counter]) > 35.0f)
-        {
-            if (wall_prot_activated[counter])
-            {
-                RCLCPP_INFO(this->get_logger(), "Stopped hitting against %u st wall", counter);
-            }
-            wall_prot_activated[counter] = false;
-        }
-        counter++;
-    }
-    deaceleration_profile(v_x, v_y);
-    move_away_from_wall(v_x, v_y);
-
-    send_commands(v_x, v_y);
-}
-
-void Player::deaceleration_profile(float &v_x, float &v_y)
-{
-    float distance = 35.0f;
-    float kf_safety_width = 5.0f;
-    float speed_limit_weight = 20.0f;
-
-    if (position[0] <= EDGE[0] + distance)
-    {
-        v_x = std::max(v_x, std::abs(v_x) * std::tanh((EDGE[0] - position[0] - kf_safety_width) / speed_limit_weight));
-    }
-    else if (position[0] + distance >= EDGE[1])
-    {
-        v_x = std::min(std::abs(v_x) * std::tanh((EDGE[1] - position[0] + kf_safety_width) / speed_limit_weight), v_x);
-    }
-    if (position[1] <= EDGE[2] + distance)
-    {
-        v_y = std::max(v_y, std::abs(v_y) * std::tanh((EDGE[2] - position[1] - kf_safety_width) / speed_limit_weight));
-    }
-    else if (position[1] + distance >= EDGE[3])
-    {
-        v_y = std::min(v_y, std::abs(v_y) * std::tanh((EDGE[3] - position[1] + kf_safety_width) / speed_limit_weight));
-    }
-}
-
-void Player::move_away_from_wall(float &v_x, float &v_y)
-{
-    if (wall_prot_activated[0] || std::any_of(motor_at_wall_buffer[0].begin(), motor_at_wall_buffer[0].end(), [](bool b)
-                                              { return b; }))
-    {
-        v_x = std::max(0.0f, v_x);
-        if (!wall_prot_activated[0])
-        {
-            RCLCPP_INFO(this->get_logger(), "Hitting against 1st wall");
-        }
-        wall_prot_activated[0] = true;
-    }
-    else if (wall_prot_activated[1] || std::any_of(motor_at_wall_buffer[1].begin(), motor_at_wall_buffer[1].end(), [](bool b)
-                                                   { return b; }))
-    {
-        v_x = std::min(0.0f, v_x);
-        if (!wall_prot_activated[1])
-        {
-            RCLCPP_INFO(this->get_logger(), "Hitting against 2st wall");
-        }
-        wall_prot_activated[1] = true;
-    }
-    if (wall_prot_activated[2] || std::any_of(motor_at_wall_buffer[2].begin(), motor_at_wall_buffer[2].end(), [](bool b)
-                                              { return b; }))
-    {
-        v_y = std::max(0.0f, v_y);
-        if (!wall_prot_activated[2])
-        {
-            RCLCPP_INFO(this->get_logger(), "Hitting against 3st wall");
-        }
-        wall_prot_activated[2] = true;
-    }
-    else if (wall_prot_activated[3] || std::any_of(motor_at_wall_buffer[3].begin(), motor_at_wall_buffer[3].end(), [](bool b)
-                                                   { return b; }))
-    {
-        v_y = std::min(0.0f, v_y);
-        if (!wall_prot_activated[3])
-        {
-            RCLCPP_INFO(this->get_logger(), "Hitting against 4st wall");
-        }
-        wall_prot_activated[3] = true;
-    }
-}
-
 void Player::send_commands(float v_x, float v_y)
 {
-    odrive_can::msg::ControlMessage control_r_msg;
-    odrive_can::msg::ControlMessage control_l_msg;
+    // Clamp input velocities to safe range
+    v_x = std::clamp(v_x, -MAX_VEL, MAX_VEL);
+    v_y = std::clamp(v_y, -MAX_VEL, MAX_VEL);
 
-    control_r_msg.input_vel = sign * (v_x + v_y) * (2 / DISTANCE_PER_REVOLUTION);
-    control_r_msg.control_mode = 2;
-    control_r_msg.input_mode = 1;
-    control_l_msg.input_vel = sign * (v_y - v_x) * (2 / DISTANCE_PER_REVOLUTION);
-    control_l_msg.control_mode = 2;
-    control_l_msg.input_mode = 1;
+    // Apply deceleration profile near boundaries if calibrated
+    if (!synchronized_state.empty())
+    {
+        deacceleration_profile(v_x, v_y);
+    }
+
+    // Log frequency periodically
+    constexpr int FREQ_LOG_INTERVAL = 100;
+    if (++callback_count >= FREQ_LOG_INTERVAL)
+    {
+        const rclcpp::Time current_time = this->now();
+        const double dt = (current_time - last_time).seconds();
+        if (dt > 0.0)
+        {
+            const double freq = FREQ_LOG_INTERVAL / dt;
+            RCLCPP_INFO(this->get_logger(), "Motor commands freq: %.2f Hz", freq);
+        }
+        last_time = current_time;
+        callback_count = 0;
+    }
+
+    // Convert velocities to motor commands (differential drive)
+    constexpr float METERS_TO_ROTATIONS = 2.0f / DISTANCE_PER_REVOLUTION;
+    constexpr int VELOCITY_CONTROL_MODE = 2;
+    constexpr int VELOCITY_INPUT_MODE = 1;
+
+    odrive_can::msg::ControlMessage control_r_msg;
+    control_r_msg.input_vel = sign * (v_x + v_y) * METERS_TO_ROTATIONS;
+    control_r_msg.control_mode = VELOCITY_CONTROL_MODE;
+    control_r_msg.input_mode = VELOCITY_INPUT_MODE;
+
+    odrive_can::msg::ControlMessage control_l_msg;
+    control_l_msg.input_vel = sign * (v_y - v_x) * METERS_TO_ROTATIONS;
+    control_l_msg.control_mode = VELOCITY_CONTROL_MODE;
+    control_l_msg.input_mode = VELOCITY_INPUT_MODE;
+
     motor_right_pub_->publish(control_r_msg);
     motor_left_pub_->publish(control_l_msg);
 }
 
+void Player::calibrate(const geometry_msgs::msg::Point &peg_pos)
+{
+    synchronized_state = {0.0f, 0.0f, 0.0f, 0.0f};
+    synchronized_state[0] = encoder_right;
+    synchronized_state[1] = encoder_left;
+    synchronized_state[2] = static_cast<float>(peg_pos.x);
+    synchronized_state[3] = static_cast<float>(peg_pos.y);
+
+    RCLCPP_INFO(this->get_logger(),
+                "Calibrated: encoders=[%.3f, %.3f], position=[%.3f, %.3f]",
+                encoder_right, encoder_left, peg_pos.x, peg_pos.y);
+}
+
+void Player::change_motor_state(const int &des_state)
+{
+    set_motor_state(des_state);
+}
+
+void Player::deacceleration_profile(float &v_x, float &v_y)
+{
+    // Helper lambda to compute linear deceleration
+    auto linear_decel = [](float distance) -> float
+    {
+        return (MAX_VEL / DEACCELERATION_DISTANCE) * distance;
+    };
+
+    const float safe_zone = DEACCELERATION_DISTANCE + PEG_RADIUS;
+    const float min_clearance = PEG_RADIUS;
+
+    // X-axis boundary checks
+    const float dist_from_left = magnet_position[0] - EDGE[0];
+    const float dist_from_right = EDGE[1] - magnet_position[0];
+
+    if (dist_from_left <= safe_zone)
+    {
+        if (dist_from_left <= min_clearance)
+        {
+            v_x = std::max(v_x, 0.0f); // Stop or move away from left edge
+        }
+        else
+        {
+            v_x = std::max(v_x, -linear_decel(dist_from_left - min_clearance));
+        }
+    }
+    else if (dist_from_right <= safe_zone)
+    {
+        if (dist_from_right <= min_clearance)
+        {
+            v_x = std::min(v_x, 0.0f); // Stop or move away from right edge
+        }
+        else
+        {
+            v_x = std::min(v_x, linear_decel(dist_from_right - min_clearance));
+        }
+    }
+
+    // Y-axis boundary checks
+    const float dist_from_bottom = magnet_position[1] - EDGE[2];
+    const float dist_from_top = EDGE[3] - magnet_position[1];
+
+    if (dist_from_bottom <= safe_zone)
+    {
+        if (dist_from_bottom <= min_clearance)
+        {
+            v_y = std::max(v_y, 0.0f);
+        }
+        else
+        {
+            v_y = std::max(v_y, -linear_decel(dist_from_bottom - min_clearance));
+        }
+    }
+    else if (dist_from_top <= safe_zone)
+    {
+        if (dist_from_top <= min_clearance)
+        {
+            v_y = std::min(v_y, 0.0f);
+        }
+        else
+        {
+            v_y = std::min(v_y, linear_decel(dist_from_top - min_clearance));
+        }
+    }
+
+    // Handle unreachable front corners (geometry constraints)
+    constexpr float CORNER_X_MARGIN = 0.03f;
+    constexpr float CORNER_Y_MARGIN = 0.01f;
+
+    const bool near_top = magnet_position[1] >= EDGE[3] - CORNER_Y_MARGIN;
+    const bool near_bottom = magnet_position[1] <= EDGE[2] + CORNER_Y_MARGIN;
+    const bool in_corner_y = near_top || near_bottom;
+
+    if (side_ == PlayerSide::LEFT_PLAYER &&
+        magnet_position[0] >= EDGE[1] - CORNER_X_MARGIN && in_corner_y)
+    {
+        v_x = std::min(0.0f, v_x); // Prevent moving further right
+        v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
+    }
+    else if (side_ == PlayerSide::RIGHT_PLAYER &&
+             magnet_position[0] <= EDGE[0] + CORNER_X_MARGIN && in_corner_y)
+    {
+        v_x = std::max(0.0f, v_x); // Prevent moving further left
+        v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
+    }
+}
+
 void Player::controller_status_callback_right(const odrive_can::msg::ControllerStatus::SharedPtr msg)
 {
-    // Update encoder state
-    encoder_values[0] = msg->pos_estimate;
-    encoder_values[2] = msg->vel_estimate;
-    torque_right_motor = msg->torque_estimate;
+    encoder_right = msg->pos_estimate;
+    update_magnet_pos();
 
-    // Check torque limits and handle collision detection
-    float total_torque = calculate_total_torque();
-    handle_torque_limits(total_torque);
-
-    // Update magnet position estimate
-    update_magnet_position(encoder_values);
-
-    // Check for motor errors
     if (msg->active_errors != 0)
     {
-        send_commands(0.0f, 0.0f);
         RCLCPP_ERROR_THROTTLE(
             this->get_logger(),
             *this->get_clock(),
             5000, // Log at most once every 5 seconds
-            "Right motor error detected: 0x%X. Stopping motors.",
+            "Right motor error detected: 0x%X. Attempting to recover.",
             msg->active_errors);
-        // Note: Removed long sleep that blocks the callback thread
-        set_motor_state(1);
+        // Note: Avoid blocking sleep in callbacks - let the system handle recovery
+        set_motor_state(1); // Set to idle state
     }
 }
 
 void Player::controller_status_callback_left(const odrive_can::msg::ControllerStatus::SharedPtr msg)
 {
-    // Update encoder state
-    encoder_values[1] = msg->pos_estimate;
-    encoder_values[3] = msg->vel_estimate;
-    torque_left_motor = msg->torque_estimate;
+    encoder_left = msg->pos_estimate;
+    update_magnet_pos();
 
-    // Check torque limits and handle collision detection
-    float total_torque = calculate_total_torque();
-    handle_torque_limits(total_torque);
-
-    // Update magnet position estimate
-    update_magnet_position(encoder_values);
-
-    // Check for motor errors
     if (msg->active_errors != 0)
     {
-        send_commands(0.0f, 0.0f);
         RCLCPP_ERROR_THROTTLE(
             this->get_logger(),
             *this->get_clock(),
             5000, // Log at most once every 5 seconds
-            "Left motor error detected: 0x%X. Stopping motors.",
+            "Left motor error detected: 0x%X. Attempting to recover.",
             msg->active_errors);
-        set_motor_state(1);
+        set_motor_state(1); // Set to idle state
     }
 }
 
-void Player::update_magnet_position(const std::vector<float> &encoder_values)
+void Player::update_magnet_pos()
 {
-    if (!synchronized_state.empty())
+    if (synchronized_state.empty())
     {
-        magnet_position[0] = synchronized_state[2] +
-                             (1.0f / 2.0f) * ((encoder_values[0] - synchronized_state[0]) * DISTANCE_PER_REVOLUTION - (encoder_values[1] - synchronized_state[1]) * DISTANCE_PER_REVOLUTION) * REAL_TO_CAM_FACTOR_X;
-        magnet_position[1] = synchronized_state[3] +
-                             (1.0f / 2.0f) * ((encoder_values[0] - synchronized_state[0]) * DISTANCE_PER_REVOLUTION + (encoder_values[1] - synchronized_state[1]) * DISTANCE_PER_REVOLUTION) * REAL_TO_CAM_FACTOR_Y;
+        return; // Early exit if not calibrated
     }
-    magnet_velocity[0] = (1.0f / 2.0f) * (encoder_values[2] * DISTANCE_PER_REVOLUTION - encoder_values[3] * DISTANCE_PER_REVOLUTION) * REAL_TO_CAM_FACTOR_X;
-    magnet_velocity[1] = (1.0f / 2.0f) * (encoder_values[2] * DISTANCE_PER_REVOLUTION + encoder_values[3] * DISTANCE_PER_REVOLUTION) * REAL_TO_CAM_FACTOR_Y;
 
+    // Calculate encoder deltas
+    const float delta_encoder_r = (encoder_right - synchronized_state[0]) * DISTANCE_PER_REVOLUTION;
+    const float delta_encoder_l = (encoder_left - synchronized_state[1]) * DISTANCE_PER_REVOLUTION;
+
+    // Differential drive kinematics: x is differential, y is average
+    constexpr float HALF = 0.5f;
+    magnet_position.resize(2);
+    magnet_position[0] = synchronized_state[2] + sign * HALF * (delta_encoder_r - delta_encoder_l);
+    magnet_position[1] = synchronized_state[3] + sign * HALF * (delta_encoder_r + delta_encoder_l);
+
+    // Publish estimated position
     std_msgs::msg::Float32MultiArray msg;
-    msg.data.resize(4);
-    msg.data[0] = magnet_position[0];
-    msg.data[1] = magnet_position[1];
-    msg.data[2] = magnet_velocity[0];
-    msg.data[3] = magnet_velocity[1];
+    msg.data = magnet_position;
     position_magnet_publisher_->publish(msg);
 }
 
@@ -529,53 +297,34 @@ void Player::set_motor_state(int state)
     auto request_l = std::make_shared<odrive_can::srv::AxisState::Request>();
     request_l->axis_requested_state = state;
 
-    while (rclcpp::ok() && !request_axis_r_state_client_->wait_for_service(std::chrono::seconds(1)))
+    // Wait for services with timeout to prevent infinite blocking
+    constexpr int MAX_WAIT_ATTEMPTS = 5;
+    int wait_attempts = 0;
+
+    while (!request_axis_r_state_client_->wait_for_service(std::chrono::seconds(1)))
     {
-        RCLCPP_WARN(this->get_logger(), "Waiting for service /odrive_axis0/request_axis_state...");
-    }
-    while (rclcpp::ok() && !request_axis_l_state_client_->wait_for_service(std::chrono::seconds(1)))
-    {
-        RCLCPP_WARN(this->get_logger(), "Waiting for service /odrive_axis1/request_axis_state...");
+        if (++wait_attempts >= MAX_WAIT_ATTEMPTS)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Right motor service not available after timeout");
+            return;
+        }
+        RCLCPP_WARN(this->get_logger(), "Waiting for right motor service...");
     }
 
-    // If node is shutting down, don't send requests
-    if (!rclcpp::ok())
+    wait_attempts = 0;
+    while (!request_axis_l_state_client_->wait_for_service(std::chrono::seconds(1)))
     {
-        return;
+        if (++wait_attempts >= MAX_WAIT_ATTEMPTS)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Left motor service not available after timeout");
+            return;
+        }
+        RCLCPP_WARN(this->get_logger(), "Waiting for left motor service...");
     }
 
+    // Send requests asynchronously
     auto future_r = request_axis_r_state_client_->async_send_request(request_r);
     auto future_l = request_axis_l_state_client_->async_send_request(request_l);
-    rclcpp::spin_until_future_complete(this->get_node_base_interface(), future_r);
-    rclcpp::spin_until_future_complete(this->get_node_base_interface(), future_l);
-}
 
-float Player::calculate_total_torque() const
-{
-    return std::sqrt(std::pow(torque_right_motor, 2) + std::pow(torque_left_motor, 2));
-}
-
-void Player::handle_torque_limits(float total_torque)
-{
-    if (total_torque > SHUTDOWN_TORQUE)
-    {
-        send_commands(0.0f, 0.0f);
-        RCLCPP_ERROR(this->get_logger(), "Shutdown torque (%.3f N·m) surpassed! Emergency stop.", total_torque);
-        set_motor_state(1); // Set to idle
-        return;
-    }
-
-    if (total_torque > MAX_TORQUE)
-    {
-        motor_at_wall = true;
-        if (total_torque > CALIB_TORQUE)
-        {
-            motor_at_wall_calib = true;
-        }
-    }
-    else
-    {
-        motor_at_wall = false;
-        motor_at_wall_calib = false;
-    }
+    RCLCPP_DEBUG(this->get_logger(), "Motor state change to %d requested", state);
 }
