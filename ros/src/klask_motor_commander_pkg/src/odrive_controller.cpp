@@ -1,15 +1,16 @@
 #include "klask_motor_commander_pkg/odrive_controller.hpp"
 
-ODriveController::ODriveController() : Node("odrive_controller") {
+ODriveController::ODriveController() : Node("odrive_controller")
+{
     RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node...");
-    
+
     // Create reentrant callback group for concurrent processing
     group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
     // Initialize player nodes
-    RCLCPP_INFO(this->get_logger(), "Creating player and opponent nodes...");
-    player_ = std::make_shared<Player>("player");
-    opponent_ = std::make_shared<Player>("opponent");
+    RCLCPP_INFO(this->get_logger(), "Creating left_player and right_player nodes...");
+    right_player_ = std::make_shared<Player>(PlayerSide::RIGHT_PLAYER);
+    left_player_ = std::make_shared<Player>(PlayerSide::LEFT_PLAYER);
 
     // Setup subscription options with callback group
     rclcpp::SubscriptionOptions sub_options;
@@ -17,85 +18,118 @@ ODriveController::ODriveController() : Node("odrive_controller") {
 
     // Create subscription for ball/peg states with reliable QoS
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
-    states_subscriber_ = this->create_subscription<klask_interfaces::msg::State>(
-        "/board_state", 
-        qos_reliable,
-        std::bind(&ODriveController::state_callback, this, std::placeholders::_1), 
-        sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to /board_state");
 
-    // Create subscription for velocity commands with reliable QoS
-    velocity_subscriber_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-        "velocity_requests_checked", 
+    // Create service servers for calibration and motor state control
+    calibrate_encoders_service_ = this->create_service<klask_interfaces::srv::CalibrateEncoders>(
+        "calibrate_encoders",
+        std::bind(&ODriveController::calibrate_encoders_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: calibrate_encoders");
+
+    set_motor_state_service_ = this->create_service<klask_interfaces::srv::SetMotorState>(
+        "set_motor_state",
+        std::bind(&ODriveController::set_motor_state_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: set_motor_state");
+
+    // Create subscriptions for velocity commands with reliable QoS
+    right_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "cmd_vel/right_player_checked",
         qos_reliable,
-        std::bind(&ODriveController::velocity_callback, this, std::placeholders::_1), 
+        std::bind(&ODriveController::right_player_velocity_callback, this, std::placeholders::_1),
         sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to velocity_requests_checked");
-    
+    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/right_player_checked");
+
+    left_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "cmd_vel/left_player_checked",
+        qos_reliable,
+        std::bind(&ODriveController::left_player_velocity_callback, this, std::placeholders::_1),
+        sub_options);
+    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/left_player_checked");
+
     RCLCPP_INFO(this->get_logger(), "ODriveController initialization complete");
 }
 
-Player::SharedPtr ODriveController::get_player_node() const {
-    return this->player_;
+Player::SharedPtr ODriveController::get_right_player_node() const
+{
+    return this->right_player_;
 }
 
-Player::SharedPtr ODriveController::get_opponent_node() const {
-    return this->opponent_;
+Player::SharedPtr ODriveController::get_left_player_node() const
+{
+    return this->left_player_;
 }
 
-void ODriveController::state_callback(const klask_interfaces::msg::State::SharedPtr msg) {
-    
-    // Update opponent position and velocity (points 2 and 3)
-    opponent_->position = {static_cast<float>(msg->left_peg.position.x), static_cast<float>(msg->left_peg.position.y)};
-    opponent_->velocity = {static_cast<float>(msg->left_peg.velocity.x), static_cast<float>(msg->left_peg.velocity.y)};
-    
-    // Update player position and velocity (points 4 and 5)
-    player_->position = {static_cast<float>(msg->right_peg.position.x), static_cast<float>(msg->right_peg.position.y)};
-    player_->velocity = {static_cast<float>(msg->right_peg.velocity.x), static_cast<float>(msg->right_peg.velocity.y)};
-    
-    // Check synchronization for player if already synchronized once
-    if (player_->synchronized_once) {
-        player_->is_synchronized();
+void ODriveController::calibrate_encoders_callback(
+    const std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Request> request,
+    std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Response> response)
+{
+    try
+    {
+        // Extract peg positions from State message
+        const auto& right_peg_pos = request->state.right_peg.position;
+        const auto& left_peg_pos = request->state.left_peg.position;
+
+        right_player_->calibrate(right_peg_pos);
+        left_player_->calibrate(left_peg_pos);
+
+        response->success = true;
+        response->message = "Encoders calibrated successfully for both players";
+        RCLCPP_INFO(this->get_logger(), "Encoders calibrated: right=[%.3f, %.3f], left=[%.3f, %.3f]",
+                    right_peg_pos.x, right_peg_pos.y,
+                    left_peg_pos.x, left_peg_pos.y);
     }
-    
-    // Check synchronization for opponent if already synchronized once
-    if (opponent_->synchronized_once) {
-        opponent_->is_synchronized();
-    }
-    
-    // Update player synchronized state if peg is synchronized
-    if (player_->peg_mag_synchronized && !player_->synchronized_state.empty()) {
-        player_->synchronized_state[0] = player_->encoder_values[0];
-        player_->synchronized_state[1] = player_->encoder_values[1];
-        player_->synchronized_state[2] = player_->position[0];
-        player_->synchronized_state[3] = player_->position[1];
-    }
-    
-    // Update opponent synchronized state if peg is synchronized
-    if (opponent_->peg_mag_synchronized && !opponent_->synchronized_state.empty()) {
-        opponent_->synchronized_state[0] = opponent_->encoder_values[0];
-        opponent_->synchronized_state[1] = opponent_->encoder_values[1];
-        opponent_->synchronized_state[2] = opponent_->position[0];
-        opponent_->synchronized_state[3] = opponent_->position[1];
+    catch (const std::exception &e)
+    {
+        response->success = false;
+        response->message = std::string("Calibration failed: ") + e.what();
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
     }
 }
 
-void ODriveController::velocity_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-    // Validate message has expected number of velocity commands
-    // Expected format: [opponent_vx, opponent_vy, player_vx, player_vy]
-    if (msg->data.size() < 4) {
-        RCLCPP_ERROR_THROTTLE(
-            this->get_logger(),
-            *this->get_clock(),
-            5000,  // Log at most once every 5 seconds
-            "Invalid velocity message: expected 4 values, got %zu",
-            msg->data.size());
-        return;
+void ODriveController::set_motor_state_callback(
+    const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
+    std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response)
+{
+    try
+    {
+        if (motor_state != request->desired_state)
+        {
+            right_player_->change_motor_state(request->desired_state);
+            left_player_->change_motor_state(request->desired_state);
+            motor_state = request->desired_state;
+
+            response->success = true;
+            response->message = "Motor state changed to " + std::to_string(request->desired_state);
+            RCLCPP_INFO(this->get_logger(), "Motor state changed to: %d", request->desired_state);
+        }
+        else
+        {
+            response->success = true;
+            response->message = "Motor already in state " + std::to_string(request->desired_state);
+            RCLCPP_DEBUG(this->get_logger(), "Motor already in state: %d", request->desired_state);
+        }
     }
-    
-    // Dispatch velocity commands to respective nodes
-    // Indices 0, 1: opponent (vx, vy)
-    // Indices 2, 3: player (vx, vy)
-    opponent_->velocity_targets(msg->data[0], msg->data[1]);
-    player_->velocity_targets(msg->data[2], msg->data[3]);
+    catch (const std::exception &e)
+    {
+        response->success = false;
+        response->message = std::string("Motor state change failed: ") + e.what();
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+    }
+}
+
+void ODriveController::right_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+    // Extract linear x and y velocities from Twist message
+    // Twist.linear.x corresponds to forward/backward velocity
+    // Twist.linear.y corresponds to left/right velocity
+    right_player_->send_commands(static_cast<float>(msg->linear.x), static_cast<float>(msg->linear.y));
+}
+
+void ODriveController::left_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+    // Extract linear x and y velocities from Twist message
+    // Twist.linear.x corresponds to forward/backward velocity
+    // Twist.linear.y corresponds to left/right velocity
+    left_player_->send_commands(static_cast<float>(msg->linear.x), static_cast<float>(msg->linear.y));
 }

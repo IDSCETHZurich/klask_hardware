@@ -113,6 +113,7 @@ RUN --mount=type=cache,target=/etc/apt/apt.conf.d,from=cacher,source=/etc/apt/ap
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-opencv \
+    xterm \
     libqt5gui5 \
     libqt5widgets5 \
     libqt5core5a \

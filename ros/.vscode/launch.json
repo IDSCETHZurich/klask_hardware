@@ -2,6 +2,44 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch ODrive Nodes (No Motor Commander)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "source install/setup.bash && ros2 launch klask_motor_commander_pkg motors_launch.py player:=both start_commander:=false",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build_workspace",
+        },
+        {
+            "name": "Debug Motor Commander (C++ with launch)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/install/klask_motor_commander_pkg/lib/klask_motor_commander_pkg/klask_motor_commander",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "ROS_DOMAIN_ID",
+                    "value": "0"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build_workspace"
+        },
+        {
             "name": "Debug state_estimator_node (ROS2)",
             "type": "debugpy",
             "request": "launch",

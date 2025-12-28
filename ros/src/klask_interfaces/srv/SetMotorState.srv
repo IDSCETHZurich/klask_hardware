@@ -1,0 +1,5 @@
+# Service to change motor state for all motors
+int32 desired_state  # Desired motor state (1=idle, 8=closed_loop_control, etc.)
+---
+bool success         # True if state change successful
+string message       # Status message

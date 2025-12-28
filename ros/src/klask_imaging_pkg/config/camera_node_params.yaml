@@ -69,11 +69,11 @@
     # These parameters control outlier detection for border line tracking
 
     line_angle_threshold:
-      10.0 # Maximum angle change between frames (degrees) (default: 10.0)
+      1.0 # Maximum angle change between frames (degrees)
       # Helps reject outlier border detections
 
     line_position_threshold:
-      50.0 # Maximum position change between frames (pixels) (default: 50.0)
+      5.0 # Maximum position change between frames (pixels)
       # Perpendicular distance threshold
 
     min_edge_points:
