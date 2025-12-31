@@ -6,6 +6,20 @@ image_viewer:
     # Toggle overlay of estimated state on the image
     show_state_overlay: true
 
+    # ============================================
+    # EU to Pixel Conversion Parameters
+    # ============================================
+    # State is received in engineering units (meters, m/s) and must be
+    # converted back to pixels for overlay visualization.
+    # Board pixel dimensions are determined automatically from the received image.
+    
+    # Board physical dimensions in meters (must match state_estimator)
+    board_width_meters: 0.42   # Physical board width (default: 0.42m)
+    board_height_meters: 0.32  # Physical board height (default: 0.32m)
+    # Conversion factors are computed automatically from actual image dimensions:
+    # meter_to_pixel_x = image_width / board_width_meters
+    # meter_to_pixel_y = image_height / board_height_meters
+
     # Goal overlay
     goal_radius: 22
     overlay_goal_color: [140, 255, 0] # BGR

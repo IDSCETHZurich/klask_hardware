@@ -30,6 +30,22 @@ class StateEstimatorNode(Node):
         self.declare_parameter("show_image", False)
         self.show_image = bool(self.get_parameter("show_image").value)
 
+        # =============================
+        # Pixel to Engineering Units (EU) Conversion
+        # =============================
+        # Board dimensions in meters (physical board size)
+        self.declare_parameter("board_width_meters", 0.42)
+        self.board_width_meters = float(self.get_parameter("board_width_meters").value)
+
+        self.declare_parameter("board_height_meters", 0.32)
+        self.board_height_meters = float(
+            self.get_parameter("board_height_meters").value
+        )
+
+        # Current image dimensions (updated each frame)
+        self.current_image_width: float = 0.0
+        self.current_image_height: float = 0.0
+
         # Radius around goal center to count as "in goal" (pixels) (default: 22)
         self.declare_parameter("goal_radius", 22)
         self.goal_radius = int(self.get_parameter("goal_radius").value)
@@ -263,6 +279,12 @@ class StateEstimatorNode(Node):
             cv_image = self.bridge.compressed_imgmsg_to_cv2(
                 msg, desired_encoding="bgr8"
             )
+
+            # Store current image dimensions for EU conversion
+            # (image size can vary each frame due to rotation/cropping)
+            height, width = cv_image.shape[:2]
+            self.current_image_width = float(width)
+            self.current_image_height = float(height)
 
             # Update delta time for Kalman filters
             current_time = time.time()
@@ -557,25 +579,76 @@ class StateEstimatorNode(Node):
         self.current_fps = float(self.frame_count)
         self.frame_count = 0
 
+    def _get_pixel_to_meter_x(self) -> float:
+        """Get current pixel-to-meter conversion factor for X axis."""
+        if self.current_image_width > 0:
+            return self.board_width_meters / self.current_image_width
+        return 0.0
+
+    def _get_pixel_to_meter_y(self) -> float:
+        """Get current pixel-to-meter conversion factor for Y axis."""
+        if self.current_image_height > 0:
+            return self.board_height_meters / self.current_image_height
+        return 0.0
+
+    def _convert_position_to_eu(
+        self, position: list[float] | np.ndarray
+    ) -> list[float]:
+        """Convert position from pixels to engineering units (meters)."""
+        return [
+            position[0] * self._get_pixel_to_meter_x(),
+            position[1] * self._get_pixel_to_meter_y(),
+        ]
+
+    def _convert_velocity_to_eu(
+        self, velocity: list[float] | np.ndarray
+    ) -> list[float]:
+        """Convert velocity from pixels/s to engineering units (m/s)."""
+        return [
+            velocity[0] * self._get_pixel_to_meter_x(),
+            velocity[1] * self._get_pixel_to_meter_y(),
+        ]
+
     def _publish_timer_callback(self) -> None:
-        """Publish estimated positions/velocities and check for goals."""
+        """Publish estimated positions/velocities in EU (meters, m/s)."""
 
         if not (self.board_state & BoardState.READY):
             return
 
+        # Wait until we have valid image dimensions for conversion
+        if self.current_image_width <= 0 or self.current_image_height <= 0:
+            return
+
+        # Get Kalman filter states (still in pixel space)
+        ball_pos_px = self.ball_kf.get_position()
+        ball_vel_px = self.ball_kf.get_velocity()
+        left_peg_pos_px = self.left_peg_kf.get_position()
+        left_peg_vel_px = self.left_peg_kf.get_velocity()
+        right_peg_pos_px = self.right_peg_kf.get_position()
+        right_peg_vel_px = self.right_peg_kf.get_velocity()
+
+        # Convert to engineering units (meters, m/s)
+        ball_pos_eu = self._convert_position_to_eu(ball_pos_px)
+        ball_vel_eu = self._convert_velocity_to_eu(ball_vel_px)
+        left_peg_pos_eu = self._convert_position_to_eu(left_peg_pos_px)
+        left_peg_vel_eu = self._convert_velocity_to_eu(left_peg_vel_px)
+        right_peg_pos_eu = self._convert_position_to_eu(right_peg_pos_px)
+        right_peg_vel_eu = self._convert_velocity_to_eu(right_peg_vel_px)
+
+        # Convert goal positions to EU
+        left_goal_eu = self._convert_position_to_eu(self.left_goal)
+        right_goal_eu = self._convert_position_to_eu(self.right_goal)
+
+        # Build message with EU values
         msg = State()
-        msg.ball.position = create_point_from_list(self.ball_kf.get_position())
-        msg.ball.velocity = create_point_from_list(self.ball_kf.get_velocity())
-        msg.left_peg.position = create_point_from_list(self.left_peg_kf.get_position())
-        msg.left_peg.velocity = create_point_from_list(self.left_peg_kf.get_velocity())
-        msg.right_peg.position = create_point_from_list(
-            self.right_peg_kf.get_position()
-        )
-        msg.right_peg.velocity = create_point_from_list(
-            self.right_peg_kf.get_velocity()
-        )
-        msg.left_goal_pos = create_point_from_list(self.left_goal)
-        msg.right_goal_pos = create_point_from_list(self.right_goal)
+        msg.ball.position = create_point_from_list(ball_pos_eu)
+        msg.ball.velocity = create_point_from_list(ball_vel_eu)
+        msg.left_peg.position = create_point_from_list(left_peg_pos_eu)
+        msg.left_peg.velocity = create_point_from_list(left_peg_vel_eu)
+        msg.right_peg.position = create_point_from_list(right_peg_pos_eu)
+        msg.right_peg.velocity = create_point_from_list(right_peg_vel_eu)
+        msg.left_goal_pos = create_point_from_list(left_goal_eu)
+        msg.right_goal_pos = create_point_from_list(right_goal_eu)
 
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.status = UInt64(data=int(self.board_state))

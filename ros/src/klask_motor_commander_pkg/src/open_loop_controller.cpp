@@ -28,10 +28,6 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     this->declare_parameter("feedback_velocity_multiplier", 2.0);
     this->declare_parameter("feedback_step_duration", 0.1);
 
-    // Pixel to meter conversion (temporary)
-    this->declare_parameter("pixel_to_meter_x", 0.00064024);
-    this->declare_parameter("pixel_to_meter_y", 0.00064386);
-
     // Timeout settings
     this->declare_parameter("initial_state_timeout", 5.0);
     this->declare_parameter("state_update_timeout", 2.0);
@@ -45,8 +41,6 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     expected_distance_factor_ = static_cast<float>(this->get_parameter("expected_distance_factor").as_double());
     feedback_velocity_multiplier_ = static_cast<float>(this->get_parameter("feedback_velocity_multiplier").as_double());
     feedback_step_duration_ = static_cast<float>(this->get_parameter("feedback_step_duration").as_double());
-    pixel_to_meter_x_ = static_cast<float>(this->get_parameter("pixel_to_meter_x").as_double());
-    pixel_to_meter_y_ = static_cast<float>(this->get_parameter("pixel_to_meter_y").as_double());
     initial_state_timeout_ = this->get_parameter("initial_state_timeout").as_double();
     state_update_timeout_ = this->get_parameter("state_update_timeout").as_double();
     feedback_state_timeout_ = this->get_parameter("feedback_state_timeout").as_double();
@@ -209,14 +203,9 @@ void OpenLoopController::execute(const std::shared_ptr<GoalHandleHomePeg> goal_h
 
 void OpenLoopController::board_state_callback(const klask_interfaces::msg::State::SharedPtr msg)
 {
-    // TODO: Remove this once estimator is correct
+    // State is already in engineering units (meters, m/s) from state estimator
     std::lock_guard<std::mutex> lock(state_mutex_);
     latest_state_ = msg;
-    // Convert peg positions from pixels to meters
-    latest_state_->left_peg.position.x *= pixel_to_meter_x_;
-    latest_state_->left_peg.position.y *= pixel_to_meter_y_;
-    latest_state_->right_peg.position.x *= pixel_to_meter_x_;
-    latest_state_->right_peg.position.y *= pixel_to_meter_y_;
     state_received_ = true;
 }
 

@@ -7,6 +7,17 @@
     show_image: false # Enable visualization windows (default: false)
 
     # ============================================
+    # Pixel to Engineering Units (EU) Conversion
+    # ============================================
+    # Board physical dimensions in meters
+    board_width_meters: 0.42  # Physical board width (default: 0.42m)
+    board_height_meters: 0.32 # Physical board height (default: 0.32m)
+    # Board pixel dimensions are determined automatically from the received
+    # cropped/warped camera image. Conversion factors are computed as:
+    # pixel_to_meter_x = board_width_meters / image_width
+    # pixel_to_meter_y = board_height_meters / image_height
+
+    # ============================================
     # Goal Detection Parameters
     # ============================================
 

@@ -76,10 +76,6 @@ private:
     float feedback_velocity_multiplier_;
     float feedback_step_duration_;
 
-    /// Pixel to meter conversion factors (TODO: remove when estimator fixed)
-    float pixel_to_meter_x_;
-    float pixel_to_meter_y_;
-
     /// Timeout values
     double initial_state_timeout_;
     double state_update_timeout_;

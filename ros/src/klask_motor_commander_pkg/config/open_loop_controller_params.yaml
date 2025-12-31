@@ -24,13 +24,8 @@
     feedback_velocity_multiplier: 2.0  # Speed multiplier after validation (times homing_velocity)
     feedback_step_duration: 0.1        # Duration of each feedback step (seconds)
     
-    # === Pixel to Meter Conversion ===
-    # TODO: Remove once state estimator provides correct units
-    pixel_to_meter_x: 0.00064024  # Conversion factor X-axis (0.42m / 656px)
-    pixel_to_meter_y: 0.00064386  # Conversion factor Y-axis (0.32m / 497px)
-    
     # === Topic Names ===
-    board_state_topic: "/board_state"  # Topic for board state updates
+    board_state_topic: "/board_state"  # Topic for board state updates (now in EU: meters, m/s)
     
     # === QoS Settings ===
     board_state_qos_depth: 10    # QoS history depth for board state subscription
