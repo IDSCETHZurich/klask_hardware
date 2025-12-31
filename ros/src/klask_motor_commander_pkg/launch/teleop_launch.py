@@ -1,3 +1,18 @@
+"""Launch file for keyboard teleoperation control.
+
+Example usage:
+    # Control left player (default):
+    ros2 launch klask_motor_commander_pkg teleop_launch.py
+    
+    # Control right player:
+    ros2 launch klask_motor_commander_pkg teleop_launch.py player:=right
+    
+    # Control left player (explicit):
+    ros2 launch klask_motor_commander_pkg teleop_launch.py player:=left
+
+Note: Requires xterm to be installed for keyboard input window.
+"""
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration

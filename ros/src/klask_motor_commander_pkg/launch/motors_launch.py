@@ -1,3 +1,22 @@
+"""Launch file for klask motor control system.
+
+Example usage:
+    # Launch both players with motor commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py
+    
+    # Launch only right player:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=right
+    
+    # Launch only left player:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=left
+    
+    # Launch ODrive nodes without motor commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py start_commander:=false
+    
+    # Launch right player only without commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=right start_commander:=false
+"""
+
 from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
