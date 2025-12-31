@@ -14,6 +14,7 @@ def launch_setup(context, *args, **kwargs):
     # Get path to parameter file
     pkg_share = get_package_share_directory('klask_motor_commander_pkg')
     player_params_file = os.path.join(pkg_share, 'config', 'player_params.yaml')
+    open_loop_params_file = os.path.join(pkg_share, 'config', 'open_loop_controller_params.yaml')
 
     nodes_to_launch = []
 
@@ -91,7 +92,7 @@ def launch_setup(context, *args, **kwargs):
             Node(
                 package="klask_motor_commander_pkg",
                 executable="klask_motor_commander",
-                parameters=[player_params_file],
+                parameters=[player_params_file, open_loop_params_file],
                 output="screen"
             )
         )

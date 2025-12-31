@@ -13,23 +13,74 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
 {
     RCLCPP_INFO(this->get_logger(), "Initializing OpenLoopController for %s...", player_name_.c_str());
 
+    // === Declare and load ROS parameters ===
+
+    // Homing motion parameters
+    this->declare_parameter("homing_velocity", 0.01);
+    this->declare_parameter("position_tolerance", 0.03);
+
+    // Movement validation parameters
+    this->declare_parameter("validation_duration", 2.0);
+    this->declare_parameter("movement_threshold", 0.01);
+    this->declare_parameter("expected_distance_factor", 0.5);
+
+    // Fast feedback loop parameters
+    this->declare_parameter("feedback_velocity_multiplier", 2.0);
+    this->declare_parameter("feedback_step_duration", 0.1);
+
+    // Pixel to meter conversion (temporary)
+    this->declare_parameter("pixel_to_meter_x", 0.00064024);
+    this->declare_parameter("pixel_to_meter_y", 0.00064386);
+
+    // Timeout settings
+    this->declare_parameter("initial_state_timeout", 5.0);
+    this->declare_parameter("state_update_timeout", 2.0);
+    this->declare_parameter("feedback_state_timeout", 0.5);
+
+    // Load parameters
+    homing_velocity_ = static_cast<float>(this->get_parameter("homing_velocity").as_double());
+    position_tolerance_ = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+    validation_duration_ = static_cast<float>(this->get_parameter("validation_duration").as_double());
+    movement_threshold_ = static_cast<float>(this->get_parameter("movement_threshold").as_double());
+    expected_distance_factor_ = static_cast<float>(this->get_parameter("expected_distance_factor").as_double());
+    feedback_velocity_multiplier_ = static_cast<float>(this->get_parameter("feedback_velocity_multiplier").as_double());
+    feedback_step_duration_ = static_cast<float>(this->get_parameter("feedback_step_duration").as_double());
+    pixel_to_meter_x_ = static_cast<float>(this->get_parameter("pixel_to_meter_x").as_double());
+    pixel_to_meter_y_ = static_cast<float>(this->get_parameter("pixel_to_meter_y").as_double());
+    initial_state_timeout_ = this->get_parameter("initial_state_timeout").as_double();
+    state_update_timeout_ = this->get_parameter("state_update_timeout").as_double();
+    feedback_state_timeout_ = this->get_parameter("feedback_state_timeout").as_double();
+
     // Set default home position based on player
     if (player_->get_side() == PlayerSide::RIGHT_PLAYER)
     {
-        default_home_.x = 0.26; // Right player field center
-        default_home_.y = 0.16;
+        this->declare_parameter("right_player_home_x", 0.26);
+        this->declare_parameter("right_player_home_y", 0.16);
+        default_home_.x = this->get_parameter("right_player_home_x").as_double();
+        default_home_.y = this->get_parameter("right_player_home_y").as_double();
     }
     else
     {
-        default_home_.x = 0.16; // Left player field center
-        default_home_.y = 0.16;
+        this->declare_parameter("left_player_home_x", 0.16);
+        this->declare_parameter("left_player_home_y", 0.16);
+        default_home_.x = this->get_parameter("left_player_home_x").as_double();
+        default_home_.y = this->get_parameter("left_player_home_y").as_double();
     }
     default_home_.z = 0.0;
 
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: homing_vel=%.3f, pos_tol=%.3f, validation_dur=%.1f",
+                homing_velocity_, position_tolerance_, validation_duration_);
+
     // Subscribe to board state
+    this->declare_parameter("board_state_topic", "/board_state");
+    this->declare_parameter("board_state_qos_depth", 10);
+    
+    std::string board_state_topic = this->get_parameter("board_state_topic").as_string();
+    int qos_depth = this->get_parameter("board_state_qos_depth").as_int();
+    
     board_state_sub_ = this->create_subscription<klask_interfaces::msg::State>(
-        "/board_state",
-        rclcpp::QoS(10).reliable(),
+        board_state_topic,
+        rclcpp::QoS(qos_depth).reliable(),
         std::bind(&OpenLoopController::board_state_callback, this, _1));
 
     // Create action server
@@ -90,7 +141,7 @@ void OpenLoopController::execute(const std::shared_ptr<GoalHandleHomePeg> goal_h
     {
         // Wait for initial state
         RCLCPP_INFO(this->get_logger(), "%s: Waiting for initial board state...", player_name_.c_str());
-        if (!wait_for_state(5.0))
+        if (!wait_for_state(initial_state_timeout_))
         {
             result->success = false;
             result->message = "Failed to receive initial board state";
@@ -112,7 +163,7 @@ void OpenLoopController::execute(const std::shared_ptr<GoalHandleHomePeg> goal_h
         // Continue homing with fast feedback loop
         float distance = calculate_distance(current_pos, target_home);
 
-        while (distance > POSITION_TOLERANCE && rclcpp::ok())
+        while (distance > position_tolerance_ && rclcpp::ok())
         {
             // Check for cancellation
             if (goal_handle->is_canceling())
@@ -158,17 +209,14 @@ void OpenLoopController::execute(const std::shared_ptr<GoalHandleHomePeg> goal_h
 
 void OpenLoopController::board_state_callback(const klask_interfaces::msg::State::SharedPtr msg)
 {
-    // TODO: Remove this onece estimator is correct
-    constexpr float PIXEL_TO_EU_X = 0.42f / 656.0f; // Meters per pixel in x
-    constexpr float PIXEL_TO_EU_Y = 0.32f / 497.0f; // Meters per pixel in y
-
+    // TODO: Remove this once estimator is correct
     std::lock_guard<std::mutex> lock(state_mutex_);
     latest_state_ = msg;
     // Convert peg positions from pixels to meters
-    latest_state_->left_peg.position.x *= PIXEL_TO_EU_X;
-    latest_state_->left_peg.position.y *= PIXEL_TO_EU_Y;
-    latest_state_->right_peg.position.x *= PIXEL_TO_EU_X;
-    latest_state_->right_peg.position.y *= PIXEL_TO_EU_Y;
+    latest_state_->left_peg.position.x *= pixel_to_meter_x_;
+    latest_state_->left_peg.position.y *= pixel_to_meter_y_;
+    latest_state_->right_peg.position.x *= pixel_to_meter_x_;
+    latest_state_->right_peg.position.y *= pixel_to_meter_y_;
     state_received_ = true;
 }
 
@@ -237,7 +285,7 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
     float dy = goal_pos.y - current_pos.y;
     float distance_to_goal = std::sqrt(dx * dx + dy * dy);
 
-    if (distance_to_goal < POSITION_TOLERANCE)
+    if (distance_to_goal < position_tolerance_)
     {
         RCLCPP_INFO(this->get_logger(), "%s: Peg already at goal position", player_name_.c_str());
         return current_pos;
@@ -248,8 +296,8 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
     float dir_y = dy / distance_to_goal;
 
     // Calculate velocity commands
-    float v_x = dir_x * HOMING_VELOCITY;
-    float v_y = dir_y * HOMING_VELOCITY;
+    float v_x = dir_x * homing_velocity_;
+    float v_y = dir_y * homing_velocity_;
 
     RCLCPP_INFO(this->get_logger(),
                 "%s: current=[%.3f, %.3f], goal=[%.3f, %.3f], distance=%.3f m",
@@ -262,19 +310,19 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
     // Send movement command
     RCLCPP_INFO(this->get_logger(),
                 "%s: Moving with velocity [%.3f, %.3f] m/s for %.1f seconds",
-                player_name_.c_str(), v_x, v_y, VALIDATION_DURATION);
+                player_name_.c_str(), v_x, v_y, validation_duration_);
 
     player_->send_commands(v_x, v_y);
 
     // Wait for validation duration
     std::this_thread::sleep_for(std::chrono::milliseconds(
-        static_cast<int>(VALIDATION_DURATION * 1000)));
+        static_cast<int>(validation_duration_ * 1000)));
 
     // Stop movement
     player_->send_commands(0.0f, 0.0f);
 
     // Wait for updated state
-    if (!wait_for_state(2.0))
+    if (!wait_for_state(state_update_timeout_))
     {
         throw std::runtime_error(player_name_ + ": Failed to receive state after movement");
     }
@@ -284,7 +332,7 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
 
     // Calculate actual movement
     float actual_movement = calculate_distance(initial_pos, new_pos);
-    float expected_movement = HOMING_VELOCITY * VALIDATION_DURATION;
+    float expected_movement = homing_velocity_ * validation_duration_;
 
     RCLCPP_INFO(this->get_logger(),
                 "%s: Moved from [%.3f, %.3f] to [%.3f, %.3f], distance=%.3f m (expected ~%.3f m)",
@@ -292,7 +340,7 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
                 new_pos.x, new_pos.y, actual_movement, expected_movement);
 
     // Validate movement
-    if (actual_movement < MOVEMENT_THRESHOLD)
+    if (actual_movement < movement_threshold_)
     {
         throw std::runtime_error(
             player_name_ + ": Movement validation failed - peg did not move! " +
@@ -300,7 +348,7 @@ geometry_msgs::msg::Point OpenLoopController::move_step_with_validation(
             std::to_string(actual_movement) + " m. Peg may be desynchronized.");
     }
 
-    if (actual_movement < expected_movement * EXPECTED_DISTANCE_FACTOR)
+    if (actual_movement < expected_movement * expected_distance_factor_)
     {
         RCLCPP_WARN(this->get_logger(),
                     "%s: Movement less than expected (%.3f m vs %.3f m). Possible slippage.",
@@ -319,7 +367,7 @@ geometry_msgs::msg::Point OpenLoopController::move_step_feedback_loop(
     float dy = goal_pos.y - current_pos.y;
     float distance_to_goal = std::sqrt(dx * dx + dy * dy);
 
-    if (distance_to_goal < POSITION_TOLERANCE)
+    if (distance_to_goal < position_tolerance_)
     {
         RCLCPP_INFO(this->get_logger(), "%s: Peg already at goal position", player_name_.c_str());
         return current_pos;
@@ -329,26 +377,25 @@ geometry_msgs::msg::Point OpenLoopController::move_step_feedback_loop(
     float dir_x = dx / distance_to_goal;
     float dir_y = dy / distance_to_goal;
 
-    // Use faster velocity for feedback loop (2x homing velocity)
-    constexpr float FEEDBACK_VELOCITY = HOMING_VELOCITY * 2.0f;
-    constexpr float FEEDBACK_STEP_DURATION = 0.1f; // 100ms steps
+    // Use faster velocity for feedback loop
+    const float feedback_velocity = homing_velocity_ * feedback_velocity_multiplier_;
 
     // Calculate velocity commands
-    float v_x = dir_x * FEEDBACK_VELOCITY;
-    float v_y = dir_y * FEEDBACK_VELOCITY;
+    float v_x = dir_x * feedback_velocity;
+    float v_y = dir_y * feedback_velocity;
 
     // Send movement command
     player_->send_commands(v_x, v_y);
 
     // Brief wait for movement
     std::this_thread::sleep_for(std::chrono::milliseconds(
-        static_cast<int>(FEEDBACK_STEP_DURATION * 1000)));
+        static_cast<int>(feedback_step_duration_ * 1000)));
 
     // Stop movement
     player_->send_commands(0.0f, 0.0f);
 
     // Wait for updated state
-    if (!wait_for_state(0.5))
+    if (!wait_for_state(feedback_state_timeout_))
     {
         throw std::runtime_error(player_name_ + ": Failed to receive state after movement");
     }
