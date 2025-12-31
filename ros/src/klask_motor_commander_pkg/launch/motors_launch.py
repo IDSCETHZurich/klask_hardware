@@ -105,6 +105,7 @@ def launch_setup(context, *args, **kwargs):
                     open_loop_params_file,
                     odrive_params_file,
                     motor_commander_params_file,
+                    {"player": player},  # Pass player selection from launch argument
                 ],
                 output="screen",
             )

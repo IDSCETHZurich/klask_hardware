@@ -7,6 +7,7 @@
 #include <odrive_can/srv/axis_state.hpp>
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
+#include "klask_motor_commander_pkg/player_side.hpp"
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -37,15 +38,6 @@ enum class ODriveAxisState : int
 };
 
 /**
- * @brief Enum to identify which side of the table the player controls.
- */
-enum class PlayerSide
-{
-    RIGHT_PLAYER, ///< Right side player (motors 0 and 1)
-    LEFT_PLAYER   ///< Left side player (motors 2 and 3)
-};
-
-/**
  * @brief Controls a single player's peg movement using two ODrive motors.
  *
  * This class manages the motor control for one player (either right_player or left_player),
@@ -61,6 +53,9 @@ enum class PlayerSide
 class Player : public rclcpp::Node
 {
 public:
+    /// Type alias for shared pointer to Player
+    using SharedPtr = std::shared_ptr<Player>;
+
     /**
      * @brief Construct a new Player object.
      *

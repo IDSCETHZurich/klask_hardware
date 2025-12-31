@@ -7,12 +7,15 @@
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
+#include "klask_motor_commander_pkg/player_side.hpp"
 #include <memory>
+#include <map>
+#include <string>
 
 /**
  * @brief Main controller node for managing ODrive motors and player pegs.
  *
- * This node coordinates two Player instances (player and opponent), subscribes to
+ * This node coordinates Player instances based on configuration, subscribes to
  * ball/peg state information and velocity commands, and dispatches these to the
  * appropriate Player nodes.
  *
@@ -25,49 +28,45 @@ public:
     /**
      * @brief Construct a new ODriveController object.
      *
-     * Initializes both player and opponent nodes, sets up callback groups,
+     * Initializes player nodes based on configuration, sets up callback groups,
      * and creates subscriptions for state and velocity data.
+     *
+     * @param player_config PlayerSide enum indicating which players to create
      */
-    ODriveController();
+    ODriveController(PlayerSide player_config = PlayerSide::BOTH_PLAYERS);
 
     /**
-     * @brief Get the right player node shared pointer.
-     * @return Player::SharedPtr Shared pointer to the right player node.
+     * @brief Get a player node by name.
+     * @param player_name Name of the player ("right_player" or "left_player")
+     * @return Player::SharedPtr Shared pointer to the player node, or nullptr if not found
      */
-    Player::SharedPtr get_right_player_node() const;
+    Player::SharedPtr get_player_node(const std::string& player_name) const;
 
     /**
-     * @brief Get the left player node shared pointer.
-     * @return Player::SharedPtr Shared pointer to the left player node.
+     * @brief Get all active player nodes.
+     * @return const std::map<std::string, Player::SharedPtr>& Map of player name to player node
      */
-    Player::SharedPtr get_left_player_node() const;
+    const std::map<std::string, Player::SharedPtr>& get_all_players() const;
 
     /**
      * @brief Remove internal pointers to player nodes.
      *
-     * Sets the shared pointers for both player nodes to nullptr.
+     * Sets all player node shared pointers to nullptr.
      */
     void remove_pointers()
     {
-        right_player_ = nullptr;
-        left_player_ = nullptr;
+        players_.clear();
     }
 
 private:
-    /// Right player node instance (right side)
-    std::shared_ptr<Player> right_player_;
-
-    /// Left player node instance (left side)
-    std::shared_ptr<Player> left_player_;
+    /// Map of active player nodes (key: "right_player" or "left_player")
+    std::map<std::string, Player::SharedPtr> players_;
 
     /// Reentrant callback group for concurrent callback execution
     rclcpp::CallbackGroup::SharedPtr group_;
 
-    /// Subscription for right player velocity commands
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr right_player_velocity_subscriber_;
-
-    /// Subscription for left player velocity commands
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr left_player_velocity_subscriber_;
+    /// Map of velocity subscriptions for active players
+    std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr> velocity_subscribers_;
 
     /// Service server for encoder calibration
     rclcpp::Service<klask_interfaces::srv::CalibrateEncoders>::SharedPtr calibrate_encoders_service_;
@@ -106,22 +105,15 @@ private:
         std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
 
     /**
-     * @brief Callback for processing right player velocity commands.
+     * @brief Generic callback for player velocity commands.
      *
-     * Dispatches velocity targets to the right player node.
+     * Extracts velocity from Twist message and forwards to specified player.
      *
-     * @param msg Shared pointer to Twist message containing velocity commands.
+     * @param msg Twist message containing velocity commands.
+     * @param player_name Name of the player ("right_player" or "left_player")
      */
-    void right_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg);
-
-    /**
-     * @brief Callback for processing left player velocity commands.
-     *
-     * Dispatches velocity targets to the left player node.
-     *
-     * @param msg Shared pointer to Twist message containing velocity commands.
-     */
-    void left_player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg);
+    void player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg, 
+                                  const std::string& player_name);
 };
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_

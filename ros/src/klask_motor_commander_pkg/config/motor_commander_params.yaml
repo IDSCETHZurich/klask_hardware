@@ -4,9 +4,8 @@
 
 /**:
   ros__parameters:
-    # === Homing Sequence Configuration ===
-    enable_right_player_homing: false  # Enable automatic homing for right player on startup
-    enable_left_player_homing: true   # Enable automatic homing for left player on startup
+    # === Player Selection ===
+    player: "both"  # Which players to control: "left", "right", or "both"
     
     # === Action Client Configuration ===
     right_player_action_name: "home_peg_right_player"  # Action server name for right player homing
