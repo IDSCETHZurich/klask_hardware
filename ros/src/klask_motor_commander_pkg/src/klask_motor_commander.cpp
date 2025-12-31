@@ -35,6 +35,34 @@ int main(int argc, char *argv[])
     // Create the main controller node
     auto controller_node = std::make_shared<ODriveController>();
 
+    // === Load parameters from controller node ===
+    controller_node->declare_parameter("enable_right_player_homing", false);
+    controller_node->declare_parameter("enable_left_player_homing", true);
+    controller_node->declare_parameter("right_player_action_name", "home_peg_right_player");
+    controller_node->declare_parameter("left_player_action_name", "home_peg_left_player");
+    controller_node->declare_parameter("action_server_wait_timeout", 5);
+    controller_node->declare_parameter("homing_action_timeout", 30);
+    controller_node->declare_parameter("calibration_service_timeout", 5);
+    controller_node->declare_parameter("startup_delay", 1000);
+    controller_node->declare_parameter("inter_homing_delay", 500);
+    controller_node->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
+
+    bool enable_right_homing = controller_node->get_parameter("enable_right_player_homing").as_bool();
+    bool enable_left_homing = controller_node->get_parameter("enable_left_player_homing").as_bool();
+    std::string right_action_name = controller_node->get_parameter("right_player_action_name").as_string();
+    std::string left_action_name = controller_node->get_parameter("left_player_action_name").as_string();
+    int action_wait_timeout = controller_node->get_parameter("action_server_wait_timeout").as_int();
+    int homing_timeout = controller_node->get_parameter("homing_action_timeout").as_int();
+    int calibration_timeout = controller_node->get_parameter("calibration_service_timeout").as_int();
+    int startup_delay = controller_node->get_parameter("startup_delay").as_int();
+    int inter_homing_delay = controller_node->get_parameter("inter_homing_delay").as_int();
+    std::string calibrate_service = controller_node->get_parameter("calibrate_encoders_service").as_string();
+
+    RCLCPP_INFO(controller_node->get_logger(), 
+                "Homing configuration: right=%s, left=%s",
+                enable_right_homing ? "enabled" : "disabled",
+                enable_left_homing ? "enabled" : "disabled");
+
     // Create multi-threaded executor for concurrent callback processing
     rclcpp::executors::MultiThreadedExecutor executor;
 
@@ -60,8 +88,8 @@ int main(int argc, char *argv[])
     std::thread spin_thread([&executor]()
                             { executor.spin(); });
 
-    // Small delay to ensure action servers are ready
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // Delay to ensure action servers are ready
+    std::this_thread::sleep_for(std::chrono::milliseconds(startup_delay));
 
     // Execute homing sequence using action clients
     RCLCPP_INFO(controller_node->get_logger(), "=== Starting Peg Homing Sequence ===");
@@ -70,19 +98,19 @@ int main(int argc, char *argv[])
 
     // Create action clients
     auto right_homing_client = rclcpp_action::create_client<HomePeg>(
-        controller_node, "home_peg_right_player");
+        controller_node, right_action_name);
     auto left_homing_client = rclcpp_action::create_client<HomePeg>(
-        controller_node, "home_peg_left_player");
+        controller_node, left_action_name);
 
     // Wait for action servers
-    if (!right_homing_client->wait_for_action_server(std::chrono::seconds(5)))
+    if (!right_homing_client->wait_for_action_server(std::chrono::seconds(action_wait_timeout)))
     {
         RCLCPP_ERROR(controller_node->get_logger(), "Right homing action server not available");
         rclcpp::shutdown();
         spin_thread.join();
         return 1;
     }
-    if (!left_homing_client->wait_for_action_server(std::chrono::seconds(5)))
+    if (!left_homing_client->wait_for_action_server(std::chrono::seconds(action_wait_timeout)))
     {
         RCLCPP_ERROR(controller_node->get_logger(), "Left homing action server not available");
         rclcpp::shutdown();
@@ -97,7 +125,9 @@ int main(int argc, char *argv[])
     try
     {
         // // Home right player peg
-        // RCLCPP_INFO(controller_node->get_logger(), "Sending homing goal for right player...");
+        if (enable_right_homing)
+        {
+            RCLCPP_INFO(controller_node->get_logger(), "Sending homing goal for right player...");
         // auto right_goal = HomePeg::Goal();
         // right_goal.home_position.x = 0.0; // Use default
         // right_goal.home_position.y = 0.0;
@@ -106,7 +136,7 @@ int main(int argc, char *argv[])
         // auto right_goal_handle_future = right_homing_client->async_send_goal(right_goal);
 
         // // Wait for goal to be accepted (executor is already spinning in separate thread)
-        // if (right_goal_handle_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+        // if (right_goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) != std::future_status::ready)
         // {
         //     RCLCPP_ERROR(controller_node->get_logger(), "Failed to send right homing goal - timeout");
         //     homing_success = false;
@@ -123,7 +153,7 @@ int main(int argc, char *argv[])
         //     {
         //         // Wait for result
         //         auto right_result_future = right_homing_client->async_get_result(right_goal_handle);
-        //         if (right_result_future.wait_for(std::chrono::seconds(30)) != std::future_status::ready)
+        //         if (right_result_future.wait_for(std::chrono::seconds(homing_timeout)) != std::future_status::ready)
         //         {
         //             RCLCPP_ERROR(controller_node->get_logger(), "Right homing action timed out");
         //             homing_success = false;
@@ -152,12 +182,15 @@ int main(int argc, char *argv[])
         // {
         //     throw std::runtime_error("Right player homing failed");
         // }
+        }
 
         // Small delay between homing operations
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(inter_homing_delay));
 
         // Home left player peg
-        RCLCPP_INFO(controller_node->get_logger(), "Sending homing goal for left player...");
+        if (enable_left_homing)
+        {
+            RCLCPP_INFO(controller_node->get_logger(), "Sending homing goal for left player...");
         auto left_goal = HomePeg::Goal();
         left_goal.home_position.x = 0.0; // Use default
         left_goal.home_position.y = 0.0;
@@ -166,7 +199,7 @@ int main(int argc, char *argv[])
         auto left_goal_handle_future = left_homing_client->async_send_goal(left_goal);
 
         // Wait for goal to be accepted (executor is already spinning in separate thread)
-        if (left_goal_handle_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+        if (left_goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) != std::future_status::ready)
         {
             RCLCPP_ERROR(controller_node->get_logger(), "Failed to send left homing goal - timeout");
             homing_success = false;
@@ -183,7 +216,7 @@ int main(int argc, char *argv[])
             {
                 // Wait for result
                 auto left_result_future = left_homing_client->async_get_result(left_goal_handle);
-                if (left_result_future.wait_for(std::chrono::seconds(30)) != std::future_status::ready)
+                if (left_result_future.wait_for(std::chrono::seconds(homing_timeout)) != std::future_status::ready)
                 {
                     RCLCPP_ERROR(controller_node->get_logger(), "Left homing action timed out");
                     homing_success = false;
@@ -211,6 +244,7 @@ int main(int argc, char *argv[])
         if (!homing_success)
         {
             throw std::runtime_error("Left player homing failed");
+        }
         }
 
         RCLCPP_INFO(controller_node->get_logger(), "=== Peg Homing Complete ===");
@@ -245,10 +279,10 @@ int main(int argc, char *argv[])
     RCLCPP_INFO(controller_node->get_logger(), "Calling calibration service with homed state...");
 
     auto calibrate_client = controller_node->create_client<klask_interfaces::srv::CalibrateEncoders>(
-        "calibrate_encoders");
+        calibrate_service);
 
     // Wait for service to be available
-    if (!calibrate_client->wait_for_service(std::chrono::seconds(5)))
+    if (!calibrate_client->wait_for_service(std::chrono::seconds(calibration_timeout)))
     {
         RCLCPP_ERROR(controller_node->get_logger(), "Calibration service not available");
     }
@@ -261,7 +295,7 @@ int main(int argc, char *argv[])
         auto result = calibrate_client->async_send_request(request);
 
         // Wait for result with timeout (executor is already spinning)
-        if (result.wait_for(std::chrono::seconds(5)) == std::future_status::ready)
+        if (result.wait_for(std::chrono::seconds(calibration_timeout)) == std::future_status::ready)
         {
             auto response = result.get();
             if (response->success)

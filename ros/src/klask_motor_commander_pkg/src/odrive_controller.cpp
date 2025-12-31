@@ -4,6 +4,32 @@ ODriveController::ODriveController() : Node("odrive_controller")
 {
     RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node...");
 
+    // === Declare and load ROS parameters ===
+    
+    // Topic names
+    this->declare_parameter("cmd_vel_right_player", "cmd_vel/right_player_checked");
+    this->declare_parameter("cmd_vel_left_player", "cmd_vel/left_player_checked");
+    
+    // Service names
+    this->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
+    this->declare_parameter("set_motor_state_service", "set_motor_state");
+    
+    // QoS settings
+    this->declare_parameter("cmd_vel_qos_depth", 1);
+    
+    // Initial motor state
+    this->declare_parameter("initial_motor_state", 8);
+    
+    // Load parameters
+    std::string cmd_vel_right_topic = this->get_parameter("cmd_vel_right_player").as_string();
+    std::string cmd_vel_left_topic = this->get_parameter("cmd_vel_left_player").as_string();
+    std::string calibrate_service = this->get_parameter("calibrate_encoders_service").as_string();
+    std::string motor_state_service = this->get_parameter("set_motor_state_service").as_string();
+    int qos_depth = this->get_parameter("cmd_vel_qos_depth").as_int();
+    motor_state = this->get_parameter("initial_motor_state").as_int();
+
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: initial_motor_state=%d", motor_state);
+
     // Create reentrant callback group for concurrent processing
     group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
@@ -17,35 +43,35 @@ ODriveController::ODriveController() : Node("odrive_controller")
     sub_options.callback_group = group_;
 
     // Create subscription for ball/peg states with reliable QoS
-    auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
+    auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(qos_depth)).reliable();
 
     // Create service servers for calibration and motor state control
     calibrate_encoders_service_ = this->create_service<klask_interfaces::srv::CalibrateEncoders>(
-        "calibrate_encoders",
+        calibrate_service,
         std::bind(&ODriveController::calibrate_encoders_callback, this,
                   std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(), "Created service: calibrate_encoders");
+    RCLCPP_INFO(this->get_logger(), "Created service: %s", calibrate_service.c_str());
 
     set_motor_state_service_ = this->create_service<klask_interfaces::srv::SetMotorState>(
-        "set_motor_state",
+        motor_state_service,
         std::bind(&ODriveController::set_motor_state_callback, this,
                   std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(), "Created service: set_motor_state");
+    RCLCPP_INFO(this->get_logger(), "Created service: %s", motor_state_service.c_str());
 
     // Create subscriptions for velocity commands with reliable QoS
     right_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
-        "cmd_vel/right_player_checked",
+        cmd_vel_right_topic,
         qos_reliable,
         std::bind(&ODriveController::right_player_velocity_callback, this, std::placeholders::_1),
         sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/right_player_checked");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to %s", cmd_vel_right_topic.c_str());
 
     left_player_velocity_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
-        "cmd_vel/left_player_checked",
+        cmd_vel_left_topic,
         qos_reliable,
         std::bind(&ODriveController::left_player_velocity_callback, this, std::placeholders::_1),
         sub_options);
-    RCLCPP_INFO(this->get_logger(), "Subscribed to cmd_vel/left_player_checked");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to %s", cmd_vel_left_topic.c_str());
 
     RCLCPP_INFO(this->get_logger(), "ODriveController initialization complete");
 }

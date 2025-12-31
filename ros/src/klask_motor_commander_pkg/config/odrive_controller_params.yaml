@@ -1,0 +1,19 @@
+# ODriveController Parameters Configuration
+# This file contains all configurable parameters for the ODriveController class
+# which manages both player motor controllers and coordinates velocity commands.
+
+/**:
+  ros__parameters:
+    # === Topic Names ===
+    cmd_vel_right_player: "cmd_vel/right_player_checked"  # Velocity command topic for right player
+    cmd_vel_left_player: "cmd_vel/left_player_checked"    # Velocity command topic for left player
+    
+    # === Service Names ===
+    calibrate_encoders_service: "calibrate_encoders"  # Service for encoder calibration
+    set_motor_state_service: "set_motor_state"        # Service for motor state changes
+    
+    # === QoS Settings ===
+    cmd_vel_qos_depth: 1        # QoS history depth for velocity command subscriptions
+    
+    # === Initial Motor State ===
+    initial_motor_state: 8      # Initial motor state (8 = closed loop control)

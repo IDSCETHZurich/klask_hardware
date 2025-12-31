@@ -12,9 +12,17 @@ def launch_setup(context, *args, **kwargs):
     start_commander = LaunchConfiguration("start_commander").perform(context)
 
     # Get path to parameter file
-    pkg_share = get_package_share_directory('klask_motor_commander_pkg')
-    player_params_file = os.path.join(pkg_share, 'config', 'player_params.yaml')
-    open_loop_params_file = os.path.join(pkg_share, 'config', 'open_loop_controller_params.yaml')
+    pkg_share = get_package_share_directory("klask_motor_commander_pkg")
+    player_params_file = os.path.join(pkg_share, "config", "player_params.yaml")
+    open_loop_params_file = os.path.join(
+        pkg_share, "config", "open_loop_controller_params.yaml"
+    )
+    odrive_params_file = os.path.join(
+        pkg_share, "config", "odrive_controller_params.yaml"
+    )
+    motor_commander_params_file = os.path.join(
+        pkg_share, "config", "motor_commander_params.yaml"
+    )
 
     nodes_to_launch = []
 
@@ -92,8 +100,13 @@ def launch_setup(context, *args, **kwargs):
             Node(
                 package="klask_motor_commander_pkg",
                 executable="klask_motor_commander",
-                parameters=[player_params_file, open_loop_params_file],
-                output="screen"
+                parameters=[
+                    player_params_file,
+                    open_loop_params_file,
+                    odrive_params_file,
+                    motor_commander_params_file,
+                ],
+                output="screen",
             )
         )
 
@@ -115,11 +128,13 @@ def generate_launch_description():
         default_value="both",
         description='Which player to launch: "left", "right", or "both" (default)',
     )
-    
+
     start_commander_arg = DeclareLaunchArgument(
         "start_commander",
         default_value="true",
         description='Whether to start the motor commander node: "true" (default) or "false"',
     )
 
-    return LaunchDescription([player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)])
+    return LaunchDescription(
+        [player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)]
+    )

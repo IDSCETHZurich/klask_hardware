@@ -78,7 +78,8 @@ private:
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
-    int motor_state = 8;
+    /// Current motor state
+    int motor_state;
 
     /**
      * @brief Service callback for encoder calibration.
