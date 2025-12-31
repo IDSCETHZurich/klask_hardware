@@ -2,12 +2,18 @@ from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 def launch_setup(context, *args, **kwargs):
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
     start_commander = LaunchConfiguration("start_commander").perform(context)
+
+    # Get path to parameter file
+    pkg_share = get_package_share_directory('klask_motor_commander_pkg')
+    player_params_file = os.path.join(pkg_share, 'config', 'player_params.yaml')
 
     nodes_to_launch = []
 
@@ -83,7 +89,10 @@ def launch_setup(context, *args, **kwargs):
     if start_commander == "true":
         nodes_to_launch.append(
             Node(
-                package="klask_motor_commander_pkg", executable="klask_motor_commander", output="screen"
+                package="klask_motor_commander_pkg",
+                executable="klask_motor_commander",
+                parameters=[player_params_file],
+                output="screen"
             )
         )
 
