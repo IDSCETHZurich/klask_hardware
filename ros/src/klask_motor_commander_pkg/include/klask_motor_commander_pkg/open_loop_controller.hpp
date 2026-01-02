@@ -61,12 +61,25 @@ private:
     /// Default home position
     geometry_msgs::msg::Point default_home_;
 
-    // Movement validation parameters
-    static constexpr float HOMING_VELOCITY = 0.01f;         ///< Slow velocity for homing (m/s)
-    static constexpr float VALIDATION_DURATION = 2.0f;      ///< Duration for movement validation (s)
-    static constexpr float POSITION_TOLERANCE = 0.03f;      ///< Tolerance for goal reaching (m)
-    static constexpr float MOVEMENT_THRESHOLD = 0.01f;      ///< Minimum expected movement (m)
-    static constexpr float EXPECTED_DISTANCE_FACTOR = 0.5f; ///< Factor of expected vs actual movement
+    // === Parameters (loaded from ROS parameters) ===
+
+    /// Homing motion parameters
+    float homing_velocity_;
+    float position_tolerance_;
+
+    /// Movement validation parameters
+    float validation_duration_;
+    float movement_threshold_;
+    float expected_distance_factor_;
+
+    /// Fast feedback loop parameters
+    float feedback_velocity_multiplier_;
+    float feedback_step_duration_;
+
+    /// Timeout values
+    double initial_state_timeout_;
+    double state_update_timeout_;
+    double feedback_state_timeout_;
 
     /**
      * @brief Handle new goal request.

@@ -1,0 +1,36 @@
+# OpenLoopController Parameters Configuration
+# This file contains all configurable parameters for the OpenLoopController class
+# which handles peg homing operations using open-loop control with validation.
+
+/**:
+  ros__parameters:
+    # === Default Home Positions (meters) ===
+    # Center positions for each player's field area
+    right_player_home_x: 0.26 # Right player default home X position
+    right_player_home_y: 0.16 # Right player default home Y position
+    left_player_home_x: 0.16 # Left player default home X position
+    left_player_home_y: 0.16 # Left player default home Y position
+
+    # === Homing Motion Parameters ===
+    homing_velocity: 0.01 # Slow velocity for initial homing with validation (m/s)
+    position_tolerance: 0.03 # Goal position tolerance for completion (meters)
+
+    # === Movement Validation Parameters ===
+    validation_duration: 2.0 # Duration to move for validation test (seconds)
+    movement_threshold: 0.01 # Minimum expected movement to validate synchronization (meters)
+    expected_distance_factor: 0.5 # Minimum fraction of expected movement (actual/expected)
+
+    # === Fast Feedback Loop Parameters ===
+    feedback_velocity_multiplier: 2.0 # Speed multiplier after validation (times homing_velocity)
+    feedback_step_duration: 0.1 # Duration of each feedback step (seconds)
+
+    # === Topic Names ===
+    board_state_topic: "/board_state" # Topic for board state updates (in EU: meters, m/s)
+
+    # === QoS Settings ===
+    board_state_qos_depth: 10 # QoS history depth for board state subscription
+
+    # === Timeout Settings ===
+    initial_state_timeout: 5.0 # Timeout waiting for initial board state (seconds)
+    state_update_timeout: 2.0 # Timeout waiting for state after movement (seconds)
+    feedback_state_timeout: 0.5 # Timeout in fast feedback loop (seconds)

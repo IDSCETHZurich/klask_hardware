@@ -7,17 +7,34 @@
 #include <odrive_can/srv/axis_state.hpp>
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
+#include "klask_motor_commander_pkg/player_side.hpp"
 #include <cmath>
 #include <algorithm>
 #include <vector>
 
 /**
- * @brief Enum to identify which side of the table the player controls.
+ * @brief ODrive motor control mode constants.
  */
-enum class PlayerSide
+enum class ODriveControlMode : int
 {
-    RIGHT_PLAYER, ///< Right side player (motors 0 and 1)
-    LEFT_PLAYER   ///< Left side player (motors 2 and 3)
+    VELOCITY_CONTROL = 2  ///< Velocity control mode
+};
+
+/**
+ * @brief ODrive input mode constants.
+ */
+enum class ODriveInputMode : int
+{
+    VEL_RAMP = 1  ///< Velocity ramp input mode
+};
+
+/**
+ * @brief ODrive axis state constants.
+ */
+enum class ODriveAxisState : int
+{
+    IDLE = 1,                ///< Motor idle state
+    CLOSED_LOOP_CONTROL = 8  ///< Closed loop control state
 };
 
 /**
@@ -36,6 +53,9 @@ enum class PlayerSide
 class Player : public rclcpp::Node
 {
 public:
+    /// Type alias for shared pointer to Player
+    using SharedPtr = std::shared_ptr<Player>;
+
     /**
      * @brief Construct a new Player object.
      *
@@ -133,19 +153,34 @@ private:
     /// Last time for frequency calculation
     rclcpp::Time last_time;
 
-    // === Physical Constants ===
+    // === Parameters (loaded from ROS parameters) ===
 
     /// Distance traveled per motor revolution (m)
-    static constexpr float DISTANCE_PER_REVOLUTION = 0.04f;
+    float distance_per_revolution_;
 
     /// Maximum allowed velocity (m/s)
-    static constexpr float MAX_VEL = 0.2f;
+    float max_velocity_;
 
     /// Deceleration distance from edge (m)
-    static constexpr float DEACCELERATION_DISTANCE = 0.09f;
+    float deceleration_distance_;
 
     /// Peg radius (m)
-    static constexpr float PEG_RADIUS = 0.0075f;
+    float peg_radius_;
+
+    /// Minimum clearance factor (multiplied by peg_radius)
+    float min_clearance_factor_;
+
+    /// Corner margins for unreachable areas (m)
+    float corner_x_margin_;
+    float corner_y_margin_;
+
+    /// Monitoring parameters
+    int frequency_log_interval_;
+    int error_throttle_duration_;
+
+    /// Service timeout parameters
+    int service_wait_timeout_;
+    int max_service_wait_attempts_;
 
     // === Private Methods ===
 

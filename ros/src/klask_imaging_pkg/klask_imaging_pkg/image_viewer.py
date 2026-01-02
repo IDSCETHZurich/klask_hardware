@@ -1,7 +1,8 @@
 """ROS2 node for viewing compressed image stream from the board camera.
 
 Optionally overlays the latest estimated state (ball/pegs/goals) received from
-the `board_state` topic.
+the `board_state` topic. State is received in engineering units (meters, m/s)
+and converted back to pixel coordinates for overlay visualization.
 """
 
 import rclpy
@@ -30,6 +31,22 @@ class ImageViewer(Node):
         # Enable/disable state overlay (default: true)
         self.declare_parameter("show_state_overlay", True)
         self.show_state_overlay = bool(self.get_parameter("show_state_overlay").value)
+
+        # =============================
+        # EU to Pixel Conversion Parameters
+        # =============================
+        # Board dimensions in meters (must match state_estimator)
+        self.declare_parameter("board_width_meters", 0.42)
+        self.board_width_meters = float(self.get_parameter("board_width_meters").value)
+
+        self.declare_parameter("board_height_meters", 0.32)
+        self.board_height_meters = float(
+            self.get_parameter("board_height_meters").value
+        )
+
+        # Current image dimensions (updated each frame)
+        self.current_image_width: float = 0.0
+        self.current_image_height: float = 0.0
 
         # Goal visualization radius (pixels)
         self.declare_parameter("goal_radius", 22)
@@ -140,6 +157,12 @@ class ImageViewer(Node):
                 msg, desired_encoding="bgr8"
             )
 
+            # Store current image dimensions for EU-to-pixel conversion
+            # (image size can vary each frame due to rotation/cropping)
+            height, width = cv_image.shape[:2]
+            self.current_image_width = float(width)
+            self.current_image_height = float(height)
+
             # Overlay latest estimated state (if enabled + available)
             if self.show_state_overlay and self.latest_state is not None:
                 self._overlay_state(cv_image, self.latest_state)
@@ -192,12 +215,53 @@ class ImageViewer(Node):
         """Store latest state for overlay."""
         self.latest_state = msg
 
+    def _get_meter_to_pixel_x(self) -> float:
+        """Get current meter-to-pixel conversion factor for X axis."""
+        if self.current_image_width > 0:
+            return self.current_image_width / self.board_width_meters
+        return 0.0
+
+    def _get_meter_to_pixel_y(self) -> float:
+        """Get current meter-to-pixel conversion factor for Y axis."""
+        if self.current_image_height > 0:
+            return self.current_image_height / self.board_height_meters
+        return 0.0
+
+    def _convert_position_to_pixels(
+        self, x_meters: float, y_meters: float
+    ) -> tuple[float, float]:
+        """Convert position from EU (meters) to pixels."""
+        return (
+            x_meters * self._get_meter_to_pixel_x(),
+            y_meters * self._get_meter_to_pixel_y(),
+        )
+
+    def _convert_velocity_to_pixels(
+        self, vx_meters: float, vy_meters: float
+    ) -> tuple[float, float]:
+        """Convert velocity from EU (m/s) to pixels/s."""
+        return (
+            vx_meters * self._get_meter_to_pixel_x(),
+            vy_meters * self._get_meter_to_pixel_y(),
+        )
+
     def _overlay_state(self, frame: np.ndarray, state: State) -> None:
-        """Draw ball/pegs velocity arrows and goals on the frame."""
+        """Draw ball/pegs velocity arrows and goals on the frame.
+        
+        State is received in engineering units (meters, m/s) and converted
+        back to pixel coordinates for visualization overlay.
+        """
 
-        # Goals
-        left_goal = (int(state.left_goal_pos.x), int(state.left_goal_pos.y))
-        right_goal = (int(state.right_goal_pos.x), int(state.right_goal_pos.y))
+        # Convert goal positions from EU to pixels
+        left_goal_px = self._convert_position_to_pixels(
+            state.left_goal_pos.x, state.left_goal_pos.y
+        )
+        right_goal_px = self._convert_position_to_pixels(
+            state.right_goal_pos.x, state.right_goal_pos.y
+        )
+
+        left_goal = (int(left_goal_px[0]), int(left_goal_px[1]))
+        right_goal = (int(right_goal_px[0]), int(right_goal_px[1]))
 
         cv2.circle(
             frame,
@@ -228,27 +292,47 @@ class ImageViewer(Node):
             -1,
         )
 
-        # Objects
+        # Convert object positions and velocities from EU to pixels
+        left_peg_pos_px = self._convert_position_to_pixels(
+            state.left_peg.position.x, state.left_peg.position.y
+        )
+        left_peg_vel_px = self._convert_velocity_to_pixels(
+            state.left_peg.velocity.x, state.left_peg.velocity.y
+        )
+        right_peg_pos_px = self._convert_position_to_pixels(
+            state.right_peg.position.x, state.right_peg.position.y
+        )
+        right_peg_vel_px = self._convert_velocity_to_pixels(
+            state.right_peg.velocity.x, state.right_peg.velocity.y
+        )
+        ball_pos_px = self._convert_position_to_pixels(
+            state.ball.position.x, state.ball.position.y
+        )
+        ball_vel_px = self._convert_velocity_to_pixels(
+            state.ball.velocity.x, state.ball.velocity.y
+        )
+
+        # Draw objects with velocity arrows (now in pixel coordinates)
         self._draw_object_with_velocity(
             frame,
-            position=(state.left_peg.position.x, state.left_peg.position.y),
-            velocity=(state.left_peg.velocity.x, state.left_peg.velocity.y),
+            position=left_peg_pos_px,
+            velocity=left_peg_vel_px,
             dot_color=self.overlay_left_peg_dot_color,
             arrow_color=self.overlay_left_peg_arrow_color,
             velocity_scale=self.overlay_left_peg_velocity_scale,
         )
         self._draw_object_with_velocity(
             frame,
-            position=(state.right_peg.position.x, state.right_peg.position.y),
-            velocity=(state.right_peg.velocity.x, state.right_peg.velocity.y),
+            position=right_peg_pos_px,
+            velocity=right_peg_vel_px,
             dot_color=self.overlay_right_peg_dot_color,
             arrow_color=self.overlay_right_peg_arrow_color,
             velocity_scale=self.overlay_right_peg_velocity_scale,
         )
         self._draw_object_with_velocity(
             frame,
-            position=(state.ball.position.x, state.ball.position.y),
-            velocity=(state.ball.velocity.x, state.ball.velocity.y),
+            position=ball_pos_px,
+            velocity=ball_vel_px,
             dot_color=self.overlay_ball_dot_color,
             arrow_color=self.overlay_ball_arrow_color,
             velocity_scale=self.overlay_ball_velocity_scale,

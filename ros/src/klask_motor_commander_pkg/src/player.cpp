@@ -14,23 +14,83 @@ Player::Player(PlayerSide side)
     const char *side_name = this->get_name();
     RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", side_name);
 
+    // === Declare and load ROS parameters ===
+    
+    // Physical constants
+    this->declare_parameter("distance_per_revolution", 0.04);
+    this->declare_parameter("max_velocity", 0.2);
+    this->declare_parameter("deceleration_distance", 0.09);
+    this->declare_parameter("peg_radius", 0.0075);
+    
+    // Motion control
+    this->declare_parameter("min_clearance_factor", 1.5);
+    this->declare_parameter("corner_x_margin", 0.03);
+    this->declare_parameter("corner_y_margin", 0.01);
+    
+    // Monitoring
+    this->declare_parameter("frequency_log_interval", 100);
+    this->declare_parameter("error_throttle_duration", 5000);
+    
+    // Service timeouts
+    this->declare_parameter("service_wait_timeout", 1);
+    this->declare_parameter("max_service_wait_attempts", 5);
+    
+    // Load parameters
+    distance_per_revolution_ = static_cast<float>(this->get_parameter("distance_per_revolution").as_double());
+    max_velocity_ = static_cast<float>(this->get_parameter("max_velocity").as_double());
+    deceleration_distance_ = static_cast<float>(this->get_parameter("deceleration_distance").as_double());
+    peg_radius_ = static_cast<float>(this->get_parameter("peg_radius").as_double());
+    min_clearance_factor_ = static_cast<float>(this->get_parameter("min_clearance_factor").as_double());
+    corner_x_margin_ = static_cast<float>(this->get_parameter("corner_x_margin").as_double());
+    corner_y_margin_ = static_cast<float>(this->get_parameter("corner_y_margin").as_double());
+    frequency_log_interval_ = this->get_parameter("frequency_log_interval").as_int();
+    error_throttle_duration_ = this->get_parameter("error_throttle_duration").as_int();
+    service_wait_timeout_ = this->get_parameter("service_wait_timeout").as_int();
+    max_service_wait_attempts_ = this->get_parameter("max_service_wait_attempts").as_int();
+
     std::string motor_ind_r;
     std::string motor_ind_l;
 
     if (side == PlayerSide::RIGHT_PLAYER)
     {
-        motor_ind_r = "0";
-        motor_ind_l = "1";
-        EDGE = {0.23f, 0.42f, 0.32f, 0.0f}; // [left, right, bottom, top] in image coords (y=0 is top)
+        // Declare and load right player parameters
+        this->declare_parameter("right_player.motor_index_right", 0);
+        this->declare_parameter("right_player.motor_index_left", 1);
+        this->declare_parameter("right_player_edge", std::vector<double>{0.23, 0.42, 0.32, 0.0});
+        
+        motor_ind_r = std::to_string(this->get_parameter("right_player.motor_index_right").as_int());
+        motor_ind_l = std::to_string(this->get_parameter("right_player.motor_index_left").as_int());
+        
+        auto edge_vector = this->get_parameter("right_player_edge").as_double_array();
+        EDGE = {static_cast<float>(edge_vector[0]), static_cast<float>(edge_vector[1]),
+                static_cast<float>(edge_vector[2]), static_cast<float>(edge_vector[3])};
         sign = 1.0f;
     }
     else
     { // LEFT_PLAYER
-        motor_ind_r = "2";
-        motor_ind_l = "3";
-        EDGE = {0.0f, 0.19f, 0.32f, 0.0f}; // [left, right, bottom, top] in image coords (y=0 is top)
+        // Declare and load left player parameters
+        this->declare_parameter("left_player.motor_index_right", 2);
+        this->declare_parameter("left_player.motor_index_left", 3);
+        this->declare_parameter("left_player_edge", std::vector<double>{0.0, 0.19, 0.32, 0.0});
+        
+        motor_ind_r = std::to_string(this->get_parameter("left_player.motor_index_right").as_int());
+        motor_ind_l = std::to_string(this->get_parameter("left_player.motor_index_left").as_int());
+        
+        auto edge_vector = this->get_parameter("left_player_edge").as_double_array();
+        EDGE = {static_cast<float>(edge_vector[0]), static_cast<float>(edge_vector[1]),
+                static_cast<float>(edge_vector[2]), static_cast<float>(edge_vector[3])};
         sign = -1.0f;
     }
+
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: max_vel=%.3f, decel_dist=%.3f, peg_radius=%.4f",
+                max_velocity_, deceleration_distance_, peg_radius_);
+    RCLCPP_INFO(this->get_logger(), "Edge boundaries: [%.3f, %.3f, %.3f, %.3f]",
+                EDGE[0], EDGE[1], EDGE[2], EDGE[3]);
+
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: max_vel=%.3f, decel_dist=%.3f, peg_radius=%.4f",
+                max_velocity_, deceleration_distance_, peg_radius_);
+    RCLCPP_INFO(this->get_logger(), "Edge boundaries: [%.3f, %.3f, %.3f, %.3f]",
+                EDGE[0], EDGE[1], EDGE[2], EDGE[3]);
 
     group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
@@ -45,37 +105,43 @@ Player::Player(PlayerSide side)
     // Use reliable QoS for status updates (ensure delivery)
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
 
-    motor_left_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
-        "/odrive_axis" + motor_ind_l + "/control_message", qos_control, pub_options);
-    motor_right_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
-        "/odrive_axis" + motor_ind_r + "/control_message", qos_control, pub_options);
-
+    // Build topic names using motor indices
+    std::string control_topic_r = "/odrive_axis" + motor_ind_r + "/control_message";
+    std::string control_topic_l = "/odrive_axis" + motor_ind_l + "/control_message";
+    std::string status_topic_r = "/odrive_axis" + motor_ind_r + "/controller_status";
+    std::string status_topic_l = "/odrive_axis" + motor_ind_l + "/controller_status";
+    std::string service_r = "/odrive_axis" + motor_ind_r + "/request_axis_state";
+    std::string service_l = "/odrive_axis" + motor_ind_l + "/request_axis_state";
+    
     std::string topic_prefix = (side == PlayerSide::RIGHT_PLAYER) ? "right_player" : "left_player";
+    std::string magnet_topic = "/" + topic_prefix + "_magnet_position";
+
+    motor_left_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
+        control_topic_l, qos_control, pub_options);
+    motor_right_pub_ = this->create_publisher<odrive_can::msg::ControlMessage>(
+        control_topic_r, qos_control, pub_options);
+
     position_magnet_publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
-        "/" + topic_prefix + "_magnet_position", qos_reliable, pub_options);
+        magnet_topic, qos_reliable, pub_options);
 
     RCLCPP_INFO(this->get_logger(), "Created publishers for motors %s and %s",
                 motor_ind_r.c_str(), motor_ind_l.c_str());
 
     request_axis_r_state_client_ = this->create_client<odrive_can::srv::AxisState>(
-        "/odrive_axis" + motor_ind_r + "/request_axis_state",
-        rmw_qos_profile_services_default,
-        group_);
+        service_r, rmw_qos_profile_services_default, group_);
     request_axis_l_state_client_ = this->create_client<odrive_can::srv::AxisState>(
-        "/odrive_axis" + motor_ind_l + "/request_axis_state",
-        rmw_qos_profile_services_default,
-        group_);
+        service_l, rmw_qos_profile_services_default, group_);
 
     RCLCPP_INFO(this->get_logger(), "Initializing motors to idle state...");
-    set_motor_state(1);
+    set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
     RCLCPP_INFO(this->get_logger(), "Setting motors to closed loop control...");
-    set_motor_state(8);
+    set_motor_state(static_cast<int>(ODriveAxisState::CLOSED_LOOP_CONTROL));
 
     controller_r_subscriber = this->create_subscription<odrive_can::msg::ControllerStatus>(
-        "/odrive_axis" + motor_ind_r + "/controller_status", qos_reliable,
+        status_topic_r, qos_reliable,
         std::bind(&Player::controller_status_callback_right, this, std::placeholders::_1), sub_options);
     controller_l_subscriber = this->create_subscription<odrive_can::msg::ControllerStatus>(
-        "/odrive_axis" + motor_ind_l + "/controller_status", qos_reliable,
+        status_topic_l, qos_reliable,
         std::bind(&Player::controller_status_callback_left, this, std::placeholders::_1), sub_options);
 
     RCLCPP_INFO(this->get_logger(), "Player node %s initialization complete", side_name);
@@ -84,8 +150,8 @@ Player::Player(PlayerSide side)
 void Player::send_commands(float v_x, float v_y)
 {
     // Clamp input velocities to safe range
-    v_x = std::clamp(v_x, -MAX_VEL, MAX_VEL);
-    v_y = std::clamp(v_y, -MAX_VEL, MAX_VEL);
+    v_x = std::clamp(v_x, -max_velocity_, max_velocity_);
+    v_y = std::clamp(v_y, -max_velocity_, max_velocity_);
 
     // Apply deceleration profile near boundaries if calibrated
     if (!synchronized_state.empty())
@@ -94,14 +160,13 @@ void Player::send_commands(float v_x, float v_y)
     }
 
     // Log frequency periodically
-    constexpr int FREQ_LOG_INTERVAL = 100;
-    if (++callback_count >= FREQ_LOG_INTERVAL)
+    if (++callback_count >= frequency_log_interval_)
     {
         const rclcpp::Time current_time = this->now();
         const double dt = (current_time - last_time).seconds();
         if (dt > 0.0)
         {
-            const double freq = FREQ_LOG_INTERVAL / dt;
+            const double freq = frequency_log_interval_ / dt;
             RCLCPP_INFO(this->get_logger(), "Motor commands freq: %.2f Hz", freq);
         }
         last_time = current_time;
@@ -109,19 +174,17 @@ void Player::send_commands(float v_x, float v_y)
     }
 
     // Convert velocities to motor commands (differential drive)
-    constexpr float METERS_TO_ROTATIONS = 2.0f / DISTANCE_PER_REVOLUTION;
-    constexpr int VELOCITY_CONTROL_MODE = 2;
-    constexpr int VELOCITY_INPUT_MODE = 1;
+    const float meters_to_rotations = 2.0f / distance_per_revolution_;
 
     odrive_can::msg::ControlMessage control_r_msg;
-    control_r_msg.input_vel = sign * (v_x + v_y) * METERS_TO_ROTATIONS;
-    control_r_msg.control_mode = VELOCITY_CONTROL_MODE;
-    control_r_msg.input_mode = VELOCITY_INPUT_MODE;
+    control_r_msg.input_vel = sign * (v_x + v_y) * meters_to_rotations;
+    control_r_msg.control_mode = static_cast<int>(ODriveControlMode::VELOCITY_CONTROL);
+    control_r_msg.input_mode = static_cast<int>(ODriveInputMode::VEL_RAMP);
 
     odrive_can::msg::ControlMessage control_l_msg;
-    control_l_msg.input_vel = sign * (v_y - v_x) * METERS_TO_ROTATIONS;
-    control_l_msg.control_mode = VELOCITY_CONTROL_MODE;
-    control_l_msg.input_mode = VELOCITY_INPUT_MODE;
+    control_l_msg.input_vel = sign * (v_y - v_x) * meters_to_rotations;
+    control_l_msg.control_mode = static_cast<int>(ODriveControlMode::VELOCITY_CONTROL);
+    control_l_msg.input_mode = static_cast<int>(ODriveInputMode::VEL_RAMP);
 
     motor_right_pub_->publish(control_r_msg);
     motor_left_pub_->publish(control_l_msg);
@@ -148,13 +211,13 @@ void Player::change_motor_state(const int &des_state)
 void Player::deacceleration_profile(float &v_x, float &v_y)
 {
     // Helper lambda to compute linear deceleration
-    auto linear_decel = [](float distance) -> float
+    auto linear_decel = [this](float distance) -> float
     {
-        return (MAX_VEL / DEACCELERATION_DISTANCE) * distance;
+        return (max_velocity_ / deceleration_distance_) * distance;
     };
 
-    const float safe_zone = DEACCELERATION_DISTANCE + PEG_RADIUS;
-    const float min_clearance = PEG_RADIUS * 1.5f;
+    const float safe_zone = deceleration_distance_ + peg_radius_;
+    const float min_clearance = peg_radius_ * min_clearance_factor_;
 
     // X-axis boundary checks
     const float dist_from_left = magnet_position[0] - EDGE[0];
@@ -217,21 +280,18 @@ void Player::deacceleration_profile(float &v_x, float &v_y)
     }
 
     // Handle unreachable front corners (geometry constraints)
-    constexpr float CORNER_X_MARGIN = 0.03f;
-    constexpr float CORNER_Y_MARGIN = 0.01f;
-
-    const bool near_top = magnet_position[1] >= EDGE[3] - CORNER_Y_MARGIN;
-    const bool near_bottom = magnet_position[1] <= EDGE[2] + CORNER_Y_MARGIN;
+    const bool near_top = magnet_position[1] >= EDGE[3] - corner_y_margin_;
+    const bool near_bottom = magnet_position[1] <= EDGE[2] + corner_y_margin_;
     const bool in_corner_y = near_top || near_bottom;
 
     if (side_ == PlayerSide::LEFT_PLAYER &&
-        magnet_position[0] >= EDGE[1] - CORNER_X_MARGIN && in_corner_y)
+        magnet_position[0] >= EDGE[1] - corner_x_margin_ && in_corner_y)
     {
         v_x = std::min(0.0f, v_x); // Prevent moving further right
         v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
     }
     else if (side_ == PlayerSide::RIGHT_PLAYER &&
-             magnet_position[0] <= EDGE[0] + CORNER_X_MARGIN && in_corner_y)
+             magnet_position[0] <= EDGE[0] + corner_x_margin_ && in_corner_y)
     {
         v_x = std::max(0.0f, v_x); // Prevent moving further left
         v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
@@ -248,11 +308,11 @@ void Player::controller_status_callback_right(const odrive_can::msg::ControllerS
         RCLCPP_ERROR_THROTTLE(
             this->get_logger(),
             *this->get_clock(),
-            5000, // Log at most once every 5 seconds
+            error_throttle_duration_,
             "Right motor error detected: 0x%X. Attempting to recover.",
             msg->active_errors);
         // Note: Avoid blocking sleep in callbacks - let the system handle recovery
-        set_motor_state(1); // Set to idle state
+        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
     }
 }
 
@@ -266,10 +326,10 @@ void Player::controller_status_callback_left(const odrive_can::msg::ControllerSt
         RCLCPP_ERROR_THROTTLE(
             this->get_logger(),
             *this->get_clock(),
-            5000, // Log at most once every 5 seconds
+            error_throttle_duration_,
             "Left motor error detected: 0x%X. Attempting to recover.",
             msg->active_errors);
-        set_motor_state(1); // Set to idle state
+        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
     }
 }
 
@@ -281,8 +341,8 @@ void Player::update_magnet_pos()
     }
 
     // Calculate encoder deltas
-    const float delta_encoder_r = (encoder_right - synchronized_state[0]) * DISTANCE_PER_REVOLUTION;
-    const float delta_encoder_l = (encoder_left - synchronized_state[1]) * DISTANCE_PER_REVOLUTION;
+    const float delta_encoder_r = (encoder_right - synchronized_state[0]) * distance_per_revolution_;
+    const float delta_encoder_l = (encoder_left - synchronized_state[1]) * distance_per_revolution_;
 
     // Differential drive kinematics: x is differential, y is average
     constexpr float HALF = 0.5f;
@@ -304,12 +364,11 @@ void Player::set_motor_state(int state)
     request_l->axis_requested_state = state;
 
     // Wait for services with timeout to prevent infinite blocking
-    constexpr int MAX_WAIT_ATTEMPTS = 5;
     int wait_attempts = 0;
 
-    while (!request_axis_r_state_client_->wait_for_service(std::chrono::seconds(1)))
+    while (!request_axis_r_state_client_->wait_for_service(std::chrono::seconds(service_wait_timeout_)))
     {
-        if (++wait_attempts >= MAX_WAIT_ATTEMPTS)
+        if (++wait_attempts >= max_service_wait_attempts_)
         {
             RCLCPP_ERROR(this->get_logger(), "Right motor service not available after timeout");
             return;
@@ -318,9 +377,9 @@ void Player::set_motor_state(int state)
     }
 
     wait_attempts = 0;
-    while (!request_axis_l_state_client_->wait_for_service(std::chrono::seconds(1)))
+    while (!request_axis_l_state_client_->wait_for_service(std::chrono::seconds(service_wait_timeout_)))
     {
-        if (++wait_attempts >= MAX_WAIT_ATTEMPTS)
+        if (++wait_attempts >= max_service_wait_attempts_)
         {
             RCLCPP_ERROR(this->get_logger(), "Left motor service not available after timeout");
             return;

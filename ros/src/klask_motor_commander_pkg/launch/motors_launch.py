@@ -1,13 +1,47 @@
+"""Launch file for klask motor control system.
+
+Example usage:
+    # Launch both players with motor commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py
+    
+    # Launch only right player:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=right
+    
+    # Launch only left player:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=left
+    
+    # Launch ODrive nodes without motor commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py start_commander:=false
+    
+    # Launch right player only without commander:
+    ros2 launch klask_motor_commander_pkg motors_launch.py player:=right start_commander:=false
+"""
+
 from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 def launch_setup(context, *args, **kwargs):
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
     start_commander = LaunchConfiguration("start_commander").perform(context)
+
+    # Get path to parameter file
+    pkg_share = get_package_share_directory("klask_motor_commander_pkg")
+    player_params_file = os.path.join(pkg_share, "config", "player_params.yaml")
+    open_loop_params_file = os.path.join(
+        pkg_share, "config", "open_loop_controller_params.yaml"
+    )
+    odrive_params_file = os.path.join(
+        pkg_share, "config", "odrive_controller_params.yaml"
+    )
+    motor_commander_params_file = os.path.join(
+        pkg_share, "config", "motor_commander_params.yaml"
+    )
 
     nodes_to_launch = []
 
@@ -83,7 +117,16 @@ def launch_setup(context, *args, **kwargs):
     if start_commander == "true":
         nodes_to_launch.append(
             Node(
-                package="klask_motor_commander_pkg", executable="klask_motor_commander", output="screen"
+                package="klask_motor_commander_pkg",
+                executable="klask_motor_commander",
+                parameters=[
+                    player_params_file,
+                    open_loop_params_file,
+                    odrive_params_file,
+                    motor_commander_params_file,
+                    {"player": player},  # Pass player selection from launch argument
+                ],
+                output="screen",
             )
         )
 
@@ -105,11 +148,13 @@ def generate_launch_description():
         default_value="both",
         description='Which player to launch: "left", "right", or "both" (default)',
     )
-    
+
     start_commander_arg = DeclareLaunchArgument(
         "start_commander",
         default_value="true",
         description='Whether to start the motor commander node: "true" (default) or "false"',
     )
 
-    return LaunchDescription([player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)])
+    return LaunchDescription(
+        [player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)]
+    )
