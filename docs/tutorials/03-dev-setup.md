@@ -4,6 +4,8 @@ This tutorial will guide you through setting up your development environment for
 
 ## Prerequisites
 
+You need a fully assembled KLASK Hardware system as described in the [Hardware Assembly Tutorial](01-hardware-assembly.md). Additionally, ensure that you are also able to run the Runtime-Container as described in the [Runtime Startup Tutorial](02-runtime-startup.md). To clone the repository you need to have [Git](https://git-scm.com/) and [Git LFS](https://git-lfs.com/) installed on your machine. The only additional software you need is an IDE. We recommend using [Visual Studio Code](https://code.visualstudio.com/) since we provide a ready-to-use configuration for it but you can use any IDE of your choice.
+
 ## TODO: FINISH THIS SECTION
 
 ## Documentation
