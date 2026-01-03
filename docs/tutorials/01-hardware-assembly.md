@@ -171,3 +171,5 @@ The frame of the gantry provides the necessary degrees of freedom that allow the
 5. Cross both belts from the timing gears to the single idler on the back beam of the frame. Repeat for both sides: from there, reach the pulley on the opposite side of the cross plates. Adjust the lateral position of the single idler on the back beam such that the belt is parallel to the Y axis beam below. Tighten the single idler.
 6. Pull the belts towards the carriage and apply tension. Make sure to have similar tension on both belts. Fasten the belts with the brass rings.
 7. If more tension is required, loosen the mount plate of the double idler, pull away from the bridge, and tighten again.
+
+Now the gantry is fully assembled and ready for integration with the electronics and software components as described in the subsequent tutorials.
