@@ -8,6 +8,9 @@
 !/ros/.vscode/c_cpp_properties.json
 !/.vscode/extensions.json
 
+# Ignore documentation build files
+/site/
+
 # Ignore ROS stuff
 devel/
 logs/
