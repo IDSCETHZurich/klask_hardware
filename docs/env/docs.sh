@@ -20,7 +20,10 @@ function build_image() {
 }
 
 function build_docs() {
-    echo "Building documentation..."
+    local build_cmd="${1:-/usr/local/bin/build-all.sh}"
+    local doc_type="${2:-all}"
+    
+    echo "Building $doc_type documentation..."
     
     # Check if image exists, if not build it
     if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
@@ -33,21 +36,32 @@ function build_docs() {
         --name "$CONTAINER_NAME" \
         -v "$REPO_ROOT:/workspace" \
         -u "$(id -u):$(id -g)" \
-        "$IMAGE_NAME"
+        "$IMAGE_NAME" \
+        "$build_cmd"
     
-    echo "Documentation built successfully at $REPO_ROOT/site"
+    if [ "$doc_type" = "all" ]; then
+        echo "Documentation built successfully at $REPO_ROOT/site"
+    elif [ "$doc_type" = "doxygen" ]; then
+        echo "Doxygen documentation built at $REPO_ROOT/docs/reference/api/doxygen"
+    else
+        echo "MkDocs documentation built at $REPO_ROOT/site"
+    fi
 }
 
 function show_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --build          Build the documentation"
+    echo "  --build          Build all documentation (Doxygen + MkDocs)"
+    echo "  --doxygen        Build only Doxygen API documentation"
+    echo "  --mkdocs         Build only MkDocs documentation"
     echo "  --rebuild-image  Rebuild the Docker image"
     echo "  --help           Show this help message"
     echo ""
-    echo "Example:"
-    echo "  $0 --build"
+    echo "Examples:"
+    echo "  $0 --build         # Build everything"
+    echo "  $0 --doxygen       # Build only Doxygen API docs"
+    echo "  $0 --mkdocs        # Build only MkDocs site"
 }
 
 # Parse command line arguments
@@ -58,7 +72,13 @@ fi
 
 case "$1" in
     --build)
-        build_docs
+        build_docs "/usr/local/bin/build-all.sh" "all"
+        ;;
+    --doxygen)
+        build_docs "/usr/local/bin/build-doxygen.sh" "doxygen"
+        ;;
+    --mkdocs)
+        build_docs "/usr/local/bin/build-mkdocs.sh" "mkdocs"
         ;;
     --rebuild-image)
         build_image

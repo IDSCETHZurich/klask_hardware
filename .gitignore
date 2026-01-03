@@ -10,6 +10,7 @@
 
 # Ignore documentation build files
 /site/
+/docs/reference/api/doxygen
 
 # Ignore ROS stuff
 devel/

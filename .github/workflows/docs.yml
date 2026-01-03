@@ -1,13 +1,11 @@
 name: docs
 
 on:
+  pull_request:
+    branches: [main] # build docs on PRs into main (no deploy)
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: ["**"] # every commit
-  #   pull_request:
-  #     branches: [main] # build docs on PRs into main (no deploy)
-  #     types: [opened, synchronize, reopened, ready_for_review]
-  #   push:
-  #     branches: [main] # deploy on merge to main
+    branches: [main] # deploy on merge to main
   workflow_dispatch:
 
 permissions:
@@ -37,11 +35,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y doxygen graphviz rsync
 
-      # - name: Prepare Doxygen output dir
-      #   run: mkdir -p docs/reference/api/doxygen
+      - name: Prepare Doxygen output dir
+        run: mkdir -p docs/reference/api/doxygen
 
-      # - name: Build Doxygen
-      #   run: doxygen docs/Doxyfile
+      - name: Build Doxygen
+        run: doxygen docs/Doxyfile
 
       - name: Build MkDocs
         run: mkdocs build --strict -f docs/mkdocs.yml

@@ -301,6 +301,13 @@ OPTIMIZE_OUTPUT_FOR_C  = NO
 
 OPTIMIZE_OUTPUT_JAVA   = NO
 
+# Set the OPTIMIZE_OUTPUT_FOR_PYTHON tag to YES if your project consists of a
+# lot of Python sources. Doxygen will then generate output that is tailored for
+# Python.
+# The default value is: NO.
+
+OPTIMIZE_OUTPUT_FOR_PYTHON = YES
+
 # Set the OPTIMIZE_FOR_FORTRAN tag to YES if your project consists of Fortran
 # sources. Doxygen will then generate output that is tailored for Fortran.
 # The default value is: NO.
@@ -984,9 +991,19 @@ INPUT_FILE_ENCODING    =
 # *.f18, *.f, *.for, *.vhd, *.vhdl, *.ucf, *.qsf and *.ice.
 
 FILE_PATTERNS          = *.c \
+                         *.cc \
+                         *.cxx \
                          *.cpp \
+                         *.c++ \
                          *.h \
-                         *.hpp
+                         *.hh \
+                         *.hxx \
+                         *.hpp \
+                         *.h++ \
+                         *.py \
+                         *.pyw \
+                         *.md \
+                         *.markdown
 
 # The RECURSIVE tag can be used to specify whether or not subdirectories should
 # be searched for input files as well.
@@ -1017,7 +1034,14 @@ EXCLUDE_SYMLINKS       = NO
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories for example use the pattern */test/*
 
-EXCLUDE_PATTERNS       =
+EXCLUDE_PATTERNS       = */test/* \
+                         */build/* \
+                         */install/* \
+                         */log/* \
+                         */__pycache__/* \
+                         *.pyc \
+                         */setup.py \
+                         */setup.cfg
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
@@ -1333,7 +1357,7 @@ HTML_FOOTER            =
 # obsolete.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-HTML_STYLESHEET        = docs/doxygen-awesome.css
+HTML_STYLESHEET        =
 
 # The HTML_EXTRA_STYLESHEET tag can be used to specify additional user-defined
 # cascading style sheets that are included after the standard style sheets
@@ -1351,7 +1375,7 @@ HTML_STYLESHEET        = docs/doxygen-awesome.css
 # documentation.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-HTML_EXTRA_STYLESHEET  =
+HTML_EXTRA_STYLESHEET  = docs/doxygen-awesome.css
 
 # The HTML_EXTRA_FILES tag can be used to specify one or more extra images or
 # other source files which should be copied to the HTML output directory. Note
