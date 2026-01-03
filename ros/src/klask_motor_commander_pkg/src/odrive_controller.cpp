@@ -1,5 +1,7 @@
 #include "klask_motor_commander_pkg/odrive_controller.hpp"
 
+namespace klask_motor_commander {
+
 ODriveController::ODriveController(PlayerSide player_config) : Node("odrive_controller")
 {
     RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node with player config: %s", 
@@ -199,3 +201,5 @@ void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist:
                     player_name.c_str());
     }
 }
+
+}  // namespace klask_motor_commander

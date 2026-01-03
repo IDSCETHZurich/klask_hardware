@@ -223,7 +223,12 @@ def _prepare_frame_with_lines(
 
 
 def plot_single_channel(channel: np.ndarray, title: str) -> None:
-    """Plot a single channel with color scale."""
+    """Plot a single channel with color scale for visualization.
+
+    Args:
+        channel: Single channel image array (0-255 values).
+        title: Window title for display.
+    """
 
     # Apply colormap to the channel for better visualization
     channel_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
@@ -262,6 +267,15 @@ def show_online_boarders(
     fps_display,
     title,
 ) -> None:
+    """Display board borders with edge detection lines overlay.
+
+    Args:
+        frame_rec: The original rectified frame.
+        boarder_segment_edge_points: List of edge points for each border segment.
+        boarder_segment_edge_lines: List of fitted line parameters for each segment.
+        fps_display: Current frames per second for display.
+        title: Window title for display.
+    """
     frame_with_edges = _prepare_frame_with_lines(
         frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
     )
@@ -270,7 +284,14 @@ def show_online_boarders(
 
 
 def show_final_output(warped, fps_display, title, goal_ellipses=None) -> None:
-    """Display the final warped board view with FPS overlay."""
+    """Display the final warped board view with FPS overlay.
+
+    Args:
+        warped: The perspective-corrected board image.
+        fps_display: Current frames per second for display.
+        title: Window title for display.
+        goal_ellipses: Optional tuple of goal ellipse parameters to overlay.
+    """
 
     # Draw FPS on image
     display_image = warped.copy()
@@ -301,7 +322,12 @@ def show_final_output(warped, fps_display, title, goal_ellipses=None) -> None:
 
 
 def print_profiling_stats(profiler, top_functions: int) -> None:
-    """Print cProfile statistics."""
+    """Print cProfile statistics for performance analysis.
+
+    Args:
+        profiler: The cProfile profiler object.
+        top_functions: Number of top functions to display in the output.
+    """
     if profiler is None:
         return
 

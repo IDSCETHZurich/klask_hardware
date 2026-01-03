@@ -1,5 +1,7 @@
 #include "klask_motor_commander_pkg/player.hpp"
 
+namespace klask_motor_commander {
+
 Player::Player(PlayerSide side)
     : Node(side == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player"),
       synchronized_state({}),
@@ -393,3 +395,5 @@ void Player::set_motor_state(int state)
 
     RCLCPP_DEBUG(this->get_logger(), "Motor state change to %d requested", state);
 }
+
+}  // namespace klask_motor_commander
