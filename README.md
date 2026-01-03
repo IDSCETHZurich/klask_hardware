@@ -1,66 +1,113 @@
 # KLASK Robotic Hardware Stack
 
-Complete KLASK robotic hardware stack, including ROS2 nodes, CAD files, and assembly instructions.
+**Autonomous robotic KLASK game platform for reinforcement learning research and education.** This repository contains everything you need to build and control a robotic KLASK table: ROS2 nodes for vision processing and motor control, CAD files for mechanical components, and comprehensive documentation.
 
-**This README is under construction**
+<!-- Docs pipeline (MkDocs/Doxygen build) -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/docs.yml">
+  <img alt="Docs pipeline" src="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/docs.yml/badge.svg">
+</a>
 
-## Prerequisites
+<!-- Docs site status -->
+<a href="https://IDSCETHZurich.github.io/klask_hardware/">
+  <img alt="Docs" src="https://img.shields.io/website?url=https%3A%2F%2FIDSCETHZurich.github.io%2Fklask_hardware%2F&label=docs%20site">
+</a>
 
-- Git, git-lfs, and Docker installed
-- User added to the docker group
-- X11 forwarding enabled: `xhost +local:root`
+<!-- Stars (social) -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/stargazers">
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/IDSCETHZurich/klask_hardware?style=social">
+</a>
 
-## Initial Setup
+<!-- Contributors -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/graphs/contributors">
+  <img alt="Contributors" src="https://img.shields.io/github/contributors/IDSCETHZurich/klask_hardware">
+</a>
 
-### Git Configuration
+## Documentation & Tutorials
 
-```bash
-git config commit.template .gitmessage.txt
-```
+All documentation lives at [https://IDSCETHZurich.github.io/klask_hardware/](https://IDSCETHZurich.github.io/klask_hardware/). You'll find comprehensive guides for:
 
-### SSH Key Setup (for idsc4gpu)
+- **Hardware Assembly:** Mechanical assembly, wiring, and component installation
+- **Runtime Startup:** Launching the system and running the autonomous game
+- **Development Setup:** Environment configuration, Docker containers, and building documentation
+- **Code Guidelines:** Coding standards and best practices
+- **API Reference:** Full Doxygen documentation for all ROS2 packages
 
-1. Generate SSH key (replace `alex` with your username):
+## What is the KLASK Robotic System
 
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_alex -C "comment"
-   ```
+KLASK is a popular magnetic table game where players control magnetic pegs to hit a ball into the opponent's goal while avoiding obstacles. Researchers and students at the **Institute for Dynamic Systems and Control** (IDSC), ETH Zurich, have developed an autonomous robotic platform that can play KLASK using advanced reinforcement learning algorithms. The system provides the ability to test, benchmark and improve RL strategies in a real-world environment.
 
-2. Add `id_ed25519_alex.pub` content to your GitHub account
+This repository contains the hardware and software components required to build and operate the KLASK robotic system. The inference node running the RL agent is hosted in the separated [klask_software](https://github.com/IDSCETHZurich/klask_software) repository.
 
-3. Edit `~/.ssh/config`:
+## System Architecture
 
-   ```txt
-   Host github.com-alex
-       HostName github.com
-       User git
-       IdentityFile ~/.ssh/id_ed25519_alex
-       IdentitiesOnly yes
-   ```
+The system consists of three main ROS2 packages:
 
-4. Clone using the alias:
+### klask_imaging_pkg (Python)
 
-   ```bash
-   git clone git@github.com-alex:IDSCETHZurich/klask_hardware.git
-   ```
+Vision processing pipeline for real-time board detection:
 
-5. Set local git config:
+- Camera acquisition and calibration
+- Board detection and perspective transform
+- Image publishing
+- Image viewer for debugging
 
-   ```bash
-   git config user.name "Your Name"
-   git config user.email "you@example.com"
-   ```
+### klask_motor_commander_pkg (C++)
 
-## SDK Docker Environment
+Motor control and coordination:
 
-Build and run the SDK container:
+- ODrive motor interface with corexy kinematics
+- Player peg synchronization and homing
+- Wall collision avoidance
+- Velocity profiling and feedforward control
 
-```bash
-./ros/ros_env/klask_docker_sdk.sh build
-./ros/ros_env/klask_docker_sdk.sh run
-```
+### klask_interfaces
 
-## VS Code Development
+Custom ROS2 messages, services, and actions for system communication
 
-- Click "Reopen in Container" when prompted, or
-- Use Remote Containers: Attach to running container from the bottom left menu
+## Hardware Components
+
+This repository includes:
+
+- **CAD Files** (`hardware/cad/`) SolidWorks assemblies and parts for mechanical structure
+  - Gantry frame and mounting brackets
+  - Motor assemblies and belt attachments
+  - Camera mount and board frame
+  - Custom game board adapter components
+
+- **Third-Party Parts** References to commercial components (bearings, motors, profiles)
+
+See the [Hardware Assembly tutorial](https://IDSCETHZurich.github.io/klask_hardware/tutorials/01-hardware-assembly/) for complete build instructions.
+
+## Roadmap
+
+We track work in GitHub issues and milestones.
+
+## Contributing
+
+We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation:
+
+1. **Fork** the repository and create a feature branch
+2. **Develop** following our [code guidelines](https://IDSCETHZurich.github.io/klask_hardware/contribution/code_guideline/)
+3. **Test** your changes thoroughly
+4. **Submit a PR** with a clear description and context
+
+See our [Contributing Guide](https://IDSCETHZurich.github.io/klask_hardware/contribution/contributing/) for detailed information.
+
+## License
+
+**TL;DR:** Code — Apache-2.0 • Hardware — CERN-OHL-S v2 • Docs — CC BY 4.0
+
+- ROS2 code and software is licensed under **Apache License 2.0**
+- Hardware designs (CAD, mechanical) are under **CERN-OHL-S v2**
+- Documentation and tutorials are under **CC BY 4.0**
+
+### Third-party Components
+
+- Dependencies and libraries retain their original licenses
+
+## Acknowledgements
+
+- ETH Zurich's **Institute for Dynamic Systems and Control** for project support
+- The ROS2 and open-source robotics community
+- ODrive project for excellent motor control hardware and software
+- All contributors and maintainers who make this project possible

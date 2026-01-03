@@ -1,4 +1,4 @@
-"""ROS2 node for camera image acquisition, AprilTag detection, and perspective transformation."""
+"""ROS2 node for camera image acquisition and perspective transformation."""
 
 import itertools
 import cv2
