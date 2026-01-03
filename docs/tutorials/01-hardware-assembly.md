@@ -83,6 +83,10 @@ We recommend following the tutorial in the same order as it is shown here.
 
 ## The main frame
 
+Start by building the motor mounts. The steppers are fixed onto the motor mount plates. The timing pulleys need to be mounted in opposing direction to fit the two belt circuits. Insert four tee nuts into the beam before tightening the motor mounts onto the back frame beam. Two will serve for the single idler pulleys, and two for the camera truss. Mount each single idler at different heights. Use angle connectors to attach the Y axis beams to the back frame beam. Finally, add the rubber feet.
+
+![1.png](res/imgs/1.png)
+
 Build **(4x)** side connectors:
 
 ![39.png](res/imgs/39.png)
@@ -98,31 +102,72 @@ Build **(4x)** side connectors:
 
 ![40a.png](res/imgs/40a.png)
 
-## Belts
+## Carriage
 
-To ensure that the belts conserve a constant tension for any position of the controller, the inner belt segments must be kept parallel and perpendicular. That is:
+The carriage is built around a Mini-V kit. Two angle connectors facing opposing directions are mounted using angle connectors. The belt attachments consist of a stack of shims and spacers. The peg is held by the clamp that is mounted on the front (longer) carriage beam.
 
-A set of parallel segments L11, L24, L21, L14 perpendicular to another set of parallel segments L12, L22, L23, L13.
+![2.png](res/imgs/2.png)
 
-The gantry is designed to be isostatic and permit calibration of each alignment.
+## Bridge
 
-The following procedure is recommended:
+Slide the carriage onto the bridge beam. On each end of the bridge beam, assemble a cross plate with two idler pulleys that lie on different planes. On the bottom side, attach Mini-V kits.
 
-1. Permanently attach the belts to the controller on the side holding the peg.
+![3.png](res/imgs/3.png)
 
-    picture
+## Bridge and carriage
 
-2. Repeat for each side: wind the belt around the double idler. Adjust the lateral position of the cross plate such that the belt is parallel to the beam below. Tighten the cross plate.
+The final assembly of the bridge with its carriage should look like this:
 
-    picture
+![4.png](res/imgs/4.png)
 
-3. Repeat for each side: straighten the belt all the way to the timing pulley. Adjust the lateral position of the motor holder such that the belt is parallel to the beam below. Tighten the motor holder.
+## Y axis assembly
 
-    picture
-4. Cross both belts from the timing pulley to the idler on the back beam of the frame. Repeat for each side: from there, reach the idler on the opposite side of the cross plates. Adjust the lateral position of the idler on the frame such that the belt is parallel to the beam below. Tighten the idler.
+On the front of the Y axis beams, mount the three following subassemblies. Using two idler mount plates, create the lateral board spacer and the double idler mount, that both have an L-connector carrying a rubber foot. On the bottom of the beam, mount a rubber foot. On only one of the Y axis assemblies, add the dual connector.
 
-    picture
+![5.png](res/imgs/5.png)
 
-5. Pull the belts to the controller and apply tension. Make sure to have similar tension on both belts. Fasten the belts with the brass rings.
+## Full frame
 
-    picture
+Slide two Y axis beam assemblies through the Mini-V kits on the bridge. Tightly connect with the back frame assembly using both interior and exterior angle connectors. Route both belt circuits (Section 6.4) around all pulleys and the timing gears for a fully assembled frame:
+
+![6.png](res/imgs/6.png)
+
+## Relevant assembly offsets
+
+For the main frame, the offsets provided here are meant to guide the construction of the gantry.
+
+### Offset between the cross plate and the bridge beam
+
+The width of the cross plates is 60 mm, so its center line is at 30 mm. The idler pulley is located on the center of the V-slot beam and has diameter 17.5 mm. The thickness of the belts is 1.5 mm, including the teeth. The shift between the idlers therefore needs to be 17.5 + 1.5 = 19 mm. This yields an offset between the cross plate and the end of the bridge beam of 30 − 19 = 11 mm.
+
+![7.png](res/imgs/7.png)
+
+### Offset between the stepper motor and the back frame beam
+
+The stepper motor has width 42.22 mm. Its shaft should be aligned with the beam axis at 20 mm. The offset needs to be −1.11 mm.
+
+![8.png](res/imgs/8.png)
+
+### Offset between the back frame beam and the Y axis beam
+
+The alignment of the stepper shaft and the idler pulley is at 20 + 10 = 30 mm. The idler pulley has radius 8.75 mm and the timing gear has radius 6.16 mm. The needed offset is 2.65 mm. Include an additional 1 mm accounting for the thickness of the belt. The total offset is 30 + 2.65 + 1 = 33.65 mm.
+
+![9.png](res/imgs/9.png)
+
+### Offset of the back frame idler pulley and the frame
+
+The idler pulley that sits on the back frame needs to be aligned with the idler pulley on the cross plate of the bridge. The offset is 9 mm to the inner of the gantry.
+
+![10.png](res/imgs/10.png)
+
+## Belt tensioning procedure
+
+The frame of the gantry provides the necessary degrees of freedom that allow the fine tuning of the belt alignments. The following procedure is recommended for installing the belts.
+
+1. Move the double idler mounts about 5 mm inwards, towards the bridge. This will later allow for further tightening of the belts.
+2. Permanently attach the belts to the attachments on the front of the carriage which carries the peg clamp.
+3. Repeat for both sides: wind the belt around the double idler mount. Adjust the lateral position of the cross plate such that the belt is parallel to the beam below. Tighten the cross plate on the bridge.
+4. Repeat for both sides: straighten the belt all the way to the timing gear. Adjust the lateral position of the motor mount such that the belt is parallel to the Y axis beam below. Tighten the motor mount.
+5. Cross both belts from the timing gears to the single idler on the back beam of the frame. Repeat for both sides: from there, reach the pulley on the opposite side of the cross plates. Adjust the lateral position of the single idler on the back beam such that the belt is parallel to the Y axis beam below. Tighten the single idler.
+6. Pull the belts towards the carriage and apply tension. Make sure to have similar tension on both belts. Fasten the belts with the brass rings.
+7. If more tension is required, loosen the mount plate of the double idler, pull away from the bridge, and tighten again.
