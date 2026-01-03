@@ -17,6 +17,8 @@
 #include <memory>
 #include <atomic>
 
+using namespace klask_motor_commander;
+
 /**
  * @brief Main function for klask_motor_commander_pkg.
  *

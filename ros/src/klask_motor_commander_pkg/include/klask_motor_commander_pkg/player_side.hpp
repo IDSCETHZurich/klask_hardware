@@ -4,6 +4,8 @@
 #include <string>
 #include <stdexcept>
 
+namespace klask_motor_commander {
+
 /**
  * @brief Enum to identify which side(s) of the table are active.
  * 
@@ -115,5 +117,7 @@ inline std::string get_player_name(PlayerSide side)
             return "unknown_player";
     }
 }
+
+}  // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__PLAYER_SIDE_HPP_

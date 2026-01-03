@@ -21,6 +21,7 @@
         "source=klask_ros_hardware_sdk_log,target=/opt/ros/klask_ws/log,type=volume",
         "source=${localWorkspaceFolder}/ros/.vscode,target=/opt/ros/klask_ws/.vscode,type=bind"
     ],
+    "initializeCommand": "xhost +local:root",
     "customizations": {
         "vscode": {
             "extensions": [

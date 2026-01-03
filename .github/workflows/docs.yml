@@ -1,0 +1,82 @@
+name: docs
+
+on:
+  pull_request:
+    branches: [main] # build docs on PRs into main (no deploy)
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main] # deploy on merge to main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          pip install mkdocs mkdocs-material mkdocs-glightbox
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz rsync
+
+      - name: Prepare Doxygen output dir
+        run: mkdir -p docs/reference/api/doxygen
+
+      - name: Build Doxygen
+        run: doxygen docs/Doxyfile
+
+      - name: Build MkDocs
+        run: mkdocs build --strict -f docs/mkdocs.yml
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-build
+          path: ./site
+          if-no-files-found: error
+
+  deploy_docs:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: build_docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write # required by deploy-pages
+      id-token: write # required by deploy-pages
+      contents: read
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Download built site
+        uses: actions/download-artifact@v4
+        with:
+          name: site-build
+          path: ./site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "./site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

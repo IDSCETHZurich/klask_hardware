@@ -12,6 +12,8 @@
 #include <map>
 #include <string>
 
+namespace klask_motor_commander {
+
 /**
  * @brief Main controller node for managing ODrive motors and player pegs.
  *
@@ -115,5 +117,7 @@ private:
     void player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg, 
                                   const std::string& player_name);
 };
+
+}  // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_

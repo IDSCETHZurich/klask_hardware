@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <vector>
 
+namespace klask_motor_commander {
+
 /**
  * @brief ODrive motor control mode constants.
  */
@@ -218,5 +220,7 @@ private:
      */
     void set_motor_state(int state);
 };
+
+}  // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__PLAYER_HPP_

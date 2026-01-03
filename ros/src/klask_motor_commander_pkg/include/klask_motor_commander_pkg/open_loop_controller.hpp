@@ -10,6 +10,8 @@
 #include <atomic>
 #include <mutex>
 
+namespace klask_motor_commander {
+
 // Forward declaration
 class Player;
 
@@ -160,5 +162,7 @@ private:
         const geometry_msgs::msg::Point &current_pos,
         const geometry_msgs::msg::Point &goal_pos);
 };
+
+}  // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__OPEN_LOOP_CONTROLLER_HPP_

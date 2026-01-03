@@ -469,6 +469,14 @@ class CameraNode(Node):
         self,
         channel: np.ndarray,
     ) -> np.ndarray:
+        """Fit lines to border segments using flood fill and edge detection.
+
+        Args:
+            channel: Single channel image (typically V channel from HSV).
+
+        Returns:
+            4x4 array of corner points in (x, y) format for perspective transform.
+        """
 
         # Lists to store results
         boarder_segment_flood_masks = []
@@ -670,7 +678,15 @@ class CameraNode(Node):
     def _compute_seed_line_samples(
         self, seed_lines: list[np.ndarray], line_sample_count: int
     ) -> list[list[np.ndarray]]:
-        """Compute sample points along each seed line for flood fill seeding."""
+        """Compute sample points along each seed line for flood fill seeding.
+
+        Args:
+            seed_lines: List of seed line endpoints for each segment.
+            line_sample_count: Number of sample points per line.
+
+        Returns:
+            List of sample point lists, one per segment.
+        """
 
         line_samples = []
         for seed_line in seed_lines:
@@ -696,6 +712,20 @@ class CameraNode(Node):
         list[np.ndarray],
         tuple[int, int, int, int],
     ]:
+        """Compute masks for each border segment of the game board.
+
+        Args:
+            rotated_rect: Detected rotated rectangle representing the board.
+            shape: Image shape (height, width).
+
+        Returns:
+            Tuple containing:
+                - List of border segment masks
+                - List of seed lines for each segment
+                - Rotation matrix
+                - List of segment offsets
+                - Segment lengths tuple (top, right, bottom, left)
+        """
         # Create boarder masks
         corner_pts, rect_width, rect_height, rotation_matrix = (
             self._corners_from_rotated_rect(rotated_rect)
@@ -843,7 +873,15 @@ class CameraNode(Node):
     def _find_rotated_rect_from_flood_mask(
         self, flood_mask: np.ndarray, rect: cv2.typing.Rect
     ) -> cv2.RotatedRect:
-        """Find rotated rectangle from flood fill mask."""
+        """Find rotated rectangle from flood fill mask.
+
+        Args:
+            flood_mask: Binary mask from flood fill operation.
+            rect: Bounding rectangle from flood fill.
+
+        Returns:
+            Minimum area rotated rectangle fitting the mask.
+        """
 
         # Get all points where flood_mask is non-zero
         points = cv2.findNonZero(flood_mask)
@@ -861,7 +899,18 @@ class CameraNode(Node):
     def _corners_from_rotated_rect(
         self, rotated_rect: cv2.RotatedRect
     ) -> tuple[np.ndarray, float, float, np.ndarray]:
-        """Get corner points from rotated rectangle."""
+        """Extract corner points and parameters from rotated rectangle.
+
+        Args:
+            rotated_rect: OpenCV rotated rectangle object.
+
+        Returns:
+            Tuple containing:
+                - Corner points as 2x4 array (x, y rows)
+                - Rectangle width
+                - Rectangle height
+                - 2x2 rotation matrix
+        """
         # rotated_rect format: ((center_x, center_y), (width, height), angle)
         center, (rect_width, rect_height), angle = rotated_rect
 

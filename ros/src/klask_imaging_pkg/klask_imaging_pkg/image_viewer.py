@@ -194,6 +194,15 @@ class ImageViewer(Node):
     def _color_param(
         self, name: str, default_value: tuple[int, int, int]
     ) -> tuple[int, int, int]:
+        """Parse color parameter from ROS parameter.
+
+        Args:
+            name: Parameter name.
+            default_value: Default RGB color tuple.
+
+        Returns:
+            RGB color tuple (B, G, R) for OpenCV.
+        """
         value = self.get_parameter(name).value
         try:
             values = [int(v) for v in value]
@@ -247,7 +256,7 @@ class ImageViewer(Node):
 
     def _overlay_state(self, frame: np.ndarray, state: State) -> None:
         """Draw ball/pegs velocity arrows and goals on the frame.
-        
+
         State is received in engineering units (meters, m/s) and converted
         back to pixel coordinates for visualization overlay.
         """
@@ -347,6 +356,16 @@ class ImageViewer(Node):
         arrow_color: tuple[int, int, int],
         velocity_scale: float,
     ) -> None:
+        """Draw object as a dot with velocity arrow overlay.
+
+        Args:
+            frame: Image frame to draw on.
+            position: Object position in pixels (x, y).
+            velocity: Object velocity in pixels/second (vx, vy).
+            dot_color: BGR color for object dot.
+            arrow_color: BGR color for velocity arrow.
+            velocity_scale: Scale factor for velocity arrow length.
+        """
         pos_int = (int(position[0]), int(position[1]))
         cv2.circle(frame, pos_int, self.overlay_dot_radius, dot_color, -1)
 

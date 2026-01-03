@@ -6,6 +6,8 @@
 
 using namespace std::placeholders;
 
+namespace klask_motor_commander {
+
 OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     : Node("open_loop_controller_" + std::string(player->get_side() == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player")),
       player_(player),
@@ -394,3 +396,5 @@ geometry_msgs::msg::Point OpenLoopController::move_step_feedback_loop(
 
     return new_pos;
 }
+
+}  // namespace klask_motor_commander
