@@ -15,6 +15,10 @@
     homing_velocity: 0.01 # Velocity for homing (m/s)
     position_tolerance: 0.03 # Goal position tolerance for completion (meters)
 
+    # === Movement Validation Parameters ===
+    movement_validation_duration: 2.0 # Time to wait before checking peg movement (seconds)
+    movement_threshold: 0.01 # Minimum distance peg must move to be considered moving (meters)
+
     # === Control Loop Parameters ===
     control_frequency: 10.0 # Control loop frequency (Hz)
 

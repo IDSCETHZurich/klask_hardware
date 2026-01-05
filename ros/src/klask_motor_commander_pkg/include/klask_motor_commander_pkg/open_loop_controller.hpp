@@ -82,6 +82,12 @@ namespace klask_motor_commander
         /// Timeout values
         double initial_state_timeout_;
 
+        /// Movement validation
+        rclcpp::TimerBase::SharedPtr validation_timer_;
+        geometry_msgs::msg::Point validation_start_position_;
+        geometry_msgs::msg::Point validation_expected_position_;
+        bool validation_active_;
+
         /// Goal state
         geometry_msgs::msg::Point target_goal_;
         std::shared_ptr<GoalHandleHomePeg> active_goal_handle_;
@@ -140,6 +146,18 @@ namespace klask_motor_commander
          * @brief Control loop callback - sends velocity commands toward goal.
          */
         void control_loop_callback();
+
+        /**
+         * @brief Validation callback - checks if peg moved as expected.
+         */
+        void movement_validation_callback();
+
+        /**
+         * @brief Start movement validation timer.
+         *
+         * @param start_pos Current position when validation starts
+         */
+        void start_movement_validation(const geometry_msgs::msg::Point& start_pos);
     };
 
 } // namespace klask_motor_commander

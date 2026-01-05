@@ -22,6 +22,10 @@ namespace klask_motor_commander
         this->declare_parameter("homing_velocity", 0.01);
         this->declare_parameter("position_tolerance", 0.03);
 
+        // Movement validation parameters
+        this->declare_parameter("movement_validation_duration", 2.0);
+        this->declare_parameter("movement_threshold", 0.01);
+
         // Control loop parameters
         this->declare_parameter("control_frequency", 10.0);
 
@@ -31,8 +35,11 @@ namespace klask_motor_commander
         // Load parameters
         homing_velocity_ = static_cast<float>(this->get_parameter("homing_velocity").as_double());
         position_tolerance_ = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+        validation_duration_ = static_cast<float>(this->get_parameter("movement_validation_duration").as_double());
+        movement_threshold_ = static_cast<float>(this->get_parameter("movement_threshold").as_double());
         control_frequency_ = this->get_parameter("control_frequency").as_double();
         initial_state_timeout_ = this->get_parameter("initial_state_timeout").as_double();
+        validation_active_ = false;
 
         // Set default home position based on player
         if (player_->get_side() == PlayerSide::RIGHT_PLAYER)
@@ -53,6 +60,8 @@ namespace klask_motor_commander
 
         RCLCPP_INFO(this->get_logger(), "Loaded parameters: homing_vel=%.3f, pos_tol=%.3f, control_freq=%.1f Hz",
                     homing_velocity_, position_tolerance_, control_frequency_);
+        RCLCPP_INFO(this->get_logger(), "Movement validation: duration=%.1fs, threshold=%.4fm",
+                    validation_duration_, movement_threshold_);
 
         // Subscribe to board state
         this->declare_parameter("board_state_topic", "/board_state");
@@ -135,6 +144,13 @@ namespace klask_motor_commander
         // Set goal and activate homing
         target_goal_ = target_home;
         active_goal_handle_ = goal_handle;
+
+        // Start movement validation if state is available
+        if (latest_state_)
+        {
+            geometry_msgs::msg::Point current_pos = get_current_peg_position();
+            start_movement_validation(current_pos);
+        }
 
         RCLCPP_INFO(this->get_logger(), "%s: Homing activated, control loop will handle movement", player_name_.c_str());
     }
@@ -243,14 +259,93 @@ namespace klask_motor_commander
         // Send velocity command
         player_->send_commands(v_x, v_y);
 
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                             "%s: Moving toward goal, distance: %.3f m, velocity: [%.3f, %.3f] m/s",
-                             player_name_.c_str(), distance, v_x, v_y);
-
         // Publish feedback
         auto feedback = std::make_shared<HomePeg::Feedback>();
         feedback->current_position = current_pos;
         feedback->distance_remaining = distance;
         active_goal_handle_->publish_feedback(feedback);
+    }
+
+    void OpenLoopController::start_movement_validation(const geometry_msgs::msg::Point &start_pos)
+    {
+        // Store starting position
+        validation_start_position_ = start_pos;
+
+        RCLCPP_INFO(this->get_logger(),
+                    "%s: Movement validation started from [%.3f, %.3f]. Will check if peg moved after %.1f seconds.",
+                    player_name_.c_str(), start_pos.x, start_pos.y, validation_duration_);
+
+        // Cancel existing timer if any
+        if (validation_timer_)
+        {
+            validation_timer_->cancel();
+        }
+
+        // Create one-shot timer for validation
+        validation_active_ = true;
+        validation_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(static_cast<int>(validation_duration_ * 1000)),
+            std::bind(&OpenLoopController::movement_validation_callback, this));
+    }
+
+    void OpenLoopController::movement_validation_callback()
+    {
+        // Cancel timer (one-shot)
+        if (validation_timer_)
+        {
+            validation_timer_->cancel();
+            validation_timer_.reset();
+        }
+
+        if (!validation_active_ || !active_goal_handle_)
+        {
+            return;
+        }
+
+        validation_active_ = false;
+
+        // Get current position
+        if (!latest_state_)
+        {
+            RCLCPP_WARN(this->get_logger(), "%s: No state available for movement validation", player_name_.c_str());
+            return;
+        }
+
+        geometry_msgs::msg::Point current_pos = get_current_peg_position();
+
+        // Calculate distance moved from start
+        float dx = current_pos.x - validation_start_position_.x;
+        float dy = current_pos.y - validation_start_position_.y;
+        float distance_moved = std::sqrt(dx * dx + dy * dy);
+
+        RCLCPP_INFO(this->get_logger(),
+                    "%s: Movement validation: peg moved %.4f m from start position (threshold: %.4f m)",
+                    player_name_.c_str(), distance_moved, movement_threshold_);
+
+        if (distance_moved < movement_threshold_)
+        {
+            // Peg didn't move enough
+            RCLCPP_ERROR(this->get_logger(),
+                         "%s: Peg not moving! Moved only %.4f m < threshold %.4f m after %.1f seconds. "
+                         "Possible desynchronization between magnetic and physical peg.",
+                         player_name_.c_str(), distance_moved, movement_threshold_, validation_duration_);
+
+            // Stop motors
+            player_->send_commands(0.0f, 0.0f);
+
+            // Abort action
+            auto result = std::make_shared<HomePeg::Result>();
+            result->success = false;
+            result->message = "Peg not moving - possible desynchronization";
+            result->final_position = current_pos;
+            active_goal_handle_->abort(result);
+            active_goal_handle_.reset();
+        }
+        else
+        {
+            RCLCPP_INFO(this->get_logger(),
+                        "%s: Movement validation passed! Peg is moving correctly.",
+                        player_name_.c_str());
+        }
     }
 } // namespace klask_motor_commander
