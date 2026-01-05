@@ -19,6 +19,3 @@
     # === Timing Configuration (milliseconds) ===
     startup_delay: 1000               # Initial delay after executor starts
     inter_homing_delay: 500           # Delay between consecutive homing operations
-    
-    # === Service Names ===
-    calibrate_encoders_service: "calibrate_encoders"  # Calibration service name

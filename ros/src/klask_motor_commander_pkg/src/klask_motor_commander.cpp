@@ -66,7 +66,6 @@ int main(int argc, char *argv[])
     controller_node->declare_parameter("calibration_service_timeout", 5);
     controller_node->declare_parameter("startup_delay", 1000);
     controller_node->declare_parameter("inter_homing_delay", 500);
-    controller_node->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
 
     std::string right_action_name = controller_node->get_parameter("right_player_action_name").as_string();
     std::string left_action_name = controller_node->get_parameter("left_player_action_name").as_string();
@@ -93,7 +92,7 @@ int main(int argc, char *argv[])
 
     // Build list of active players based on configuration
     std::vector<PlayerData> active_players;
-    
+
     // Build list of active players from controller node
     const auto& all_players = controller_node->get_all_players();
     for (const auto& [player_name, player_node] : all_players)
@@ -108,7 +107,7 @@ int main(int argc, char *argv[])
         active_players.push_back(player_data);
     }
 
-    RCLCPP_INFO(controller_node->get_logger(), 
+    RCLCPP_INFO(controller_node->get_logger(),
                 "Player configuration: %s (%zu player(s) active)",
                 player_side_to_string(player_config).c_str(), active_players.size());
 
@@ -149,11 +148,11 @@ int main(int argc, char *argv[])
     {
         player_data.homing_client = rclcpp_action::create_client<HomePeg>(
             controller_node, player_data.action_name);
-        
+
         if (!player_data.homing_client->wait_for_action_server(std::chrono::seconds(action_wait_timeout)))
         {
-            RCLCPP_ERROR(controller_node->get_logger(), "%s homing action server not available", 
-                        player_data.name.c_str());
+            RCLCPP_ERROR(controller_node->get_logger(), "%s homing action server not available",
+                         player_data.name.c_str());
             rclcpp::shutdown();
             spin_thread.join();
             return 1;
@@ -168,9 +167,9 @@ int main(int argc, char *argv[])
         for (size_t i = 0; i < active_players.size(); i++)
         {
             auto& player_data = active_players[i];
-            
+
             RCLCPP_INFO(controller_node->get_logger(), "Sending homing goal for %s...", player_data.name.c_str());
-            
+
             auto goal = HomePeg::Goal();
             goal.home_position.x = 0.0; // Use default
             goal.home_position.y = 0.0;
@@ -181,8 +180,8 @@ int main(int argc, char *argv[])
             // Wait for goal to be accepted (executor is already spinning in separate thread)
             if (goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) != std::future_status::ready)
             {
-                RCLCPP_ERROR(controller_node->get_logger(), "Failed to send %s homing goal - timeout", 
-                            player_data.name.c_str());
+                RCLCPP_ERROR(controller_node->get_logger(), "Failed to send %s homing goal - timeout",
+                             player_data.name.c_str());
                 homing_success = false;
             }
             else
@@ -190,8 +189,8 @@ int main(int argc, char *argv[])
                 auto goal_handle = goal_handle_future.get();
                 if (!goal_handle)
                 {
-                    RCLCPP_ERROR(controller_node->get_logger(), "%s homing goal was rejected", 
-                                player_data.name.c_str());
+                    RCLCPP_ERROR(controller_node->get_logger(), "%s homing goal was rejected",
+                                 player_data.name.c_str());
                     homing_success = false;
                 }
                 else
@@ -200,8 +199,8 @@ int main(int argc, char *argv[])
                     auto result_future = player_data.homing_client->async_get_result(goal_handle);
                     if (result_future.wait_for(std::chrono::seconds(homing_timeout)) != std::future_status::ready)
                     {
-                        RCLCPP_ERROR(controller_node->get_logger(), "%s homing action timed out", 
-                                    player_data.name.c_str());
+                        RCLCPP_ERROR(controller_node->get_logger(), "%s homing action timed out",
+                                     player_data.name.c_str());
                         homing_success = false;
                     }
                     else
@@ -213,13 +212,13 @@ int main(int argc, char *argv[])
                             RCLCPP_INFO(controller_node->get_logger(),
                                         "%s peg homed at [%.3f, %.3f]",
                                         player_data.name.c_str(),
-                                        player_data.final_position.x, 
+                                        player_data.final_position.x,
                                         player_data.final_position.y);
                         }
                         else
                         {
                             RCLCPP_ERROR(controller_node->get_logger(),
-                                         "%s homing failed: %s", 
+                                         "%s homing failed: %s",
                                          player_data.name.c_str(),
                                          result.result->message.c_str());
                             homing_success = false;
