@@ -9,6 +9,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from klask_interfaces.msg import State
+from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 import cv2
 import time
@@ -31,6 +32,16 @@ class ImageViewer(Node):
         # Enable/disable state overlay (default: true)
         self.declare_parameter("show_state_overlay", True)
         self.show_state_overlay = bool(self.get_parameter("show_state_overlay").value)
+
+        # Enable/disable cmd_vel overlay (default: false)
+        self.declare_parameter("show_cmd_vel_overlay", False)
+        self.show_cmd_vel_overlay = bool(self.get_parameter("show_cmd_vel_overlay").value)
+
+        self.declare_parameter("cmd_vel_left_player_topic", "cmd_vel/left_player")
+        self.cmd_vel_left_player_topic = str(self.get_parameter("cmd_vel_left_player_topic").value)
+
+        self.declare_parameter("cmd_vel_right_player_topic", "cmd_vel/right_player")
+        self.cmd_vel_right_player_topic = str(self.get_parameter("cmd_vel_right_player_topic").value)
 
         # =============================
         # EU to Pixel Conversion Parameters
@@ -119,6 +130,35 @@ class ImageViewer(Node):
             self.get_parameter("overlay_ball_velocity_scale").value
         )
 
+        # Cmd_vel overlay appearance
+        self.declare_parameter("overlay_cmd_vel_left_arrow_color", [255, 100, 255])
+        self.overlay_cmd_vel_left_arrow_color = self._color_param(
+            "overlay_cmd_vel_left_arrow_color", (255, 100, 255)
+        )
+        self.declare_parameter("overlay_cmd_vel_left_velocity_scale", 0.5)
+        self.overlay_cmd_vel_left_velocity_scale = float(
+            self.get_parameter("overlay_cmd_vel_left_velocity_scale").value
+        )
+
+        self.declare_parameter("overlay_cmd_vel_right_arrow_color", [255, 255, 100])
+        self.overlay_cmd_vel_right_arrow_color = self._color_param(
+            "overlay_cmd_vel_right_arrow_color", (255, 255, 100)
+        )
+        self.declare_parameter("overlay_cmd_vel_right_velocity_scale", 0.5)
+        self.overlay_cmd_vel_right_velocity_scale = float(
+            self.get_parameter("overlay_cmd_vel_right_velocity_scale").value
+        )
+
+        self.declare_parameter("overlay_cmd_vel_arrow_thickness", 3)
+        self.overlay_cmd_vel_arrow_thickness = int(
+            self.get_parameter("overlay_cmd_vel_arrow_thickness").value
+        )
+
+        self.declare_parameter("overlay_cmd_vel_arrow_tip_length", 0.3)
+        self.overlay_cmd_vel_arrow_tip_length = float(
+            self.get_parameter("overlay_cmd_vel_arrow_tip_length").value
+        )
+
         # CV Bridge for image conversion
         self.bridge = CvBridge()
 
@@ -134,10 +174,24 @@ class ImageViewer(Node):
 
         self.latest_state: State | None = None
 
-        self.get_logger().info(
-            "Image viewer node started. "
+        # Subscribe to cmd_vel topics
+        self.cmd_vel_left_subscription = self.create_subscription(
+            Twist, self.cmd_vel_left_player_topic, self.cmd_vel_left_callback, 10
+        )
+        self.cmd_vel_right_subscription = self.create_subscription(
+            Twist, self.cmd_vel_right_player_topic, self.cmd_vel_right_callback, 10
+        )
+
+        self.latest_cmd_vel_left: Twist | None = None
+        self.latest_cmd_vel_right: Twist | None = None
+
+        info_msg = (
+            f"Image viewer node started. "
             f"Subscribing to '{self.board_image_topic}' and '{self.board_state_topic}'"
         )
+        if self.show_cmd_vel_overlay:
+            info_msg += f", '{self.cmd_vel_left_player_topic}', '{self.cmd_vel_right_player_topic}'"
+        self.get_logger().info(info_msg)
 
         # Window name
         self.window_name = "Board Image Stream"
@@ -166,6 +220,10 @@ class ImageViewer(Node):
             # Overlay latest estimated state (if enabled + available)
             if self.show_state_overlay and self.latest_state is not None:
                 self._overlay_state(cv_image, self.latest_state)
+
+            # Overlay cmd_vel vectors (if enabled + available)
+            if self.show_cmd_vel_overlay and self.latest_state is not None:
+                self._overlay_cmd_vel(cv_image, self.latest_state)
 
             # Update FPS counter
             self._update_fps()
@@ -223,6 +281,14 @@ class ImageViewer(Node):
     def state_callback(self, msg: State) -> None:
         """Store latest state for overlay."""
         self.latest_state = msg
+
+    def cmd_vel_left_callback(self, msg: Twist) -> None:
+        """Store latest left player cmd_vel for overlay."""
+        self.latest_cmd_vel_left = msg
+
+    def cmd_vel_right_callback(self, msg: Twist) -> None:
+        """Store latest right player cmd_vel for overlay."""
+        self.latest_cmd_vel_right = msg
 
     def _get_meter_to_pixel_x(self) -> float:
         """Get current meter-to-pixel conversion factor for X axis."""
@@ -381,6 +447,64 @@ class ImageViewer(Node):
             self.overlay_arrow_thickness,
             tipLength=self.overlay_arrow_tip_length,
         )
+
+    def _overlay_cmd_vel(
+        self, frame: np.ndarray, state: State
+    ) -> None:
+        """Draw cmd_vel command vectors for left and right players.
+
+        Command velocities are in m/s and are converted to pixel coordinates
+        for visualization. Arrows start from the respective peg positions.
+        """
+        # Draw left player cmd_vel
+        if self.latest_cmd_vel_left is not None:
+            left_peg_pos_px = self._convert_position_to_pixels(
+                state.left_peg.position.x, state.left_peg.position.y
+            )
+            # cmd_vel.linear.x and .y are in m/s
+            left_cmd_vel_px = self._convert_velocity_to_pixels(
+                self.latest_cmd_vel_left.linear.x,
+                self.latest_cmd_vel_left.linear.y,
+            )
+
+            pos_int = (int(left_peg_pos_px[0]), int(left_peg_pos_px[1]))
+            end_point = (
+                int(left_peg_pos_px[0] + left_cmd_vel_px[0] * self.overlay_cmd_vel_left_velocity_scale),
+                int(left_peg_pos_px[1] + left_cmd_vel_px[1] * self.overlay_cmd_vel_left_velocity_scale),
+            )
+            cv2.arrowedLine(
+                frame,
+                pos_int,
+                end_point,
+                self.overlay_cmd_vel_left_arrow_color,
+                self.overlay_cmd_vel_arrow_thickness,
+                tipLength=self.overlay_cmd_vel_arrow_tip_length,
+            )
+
+        # Draw right player cmd_vel
+        if self.latest_cmd_vel_right is not None:
+            right_peg_pos_px = self._convert_position_to_pixels(
+                state.right_peg.position.x, state.right_peg.position.y
+            )
+            # cmd_vel.linear.x and .y are in m/s
+            right_cmd_vel_px = self._convert_velocity_to_pixels(
+                self.latest_cmd_vel_right.linear.x,
+                self.latest_cmd_vel_right.linear.y,
+            )
+
+            pos_int = (int(right_peg_pos_px[0]), int(right_peg_pos_px[1]))
+            end_point = (
+                int(right_peg_pos_px[0] + right_cmd_vel_px[0] * self.overlay_cmd_vel_right_velocity_scale),
+                int(right_peg_pos_px[1] + right_cmd_vel_px[1] * self.overlay_cmd_vel_right_velocity_scale),
+            )
+            cv2.arrowedLine(
+                frame,
+                pos_int,
+                end_point,
+                self.overlay_cmd_vel_right_arrow_color,
+                self.overlay_cmd_vel_arrow_thickness,
+                tipLength=self.overlay_cmd_vel_arrow_tip_length,
+            )
 
     def _update_fps(self) -> None:
         """Update FPS calculation."""
