@@ -92,6 +92,10 @@ namespace klask_motor_commander
         geometry_msgs::msg::Point target_goal_;
         std::shared_ptr<GoalHandleHomePeg> active_goal_handle_;
 
+        /// State waiting tracking
+        rclcpp::Time goal_accepted_time_;
+        std::atomic<bool> waiting_for_initial_state_;
+
         /**
          * @brief Handle new goal request.
          */

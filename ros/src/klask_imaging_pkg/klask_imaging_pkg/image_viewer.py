@@ -9,6 +9,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from klask_interfaces.msg import State
+from klask_interfaces_py import BoardState
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 import cv2
@@ -36,6 +37,10 @@ class ImageViewer(Node):
         # Enable/disable cmd_vel overlay (default: false)
         self.declare_parameter("show_cmd_vel_overlay", False)
         self.show_cmd_vel_overlay = bool(self.get_parameter("show_cmd_vel_overlay").value)
+
+        # Enable/disable status overlay (default: true)
+        self.declare_parameter("show_status_overlay", True)
+        self.show_status_overlay = bool(self.get_parameter("show_status_overlay").value)
 
         self.declare_parameter("cmd_vel_left_player_topic", "cmd_vel/left_player")
         self.cmd_vel_left_player_topic = str(self.get_parameter("cmd_vel_left_player_topic").value)
@@ -159,6 +164,27 @@ class ImageViewer(Node):
             self.get_parameter("overlay_cmd_vel_arrow_tip_length").value
         )
 
+        # Status overlay appearance
+        self.declare_parameter("overlay_status_font_scale", 0.7)
+        self.overlay_status_font_scale = float(
+            self.get_parameter("overlay_status_font_scale").value
+        )
+
+        self.declare_parameter("overlay_status_font_thickness", 2)
+        self.overlay_status_font_thickness = int(
+            self.get_parameter("overlay_status_font_thickness").value
+        )
+
+        self.declare_parameter("overlay_status_text_color", [0, 255, 255])
+        self.overlay_status_text_color = self._color_param(
+            "overlay_status_text_color", (0, 255, 255)
+        )
+
+        self.declare_parameter("overlay_status_margin", 10)
+        self.overlay_status_margin = int(
+            self.get_parameter("overlay_status_margin").value
+        )
+
         # CV Bridge for image conversion
         self.bridge = CvBridge()
 
@@ -224,6 +250,10 @@ class ImageViewer(Node):
             # Overlay cmd_vel vectors (if enabled + available)
             if self.show_cmd_vel_overlay and self.latest_state is not None:
                 self._overlay_cmd_vel(cv_image, self.latest_state)
+
+            # Overlay status flags (if enabled + available)
+            if self.show_status_overlay and self.latest_state is not None:
+                self._overlay_status(cv_image, self.latest_state)
 
             # Update FPS counter
             self._update_fps()
@@ -504,6 +534,89 @@ class ImageViewer(Node):
                 self.overlay_cmd_vel_right_arrow_color,
                 self.overlay_cmd_vel_arrow_thickness,
                 tipLength=self.overlay_cmd_vel_arrow_tip_length,
+            )
+
+    def _overlay_status(self, frame: np.ndarray, state: State) -> None:
+        """Draw status flags on the frame.
+
+        Status flags are displayed at the bottom of the frame:
+        - READY/UNKNOWN: centered at bottom
+        - Left player flags (ball/peg in left goal): bottom left corner
+        - Right player flags (ball/peg in right goal): bottom right corner
+        
+        Only active flags are displayed.
+        """
+        status_value = state.status.data
+        frame_height, frame_width = frame.shape[:2]
+        margin = self.overlay_status_margin
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = self.overlay_status_font_scale
+        thickness = self.overlay_status_font_thickness
+        color = self.overlay_status_text_color
+
+        # Calculate vertical position (bottom of frame, accounting for margin)
+        y_pos = frame_height - margin
+
+        # Center status (READY or UNKNOWN)
+        if status_value == BoardState.UNKNOWN:
+            center_text = "UNKNOWN"
+        elif status_value & BoardState.READY:
+            center_text = "READY"
+        else:
+            center_text = None
+
+        if center_text:
+            text_size = cv2.getTextSize(center_text, font, font_scale, thickness)[0]
+            x_pos = (frame_width - text_size[0]) // 2
+            cv2.putText(
+                frame,
+                center_text,
+                (x_pos, y_pos),
+                font,
+                font_scale,
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+
+        # Left player status (bottom left corner)
+        left_texts = []
+        if status_value & BoardState.BALL_IN_LEFT_GOAL:
+            left_texts.append("Ball in left goal")
+        if status_value & BoardState.PEG_IN_LEFT_GOAL:
+            left_texts.append("Peg in left goal")
+
+        for i, text in enumerate(left_texts):
+            cv2.putText(
+                frame,
+                text,
+                (margin, y_pos - i * 30),
+                font,
+                font_scale,
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+
+        # Right player status (bottom right corner)
+        right_texts = []
+        if status_value & BoardState.BALL_IN_RIGHT_GOAL:
+            right_texts.append("Ball in right goal")
+        if status_value & BoardState.PEG_IN_RIGHT_GOAL:
+            right_texts.append("Peg in right goal")
+
+        for i, text in enumerate(right_texts):
+            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+            x_pos = frame_width - text_size[0] - margin
+            cv2.putText(
+                frame,
+                text,
+                (x_pos, y_pos - i * 30),
+                font,
+                font_scale,
+                color,
+                thickness,
+                cv2.LINE_AA,
             )
 
     def _update_fps(self) -> None:

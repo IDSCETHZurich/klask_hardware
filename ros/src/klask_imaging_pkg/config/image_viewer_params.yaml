@@ -11,6 +11,9 @@ image_viewer:
     cmd_vel_left_player_topic: /cmd_vel/left_player
     cmd_vel_right_player_topic: /cmd_vel/right_player
 
+    # Toggle overlay of status flags on the image
+    show_status_overlay: true
+
     # ============================================
     # EU to Pixel Conversion Parameters
     # ============================================
@@ -58,3 +61,9 @@ image_viewer:
     overlay_cmd_vel_right_velocity_scale: 0.5
     overlay_cmd_vel_arrow_thickness: 3
     overlay_cmd_vel_arrow_tip_length: 0.2
+
+    # Status overlay
+    overlay_status_font_scale: 0.7
+    overlay_status_font_thickness: 2
+    overlay_status_text_color: [0, 255, 255]
+    overlay_status_margin: 10  # Distance from edge in pixels

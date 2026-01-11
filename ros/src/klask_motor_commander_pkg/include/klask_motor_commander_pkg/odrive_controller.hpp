@@ -2,15 +2,20 @@
 #define KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <klask_interfaces/msg/state.hpp>
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
+#include <klask_interfaces/srv/get_calibration_status.hpp>
+#include <klask_interfaces/srv/home_and_calibrate.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
+#include <klask_interfaces/action/home_peg.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
 #include "klask_motor_commander_pkg/player_side.hpp"
 #include <memory>
 #include <map>
 #include <string>
+#include <atomic>
 
 namespace klask_motor_commander {
 
@@ -60,6 +65,47 @@ public:
         players_.clear();
     }
 
+    /**
+     * @brief Enable or disable external cmd_vel commands.
+     *
+     * When disabled, cmd_vel commands from external sources will be ignored.
+     * Useful during startup sequences like homing and calibration.
+     *
+     * @param enabled True to accept cmd_vel commands, false to ignore them.
+     */
+    void set_external_commands_enabled(bool enabled)
+    {
+        external_commands_enabled_.store(enabled);
+        if (enabled)
+        {
+            RCLCPP_INFO(this->get_logger(), "External cmd_vel commands enabled");
+        }
+        else
+        {
+            RCLCPP_INFO(this->get_logger(), "External cmd_vel commands disabled");
+        }
+    }
+
+    /**
+     * @brief Get external commands enabled status.
+     *
+     * @return true if external commands are enabled, false otherwise.
+     */
+    bool get_external_commands_enabled() const
+    {
+        return external_commands_enabled_.load();
+    }
+
+    /**
+     * @brief Get system calibration status.
+     *
+     * @return true if system has been calibrated, false otherwise.
+     */
+    bool is_calibrated() const
+    {
+        return is_calibrated_.load();
+    }
+
 private:
     /// Map of active player nodes (key: "right_player" or "left_player")
     std::map<std::string, Player::SharedPtr> players_;
@@ -76,11 +122,38 @@ private:
     /// Service server for motor state changes
     rclcpp::Service<klask_interfaces::srv::SetMotorState>::SharedPtr set_motor_state_service_;
 
+    /// Service server for calibration status query
+    rclcpp::Service<klask_interfaces::srv::GetCalibrationStatus>::SharedPtr get_calibration_status_service_;
+
+    /// Service server for home and calibrate sequence
+    rclcpp::Service<klask_interfaces::srv::HomeAndCalibrate>::SharedPtr home_and_calibrate_service_;
+
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
     /// Current motor state
     int motor_state;
+
+    /// Flag indicating if external cmd_vel commands are enabled
+    std::atomic<bool> external_commands_enabled_;
+
+    /// Flag indicating if system has been calibrated
+    std::atomic<bool> is_calibrated_;
+
+    /// Action client for right player homing
+    rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr right_player_homing_client_;
+
+    /// Action client for left player homing
+    rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr left_player_homing_client_;
+
+    /// Homing action timeout in seconds
+    int homing_action_timeout_;
+
+    /// Action server wait timeout in seconds
+    int action_server_wait_timeout_;
+
+    /// Delay between homing different players (ms)
+    int inter_homing_delay_;
 
     /**
      * @brief Service callback for encoder calibration.
@@ -105,6 +178,30 @@ private:
     void set_motor_state_callback(
         const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
         std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
+
+    /**
+     * @brief Service callback for calibration status query.
+     *
+     * Returns whether the system has been calibrated.
+     *
+     * @param request Shared pointer to request (empty).
+     * @param response Shared pointer to response with calibration status.
+     */
+    void get_calibration_status_callback(
+        const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> request,
+        std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response);
+
+    /**
+     * @brief Service callback for home and calibrate sequence.
+     *
+     * Executes homing for all active players followed by calibration.
+     *
+     * @param request Shared pointer to request (empty).
+     * @param response Shared pointer to response with success status.
+     */
+    void home_and_calibrate_callback(
+        const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
+        std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response);
 
     /**
      * @brief Generic callback for player velocity commands.

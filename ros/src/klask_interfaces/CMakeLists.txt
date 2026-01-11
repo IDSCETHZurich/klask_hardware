@@ -7,25 +7,26 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/MotorCommunication.msg"
   "msg/ObjectState.msg"
-  "msg/PolygonArray.msg"
-  "msg/Rewards.msg"
   "msg/State.msg"
-  "msg/StampedInt32.msg"
   "msg/StampedPolygon.msg"
-  "msg/StampedPolygonArray.msg"
   "srv/CalibrateEncoders.srv"
+  "srv/GetCalibrationStatus.srv"
+  "srv/HomeAndCalibrate.srv"
   "srv/SetMotorState.srv"
   "action/HomePeg.action"
   DEPENDENCIES geometry_msgs std_msgs diagnostic_msgs
 )
+
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME}_py)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
