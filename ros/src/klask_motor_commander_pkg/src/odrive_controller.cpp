@@ -4,7 +4,8 @@ namespace klask_motor_commander
 {
 
     ODriveController::ODriveController(PlayerSide player_config) : Node("odrive_controller"),
-                                                                        external_commands_enabled_(true)
+                                                                        external_commands_enabled_(true),
+                                                                        is_calibrated_(false)
     {
         RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node with player config: %s",
                     player_side_to_string(player_config).c_str());
@@ -17,6 +18,7 @@ namespace klask_motor_commander
 
         // Service names
         this->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
+        this->declare_parameter("get_calibration_status_service", "get_calibration_status");
         this->declare_parameter("set_motor_state_service", "set_motor_state");
 
         // QoS settings
@@ -29,6 +31,7 @@ namespace klask_motor_commander
         std::string cmd_vel_right_topic = this->get_parameter("cmd_vel_right_player").as_string();
         std::string cmd_vel_left_topic = this->get_parameter("cmd_vel_left_player").as_string();
         std::string calibrate_service = this->get_parameter("calibrate_encoders_service").as_string();
+        std::string calibration_status_service = this->get_parameter("get_calibration_status_service").as_string();
         std::string motor_state_service = this->get_parameter("set_motor_state_service").as_string();
         int qos_depth = this->get_parameter("cmd_vel_qos_depth").as_int();
         motor_state = this->get_parameter("initial_motor_state").as_int();
@@ -70,6 +73,12 @@ namespace klask_motor_commander
             std::bind(&ODriveController::set_motor_state_callback, this,
                       std::placeholders::_1, std::placeholders::_2));
         RCLCPP_INFO(this->get_logger(), "Created service: %s", motor_state_service.c_str());
+
+        get_calibration_status_service_ = this->create_service<klask_interfaces::srv::GetCalibrationStatus>(
+            calibration_status_service,
+            std::bind(&ODriveController::get_calibration_status_callback, this,
+                      std::placeholders::_1, std::placeholders::_2));
+        RCLCPP_INFO(this->get_logger(), "Created service: %s", calibration_status_service.c_str());
 
         // Create subscriptions for velocity commands with reliable QoS (only for active players)
         if (players_.find("right_player") != players_.end())
@@ -144,12 +153,14 @@ namespace klask_motor_commander
 
             response->success = true;
             response->message = "Encoders calibrated successfully for active players";
+            is_calibrated_.store(true);
             RCLCPP_INFO(this->get_logger(), "Encoders calibrated: %s", calibrated_players.c_str());
         }
         catch (const std::exception &e)
         {
             response->success = false;
             response->message = std::string("Calibration failed: ") + e.what();
+            is_calibrated_.store(false);
             RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
         }
     }
@@ -186,6 +197,24 @@ namespace klask_motor_commander
             response->message = std::string("Motor state change failed: ") + e.what();
             RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
         }
+    }
+
+    void ODriveController::get_calibration_status_callback(
+        const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> request,
+        std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response)
+    {
+        (void)request; // Unused parameter
+        response->is_calibrated = is_calibrated_.load();
+        if (response->is_calibrated)
+        {
+            response->message = "System is calibrated and ready";
+        }
+        else
+        {
+            response->message = "System is not calibrated";
+        }
+        RCLCPP_DEBUG(this->get_logger(), "Calibration status queried: %s", 
+                     response->is_calibrated ? "calibrated" : "not calibrated");
     }
 
     void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg,

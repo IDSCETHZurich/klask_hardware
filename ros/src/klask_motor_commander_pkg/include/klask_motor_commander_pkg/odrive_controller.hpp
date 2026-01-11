@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <klask_interfaces/msg/state.hpp>
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
+#include <klask_interfaces/srv/get_calibration_status.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
 #include "klask_motor_commander_pkg/player_side.hpp"
@@ -92,6 +93,16 @@ public:
         return external_commands_enabled_.load();
     }
 
+    /**
+     * @brief Get system calibration status.
+     *
+     * @return true if system has been calibrated, false otherwise.
+     */
+    bool is_calibrated() const
+    {
+        return is_calibrated_.load();
+    }
+
 private:
     /// Map of active player nodes (key: "right_player" or "left_player")
     std::map<std::string, Player::SharedPtr> players_;
@@ -108,6 +119,9 @@ private:
     /// Service server for motor state changes
     rclcpp::Service<klask_interfaces::srv::SetMotorState>::SharedPtr set_motor_state_service_;
 
+    /// Service server for calibration status query
+    rclcpp::Service<klask_interfaces::srv::GetCalibrationStatus>::SharedPtr get_calibration_status_service_;
+
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
@@ -116,6 +130,9 @@ private:
 
     /// Flag indicating if external cmd_vel commands are enabled
     std::atomic<bool> external_commands_enabled_;
+
+    /// Flag indicating if system has been calibrated
+    std::atomic<bool> is_calibrated_;
 
     /**
      * @brief Service callback for encoder calibration.
@@ -140,6 +157,18 @@ private:
     void set_motor_state_callback(
         const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
         std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
+
+    /**
+     * @brief Service callback for calibration status query.
+     *
+     * Returns whether the system has been calibrated.
+     *
+     * @param request Shared pointer to request (empty).
+     * @param response Shared pointer to response with calibration status.
+     */
+    void get_calibration_status_callback(
+        const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> request,
+        std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response);
 
     /**
      * @brief Generic callback for player velocity commands.

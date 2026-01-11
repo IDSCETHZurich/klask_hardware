@@ -1,0 +1,4 @@
+# Service to query system calibration status
+---
+bool is_calibrated   # True if system has been calibrated
+string message       # Status message with additional info

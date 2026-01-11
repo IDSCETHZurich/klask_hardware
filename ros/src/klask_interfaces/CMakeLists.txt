@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StampedPolygon.msg"
   "msg/StampedPolygonArray.msg"
   "srv/CalibrateEncoders.srv"
+  "srv/GetCalibrationStatus.srv"
   "srv/SetMotorState.srv"
   "action/HomePeg.action"
   DEPENDENCIES geometry_msgs std_msgs diagnostic_msgs
