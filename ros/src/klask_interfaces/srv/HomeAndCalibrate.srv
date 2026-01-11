@@ -1,0 +1,5 @@
+# Service to trigger homing and calibration sequence for specified players
+string player  # Player to home: "right_player", "left_player", or "both"
+---
+bool success         # True if homing and calibration completed successfully
+string message       # Status message with details

@@ -1,4 +1,5 @@
 #include "klask_motor_commander_pkg/odrive_controller.hpp"
+#include "klask_motor_commander_pkg/open_loop_controller.hpp"
 
 namespace klask_motor_commander
 {
@@ -19,7 +20,17 @@ namespace klask_motor_commander
         // Service names
         this->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
         this->declare_parameter("get_calibration_status_service", "get_calibration_status");
+        this->declare_parameter("home_and_calibrate_service", "home_and_calibrate");
         this->declare_parameter("set_motor_state_service", "set_motor_state");
+
+        // Action names for homing
+        this->declare_parameter("right_player_action_name", "home_peg_right_player");
+        this->declare_parameter("left_player_action_name", "home_peg_left_player");
+
+        // Homing timeouts
+        this->declare_parameter("action_server_wait_timeout", 5);
+        this->declare_parameter("homing_action_timeout", 30);
+        this->declare_parameter("inter_homing_delay", 500);
 
         // QoS settings
         this->declare_parameter("cmd_vel_qos_depth", 1);
@@ -32,9 +43,15 @@ namespace klask_motor_commander
         std::string cmd_vel_left_topic = this->get_parameter("cmd_vel_left_player").as_string();
         std::string calibrate_service = this->get_parameter("calibrate_encoders_service").as_string();
         std::string calibration_status_service = this->get_parameter("get_calibration_status_service").as_string();
+        std::string home_calibrate_service = this->get_parameter("home_and_calibrate_service").as_string();
         std::string motor_state_service = this->get_parameter("set_motor_state_service").as_string();
+        std::string right_action_name = this->get_parameter("right_player_action_name").as_string();
+        std::string left_action_name = this->get_parameter("left_player_action_name").as_string();
         int qos_depth = this->get_parameter("cmd_vel_qos_depth").as_int();
         motor_state = this->get_parameter("initial_motor_state").as_int();
+        action_server_wait_timeout_ = this->get_parameter("action_server_wait_timeout").as_int();
+        homing_action_timeout_ = this->get_parameter("homing_action_timeout").as_int();
+        inter_homing_delay_ = this->get_parameter("inter_homing_delay").as_int();
 
         RCLCPP_INFO(this->get_logger(), "Loaded parameters: initial_motor_state=%d", motor_state);
 
@@ -79,6 +96,27 @@ namespace klask_motor_commander
             std::bind(&ODriveController::get_calibration_status_callback, this,
                       std::placeholders::_1, std::placeholders::_2));
         RCLCPP_INFO(this->get_logger(), "Created service: %s", calibration_status_service.c_str());
+
+        home_and_calibrate_service_ = this->create_service<klask_interfaces::srv::HomeAndCalibrate>(
+            home_calibrate_service,
+            std::bind(&ODriveController::home_and_calibrate_callback, this,
+                      std::placeholders::_1, std::placeholders::_2));
+        RCLCPP_INFO(this->get_logger(), "Created service: %s", home_calibrate_service.c_str());
+
+        // Create action clients for homing
+        if (players_.find("right_player") != players_.end())
+        {
+            right_player_homing_client_ = rclcpp_action::create_client<klask_interfaces::action::HomePeg>(
+                this, right_action_name);
+            RCLCPP_INFO(this->get_logger(), "Created action client for right_player homing: %s", right_action_name.c_str());
+        }
+
+        if (players_.find("left_player") != players_.end())
+        {
+            left_player_homing_client_ = rclcpp_action::create_client<klask_interfaces::action::HomePeg>(
+                this, left_action_name);
+            RCLCPP_INFO(this->get_logger(), "Created action client for left_player homing: %s", left_action_name.c_str());
+        }
 
         // Create subscriptions for velocity commands with reliable QoS (only for active players)
         if (players_.find("right_player") != players_.end())
@@ -215,6 +253,218 @@ namespace klask_motor_commander
         }
         RCLCPP_DEBUG(this->get_logger(), "Calibration status queried: %s", 
                      response->is_calibrated ? "calibrated" : "not calibrated");
+    }
+
+    void ODriveController::home_and_calibrate_callback(
+        const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
+        std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response)
+    {
+        RCLCPP_INFO(this->get_logger(), "Home and calibrate service called for player: %s", request->player.c_str());
+
+        // Parse player selection
+        std::vector<std::string> selected_players;
+        if (request->player == "both")
+        {
+            if (players_.count("right_player")) selected_players.push_back("right_player");
+            if (players_.count("left_player")) selected_players.push_back("left_player");
+        }
+        else if (request->player == "right_player" || request->player == "left_player")
+        {
+            if (players_.count(request->player))
+            {
+                selected_players.push_back(request->player);
+            }
+            else
+            {
+                response->success = false;
+                response->message = request->player + " is not active in this configuration";
+                RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+                return;
+            }
+        }
+        else
+        {
+            response->success = false;
+            response->message = "Invalid player selection: '" + request->player + "'. Must be 'right_player', 'left_player', or 'both'";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        if (selected_players.empty())
+        {
+            response->success = false;
+            response->message = "No active players to home";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        // Disable external commands during homing/calibration
+        bool previously_enabled = external_commands_enabled_.load();
+        set_external_commands_enabled(false);
+
+        // Structure to hold player-specific data (matching motor_commander.cpp)
+        struct PlayerHomingData
+        {
+            std::string name;
+            Player::SharedPtr player_node;
+            std::shared_ptr<OpenLoopController> homing_controller;
+            rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr homing_client;
+            geometry_msgs::msg::Point final_position;
+        };
+
+        std::vector<PlayerHomingData> players_to_home;
+
+        try
+        {
+            using HomePeg = klask_interfaces::action::HomePeg;
+
+            // Create open-loop controllers for homing (action servers) for selected players
+            RCLCPP_INFO(this->get_logger(), "Creating open-loop controllers for peg homing...");
+            for (const auto &player_name : selected_players)
+            {
+                PlayerHomingData player_data;
+                player_data.name = player_name;
+                player_data.player_node = players_[player_name];
+                player_data.homing_controller = std::make_shared<OpenLoopController>(
+                    std::dynamic_pointer_cast<Player>(player_data.player_node));
+                
+                RCLCPP_INFO(this->get_logger(), "%s homing controller created", player_name.c_str());
+                players_to_home.push_back(player_data);
+            }
+
+            RCLCPP_INFO(this->get_logger(), "=== Starting Peg Homing Sequence ===");
+
+            // Create action clients for selected players and wait for servers
+            for (auto &player_data : players_to_home)
+            {
+                std::string action_name = "home_peg_" + player_data.name;
+                player_data.homing_client = rclcpp_action::create_client<HomePeg>(
+                    shared_from_this(), action_name);
+
+                if (!player_data.homing_client->wait_for_action_server(std::chrono::seconds(action_server_wait_timeout_)))
+                {
+                    throw std::runtime_error(player_data.name + " homing action server not available");
+                }
+            }
+
+            bool homing_success = true;
+
+            // Home all selected players
+            for (size_t i = 0; i < players_to_home.size(); i++)
+            {
+                auto &player_data = players_to_home[i];
+
+                RCLCPP_INFO(this->get_logger(), "Sending homing goal for %s...", player_data.name.c_str());
+
+                auto goal = HomePeg::Goal();
+                goal.home_position.x = 0.0; // Use default
+                goal.home_position.y = 0.0;
+                goal.home_position.z = 0.0;
+
+                auto goal_handle_future = player_data.homing_client->async_send_goal(goal);
+
+                // Wait for goal to be accepted
+                if (goal_handle_future.wait_for(std::chrono::seconds(action_server_wait_timeout_)) != std::future_status::ready)
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to send %s homing goal - timeout",
+                                 player_data.name.c_str());
+                    homing_success = false;
+                }
+                else
+                {
+                    auto goal_handle = goal_handle_future.get();
+                    if (!goal_handle)
+                    {
+                        RCLCPP_ERROR(this->get_logger(), "%s homing goal was rejected",
+                                     player_data.name.c_str());
+                        homing_success = false;
+                    }
+                    else
+                    {
+                        // Wait for result
+                        auto result_future = player_data.homing_client->async_get_result(goal_handle);
+                        if (result_future.wait_for(std::chrono::seconds(homing_action_timeout_)) != std::future_status::ready)
+                        {
+                            RCLCPP_ERROR(this->get_logger(), "%s homing action timed out",
+                                         player_data.name.c_str());
+                            homing_success = false;
+                        }
+                        else
+                        {
+                            auto result = result_future.get();
+                            if (result.code == rclcpp_action::ResultCode::SUCCEEDED && result.result->success)
+                            {
+                                player_data.final_position = result.result->final_position;
+                                RCLCPP_INFO(this->get_logger(),
+                                            "%s peg homed at [%.3f, %.3f]",
+                                            player_data.name.c_str(),
+                                            player_data.final_position.x,
+                                            player_data.final_position.y);
+                            }
+                            else
+                            {
+                                RCLCPP_ERROR(this->get_logger(),
+                                             "%s homing failed: %s",
+                                             player_data.name.c_str(),
+                                             result.result->message.c_str());
+                                homing_success = false;
+                            }
+                        }
+                    }
+                }
+
+                if (!homing_success)
+                {
+                    throw std::runtime_error(player_data.name + " homing failed");
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(inter_homing_delay_));
+            }
+
+            RCLCPP_INFO(this->get_logger(), "=== Peg Homing Complete ===");
+
+            // Construct State message from homed positions (only for selected players)
+            klask_interfaces::msg::State calibration_state;
+            for (const auto &player_data : players_to_home)
+            {
+                if (player_data.name == "right_player")
+                {
+                    calibration_state.right_peg.position = player_data.final_position;
+                }
+                else if (player_data.name == "left_player")
+                {
+                    calibration_state.left_peg.position = player_data.final_position;
+                }
+            }
+
+            // Call calibration with final homed state
+            RCLCPP_INFO(this->get_logger(), "Calling calibration service with homed state...");
+
+            auto calib_request = std::make_shared<klask_interfaces::srv::CalibrateEncoders::Request>();
+            calib_request->state = calibration_state;
+            auto calib_response = std::make_shared<klask_interfaces::srv::CalibrateEncoders::Response>();
+
+            calibrate_encoders_callback(calib_request, calib_response);
+
+            if (!calib_response->success)
+            {
+                throw std::runtime_error("Calibration failed: " + calib_response->message);
+            }
+
+            response->success = true;
+            response->message = "Homing and calibration completed successfully";
+            RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
+        }
+        catch (const std::exception &e)
+        {
+            response->success = false;
+            response->message = std::string("Home and calibrate failed: ") + e.what();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            is_calibrated_.store(false);
+        }
+
+        // Restore external commands state
+        set_external_commands_enabled(previously_enabled);
     }
 
     void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg,

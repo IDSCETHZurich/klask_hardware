@@ -11,6 +11,7 @@
     # === Service Names ===
     calibrate_encoders_service: "calibrate_encoders"  # Service for encoder calibration
     get_calibration_status_service: "get_calibration_status"  # Service for querying calibration status
+    home_and_calibrate_service: "home_and_calibrate"  # Service for homing and calibration sequence
     set_motor_state_service: "set_motor_state"        # Service for motor state changes
     
     # === QoS Settings ===
