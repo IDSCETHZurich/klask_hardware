@@ -12,7 +12,8 @@ namespace klask_motor_commander
     OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
         : Node("open_loop_controller_" + std::string(player->get_side() == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player")),
           player_(player),
-          player_name_(player->get_side() == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player")
+          player_name_(player->get_side() == PlayerSide::RIGHT_PLAYER ? "right_player" : "left_player"),
+          waiting_for_initial_state_(false)
     {
         RCLCPP_INFO(this->get_logger(), "Initializing OpenLoopController for %s...", player_name_.c_str());
 
@@ -127,32 +128,14 @@ namespace klask_motor_commander
             RCLCPP_INFO(this->get_logger(), "%s: Using default home position", player_name_.c_str());
         }
 
-        // Check if state is available
-        if (!latest_state_)
-        {
-            RCLCPP_WARN(this->get_logger(), "%s: No board state available yet, will start when state arrives", player_name_.c_str());
-        }
-        else
-        {
-            geometry_msgs::msg::Point current_pos = get_current_peg_position();
-            RCLCPP_INFO(this->get_logger(),
-                        "%s: Initial position: [%.3f, %.3f], Target: [%.3f, %.3f]",
-                        player_name_.c_str(), current_pos.x, current_pos.y,
-                        target_home.x, target_home.y);
-        }
-
         // Set goal and activate homing
         target_goal_ = target_home;
         active_goal_handle_ = goal_handle;
+        goal_accepted_time_ = this->now();
 
-        // Start movement validation if state is available
-        if (latest_state_)
-        {
-            geometry_msgs::msg::Point current_pos = get_current_peg_position();
-            start_movement_validation(current_pos);
-        }
-
-        RCLCPP_INFO(this->get_logger(), "%s: Homing activated, control loop will handle movement", player_name_.c_str());
+        // Set flag to wait for a NEW board state message
+        waiting_for_initial_state_ = true;
+        RCLCPP_INFO(this->get_logger(), "%s: Waiting for fresh board_state message...", player_name_.c_str());
     }
 
     void OpenLoopController::board_state_callback(const klask_interfaces::msg::State::SharedPtr msg)
@@ -161,6 +144,12 @@ namespace klask_motor_commander
         std::lock_guard<std::mutex> lock(state_mutex_);
         latest_state_ = msg;
         state_received_ = true;
+        
+        // If we were waiting for initial state, trigger movement validation start
+        if (waiting_for_initial_state_.load())
+        {
+            waiting_for_initial_state_ = false;
+        }
     }
 
     float OpenLoopController::calculate_distance(const geometry_msgs::msg::Point &p1,
@@ -194,8 +183,39 @@ namespace klask_motor_commander
         // Check if we have an active goal
         if (!active_goal_handle_)
         {
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                                 "%s: No active goal in control loop", player_name_.c_str());
+            return;
+        }
+
+        // If waiting for initial state, check timeout and log
+        if (waiting_for_initial_state_.load())
+        {
+            double elapsed = (this->now() - goal_accepted_time_).seconds();
+            
+            if (elapsed >= initial_state_timeout_)
+            {
+                RCLCPP_ERROR(this->get_logger(),
+                             "%s: Timeout waiting for board_state message (%.1f seconds). Aborting homing.",
+                             player_name_.c_str(), initial_state_timeout_);
+                
+                waiting_for_initial_state_ = false;
+                
+                // Stop motors
+                player_->send_commands(0.0f, 0.0f);
+                
+                // Abort action
+                auto result = std::make_shared<HomePeg::Result>();
+                result->success = false;
+                result->message = "Timeout waiting for board_state";
+                result->final_position = geometry_msgs::msg::Point();
+                active_goal_handle_->abort(result);
+                active_goal_handle_.reset();
+                return;
+            }
+            
+            // Log progress
+            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                                "%s: Waiting for board_state message (%.1f s elapsed)...",
+                                player_name_.c_str(), elapsed);
             return;
         }
 
@@ -207,10 +227,18 @@ namespace klask_motor_commander
         }
         catch (const std::exception &e)
         {
-            // No state available yet, skip this iteration
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                                 "%s: No state available in control loop", player_name_.c_str());
+            // State not available
             return;
+        }
+
+        // Check if this is the first control loop after state received (start validation)
+        if (validation_active_ == false && validation_timer_ == nullptr)
+        {
+            RCLCPP_INFO(this->get_logger(),
+                        "%s: Board state received! Initial position: [%.3f, %.3f], Target: [%.3f, %.3f]",
+                        player_name_.c_str(), current_pos.x, current_pos.y,
+                        target_goal_.x, target_goal_.y);
+            start_movement_validation(current_pos);
         }
 
         // Check for cancellation
