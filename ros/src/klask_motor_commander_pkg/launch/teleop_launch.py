@@ -3,10 +3,10 @@
 Example usage:
     # Control left player (default):
     ros2 launch klask_motor_commander_pkg teleop_launch.py
-    
+
     # Control right player:
     ros2 launch klask_motor_commander_pkg teleop_launch.py player:=right
-    
+
     # Control left player (explicit):
     ros2 launch klask_motor_commander_pkg teleop_launch.py player:=left
 
@@ -25,10 +25,10 @@ def launch_setup(context, *args, **kwargs):
 
     # Determine topic based on player selection
     if player == "left":
-        topic = "/cmd_vel/left_player_checked"
+        topic = "/cmd_vel/left_player"
         node_name = "teleop_left_player"
     else:  # Default to right
-        topic = "/cmd_vel/right_player_checked"
+        topic = "/cmd_vel/right_player"
         node_name = "teleop_right_player"
 
     teleop_node = Node(

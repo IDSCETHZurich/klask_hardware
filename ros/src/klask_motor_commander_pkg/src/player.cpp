@@ -134,17 +134,27 @@ Player::Player(PlayerSide side)
     request_axis_l_state_client_ = this->create_client<odrive_can::srv::AxisState>(
         service_l, rmw_qos_profile_services_default, group_);
 
-    RCLCPP_INFO(this->get_logger(), "Initializing motors to idle state...");
-    set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
-    RCLCPP_INFO(this->get_logger(), "Setting motors to closed loop control...");
-    set_motor_state(static_cast<int>(ODriveAxisState::CLOSED_LOOP_CONTROL));
-
     controller_r_subscriber = this->create_subscription<odrive_can::msg::ControllerStatus>(
         status_topic_r, qos_reliable,
         std::bind(&Player::controller_status_callback_right, this, std::placeholders::_1), sub_options);
     controller_l_subscriber = this->create_subscription<odrive_can::msg::ControllerStatus>(
         status_topic_l, qos_reliable,
         std::bind(&Player::controller_status_callback_left, this, std::placeholders::_1), sub_options);
+
+    // Initialize motors to CLOSED_LOOP_CONTROL state
+    // Wait for services to be available before setting state
+    RCLCPP_INFO(this->get_logger(), "Waiting for motor state services...");
+    if (request_axis_r_state_client_->wait_for_service(std::chrono::seconds(service_wait_timeout_)) &&
+        request_axis_l_state_client_->wait_for_service(std::chrono::seconds(service_wait_timeout_)))
+    {
+        RCLCPP_INFO(this->get_logger(), "Setting motors to CLOSED_LOOP_CONTROL state...");
+        set_motor_state(static_cast<int>(ODriveAxisState::CLOSED_LOOP_CONTROL));
+        RCLCPP_INFO(this->get_logger(), "Motors initialized to CLOSED_LOOP_CONTROL");
+    }
+    else
+    {
+        RCLCPP_WARN(this->get_logger(), "Motor state services not available, motors may need manual initialization");
+    }
 
     RCLCPP_INFO(this->get_logger(), "Player node %s initialization complete", side_name);
 }

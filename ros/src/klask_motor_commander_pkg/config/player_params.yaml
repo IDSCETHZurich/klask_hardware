@@ -23,11 +23,11 @@
     # === Physical Constants ===
     distance_per_revolution: 0.04  # Distance traveled per motor revolution (meters)
     max_velocity: 0.2              # Maximum allowed peg velocity (m/s)
-    deceleration_distance: 0.09    # Distance from edge to start deceleration (meters)
+    deceleration_distance: 0.05    # Distance from edge to start deceleration (meters)
     peg_radius: 0.0075             # Physical peg radius (meters)
     
     # === Motion Control Parameters ===
-    min_clearance_factor: 1.5      # Safety factor for minimum clearance (multiplied by peg_radius)
+    min_clearance_factor: 2.0      # Safety factor for minimum clearance (multiplied by peg_radius)
     corner_x_margin: 0.03          # X-axis margin for unreachable corners (meters)
     corner_y_margin: 0.01          # Y-axis margin for unreachable corners (meters)
     
