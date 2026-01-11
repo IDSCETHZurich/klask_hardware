@@ -3,7 +3,8 @@
 namespace klask_motor_commander
 {
 
-    ODriveController::ODriveController(PlayerSide player_config) : Node("odrive_controller")
+    ODriveController::ODriveController(PlayerSide player_config) : Node("odrive_controller"),
+                                                                        external_commands_enabled_(true)
     {
         RCLCPP_INFO(this->get_logger(), "Initializing ODriveController node with player config: %s",
                     player_side_to_string(player_config).c_str());
@@ -190,6 +191,15 @@ namespace klask_motor_commander
     void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg,
                                                     const std::string &player_name)
     {
+        // Ignore velocity commands if external commands are disabled
+        if (!external_commands_enabled_.load())
+        {
+            RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                                 "Ignoring cmd_vel command for %s - external commands disabled",
+                                 player_name.c_str());
+            return;
+        }
+
         // Extract linear x and y velocities from Twist message
         // Twist.linear.x corresponds to forward/backward velocity
         // Twist.linear.y corresponds to left/right velocity

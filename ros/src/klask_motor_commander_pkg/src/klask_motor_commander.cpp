@@ -136,6 +136,9 @@ int main(int argc, char *argv[])
     // Execute homing sequence if enabled
     if (enable_homing)
     {
+        // Disable external cmd_vel commands during homing/calibration
+        controller_node->set_external_commands_enabled(false);
+
         // Create open-loop controllers for homing (action servers) for active players
         RCLCPP_INFO(controller_node->get_logger(), "Creating open-loop controllers for peg homing...");
         for (auto &player_data : active_players)
@@ -247,6 +250,9 @@ int main(int argc, char *argv[])
             RCLCPP_ERROR(controller_node->get_logger(),
                          "Homing failed: %s. Shutting down...", e.what());
 
+            // Re-enable external commands before shutdown
+            controller_node->set_external_commands_enabled(true);
+
             // Cleanup and shutdown
             for (auto &player_data : active_players)
             {
@@ -329,6 +335,9 @@ int main(int argc, char *argv[])
                 RCLCPP_ERROR(controller_node->get_logger(), "Calibration service call timed out");
             }
         }
+
+        // Re-enable external cmd_vel commands now that homing/calibration is complete
+        controller_node->set_external_commands_enabled(true);
     }
     else
     {

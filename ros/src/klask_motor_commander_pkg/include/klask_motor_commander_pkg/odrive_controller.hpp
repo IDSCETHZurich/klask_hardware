@@ -11,6 +11,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <atomic>
 
 namespace klask_motor_commander {
 
@@ -60,6 +61,37 @@ public:
         players_.clear();
     }
 
+    /**
+     * @brief Enable or disable external cmd_vel commands.
+     *
+     * When disabled, cmd_vel commands from external sources will be ignored.
+     * Useful during startup sequences like homing and calibration.
+     *
+     * @param enabled True to accept cmd_vel commands, false to ignore them.
+     */
+    void set_external_commands_enabled(bool enabled)
+    {
+        external_commands_enabled_.store(enabled);
+        if (enabled)
+        {
+            RCLCPP_INFO(this->get_logger(), "External cmd_vel commands enabled");
+        }
+        else
+        {
+            RCLCPP_INFO(this->get_logger(), "External cmd_vel commands disabled");
+        }
+    }
+
+    /**
+     * @brief Get external commands enabled status.
+     *
+     * @return true if external commands are enabled, false otherwise.
+     */
+    bool get_external_commands_enabled() const
+    {
+        return external_commands_enabled_.load();
+    }
+
 private:
     /// Map of active player nodes (key: "right_player" or "left_player")
     std::map<std::string, Player::SharedPtr> players_;
@@ -81,6 +113,9 @@ private:
 
     /// Current motor state
     int motor_state;
+
+    /// Flag indicating if external cmd_vel commands are enabled
+    std::atomic<bool> external_commands_enabled_;
 
     /**
      * @brief Service callback for encoder calibration.
