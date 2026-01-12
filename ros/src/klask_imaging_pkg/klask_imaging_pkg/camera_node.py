@@ -26,6 +26,7 @@ class CameraNode(Node):
     """ROS2 node for acquiring camera images and publishing transformed board view."""
 
     def __init__(self):
+        """Initialize the CameraNode and load calibration data."""
         super().__init__("camera_node")
 
         # Declare ROS parameters with default values
@@ -192,7 +193,6 @@ class CameraNode(Node):
 
     def initial_board_detection(self) -> None:
         """Perform initial board detection using flood fill to establish perspective transform."""
-
         # Wait for a valid frame from the camera
         ret, frame = self.cap.read()
         while not ret:
@@ -317,8 +317,8 @@ class CameraNode(Node):
             h_factor: Horizontal factor for goal seed positioning.
             o_factor: Offset factor for goal seed positioning.
             e_factor: Ellipse scaling factor for goal size.
-        """
 
+        """
         offset_combinations = list(itertools.product([-o_factor, o_factor], [-o_factor, o_factor]))
         goal_seed_centers = (
             (int(self.width * h_factor), int(self.height * 0.5)),
@@ -371,6 +371,7 @@ class CameraNode(Node):
 
         These transformations remain constant across all frames and only depend on
         the initial board detection results.
+
         """
         # Define rotation matrices for each segment (constant)
         self.diff_rotations = (
@@ -425,7 +426,6 @@ class CameraNode(Node):
         Returns:
             4x4 array of corner points in (x, y) format for perspective transform.
         """
-
         # Lists to store results
         boarder_segment_flood_masks = []
         boarder_segment_flood_masks_aligned = []
@@ -622,7 +622,6 @@ class CameraNode(Node):
         Returns:
             List of sample point lists, one per segment.
         """
-
         line_samples = []
         for seed_line in seed_lines:
             # Move the seed sample line slightly inward to avoid edge artifacts
@@ -759,13 +758,13 @@ class CameraNode(Node):
         seed: tuple[int, int] | list[tuple[int, int]],
         threshold: int,
     ) -> tuple[np.ndarray, cv2.typing.Rect]:
-        """
-        Perform flood fill on the given channel starting from the seed point(s).
+        """Perform flood fill on the given channel starting from the seed point(s).
 
         Args:
             channel (np.ndarray): The image channel to perform flood fill on.
             seed (tuple[int, int] | list[tuple[int, int]]): The seed point(s) for flood fill.
             threshold (int): Threshold relative to seed pixel value (loDiff=upDiff=threshold).
+
         Returns:
             flood_mask (np.ndarray): The resulting flood fill mask.
             rect (cv2.typing.Rect): The bounding rectangle of the flooded area.
@@ -806,7 +805,6 @@ class CameraNode(Node):
         Returns:
             Minimum area rotated rectangle fitting the mask.
         """
-
         # Get all points where flood_mask is non-zero
         points = cv2.findNonZero(flood_mask)
 
@@ -869,7 +867,6 @@ class CameraNode(Node):
 
     def _compute_perspective_transform_from_corners(self, corners: np.ndarray, width: int, height: int) -> None:
         """Compute perspective transformation matrix from board corners."""
-
         # Destination points (perfect rectangle)
         dst_pts = np.array(
             [
@@ -901,7 +898,7 @@ class CameraNode(Node):
             self.profiling_timer = None
 
     def _timer_callback(self) -> None:
-        """Main timer callback for processing camera frames."""
+        """Process camera frames in timer callback."""
         # Capture and validate frame
         ret, frame = self.cap.read()
         if not ret:
@@ -916,7 +913,6 @@ class CameraNode(Node):
 
     def _process_frame(self, undistorted_frame: np.ndarray) -> None:
         """Process frame to create perspective-corrected view and publish."""
-
         # Convert to HSV and split channels
         frame_hsv = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(frame_hsv)
@@ -1013,6 +1009,7 @@ class CameraNode(Node):
 
 
 def main(args=None):
+    """Run the camera node."""
     rclpy.init(args=args)
 
     camera_node = CameraNode()

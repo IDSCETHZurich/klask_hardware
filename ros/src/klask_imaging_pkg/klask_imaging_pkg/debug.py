@@ -1,5 +1,4 @@
-"""
-Debugging utilities for border segment analysis in imaging."""
+"""Debugging utilities for border segment analysis in imaging."""
 
 import cv2
 import pstats
@@ -18,16 +17,19 @@ def print_initial_debug_view(
     warped_v_channel: np.ndarray,
     goal_ellipses: tuple[cv2.RotatedRect, cv2.RotatedRect],
 ) -> None:
-    """
-    Display debug views for initial board analysis.
+    """Display debug views for initial board analysis.
 
     Args:
         frame_rec (np.ndarray): The original rectified frame.
         h (np.ndarray): The H channel of the image.
         s (np.ndarray): The S channel of the image.
         v (np.ndarray): The V channel of the image.
+        flood_seed (list[tuple[int, int]]): The flood fill seed points.
         flood_mask (np.ndarray): The flood fill mask.
         rotated_rect (cv2.RotatedRect): The detected rotated rectangle.
+        warped_v_channel (np.ndarray): The warped V channel image.
+        goal_ellipses (tuple[cv2.RotatedRect, cv2.RotatedRect]): The goal ellipse parameters.
+
     """
     # Display warped V channel with goal ellipses
     for goal_ellipse in goal_ellipses:
@@ -221,7 +223,6 @@ def plot_single_channel(channel: np.ndarray, title: str) -> None:
         channel: Single channel image array (0-255 values).
         title: Window title for display.
     """
-
     # Apply colormap to the channel for better visualization
     channel_colored = cv2.applyColorMap(channel, cv2.COLORMAP_JET)
 
@@ -282,7 +283,6 @@ def show_final_output(warped, fps_display, title, goal_ellipses=None) -> None:
         title: Window title for display.
         goal_ellipses: Optional tuple of goal ellipse parameters to overlay.
     """
-
     # Draw FPS on image
     display_image = warped.copy()
     fps_text = f"FPS: {fps_display}"

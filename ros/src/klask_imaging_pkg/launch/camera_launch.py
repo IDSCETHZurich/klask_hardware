@@ -9,7 +9,6 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     """Generate launch description for camera node."""
-
     # Declare launch arguments
     params_file_arg = DeclareLaunchArgument(
         "params_file",

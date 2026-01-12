@@ -21,6 +21,7 @@ class ImageViewer(Node):
     """ROS2 node that subscribes to compressed images and displays them."""
 
     def __init__(self):
+        """Initialize the ImageViewer node."""
         super().__init__("image_viewer")
 
         # Declare and get parameters
@@ -183,7 +184,7 @@ class ImageViewer(Node):
         self.current_fps = 0.0
 
     def image_callback(self, msg: CompressedImage) -> None:
-        """Callback for receiving compressed images."""
+        """Handle incoming compressed images."""
         try:
             # Convert ROS CompressedImage message to OpenCV image
             cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -299,7 +300,6 @@ class ImageViewer(Node):
         State is received in engineering units (meters, m/s) and converted
         back to pixel coordinates for visualization overlay.
         """
-
         # Convert goal positions from EU to pixels
         left_goal_px = self._convert_position_to_pixels(state.left_goal_pos.x, state.left_goal_pos.y)
         right_goal_px = self._convert_position_to_pixels(state.right_goal_pos.x, state.right_goal_pos.y)
@@ -558,6 +558,11 @@ class ImageViewer(Node):
 
 
 def main(args=None):
+    """Run the image viewer node.
+
+    Args:
+        args: ROS arguments.
+    """
     rclpy.init(args=args)
 
     image_viewer = ImageViewer()
