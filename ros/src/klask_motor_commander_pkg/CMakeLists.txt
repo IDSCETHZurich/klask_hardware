@@ -14,7 +14,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 find_package(klask_interfaces REQUIRED)
 
-add_executable(klask_motor_commander 
+add_executable(klask_motor_commander
   src/klask_motor_commander.cpp
   src/player.cpp
   src/odrive_controller.cpp
@@ -41,13 +41,32 @@ install(DIRECTORY config
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
+
+  # Add custom clang-format check test
+  find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+  if(CLANG_FORMAT_EXECUTABLE)
+    file(GLOB_RECURSE ALL_SOURCE_FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp
+    )
+
+    add_test(
+      NAME clang_format_check
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test/check_clang_format.sh
+        ${CMAKE_SOURCE_DIR}
+        ${ALL_SOURCE_FILES}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+    set_tests_properties(clang_format_check PROPERTIES
+      LABELS "linter;clang_format"
+    )
+  else()
+    message(WARNING "clang-format not found, skipping format check")
+  endif()
+
   ament_lint_auto_find_test_dependencies()
 endif()
 
