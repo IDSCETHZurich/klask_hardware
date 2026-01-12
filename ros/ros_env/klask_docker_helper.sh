@@ -128,6 +128,9 @@ cmd_run() {
             --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
             --volume="$SCRIPT_DIR/../src:/opt/ros/klask_ws/src:rw" \
             --volume="$SCRIPT_DIR/../.vscode:/opt/ros/klask_ws/.vscode:rw" \
+            --volume="$SCRIPT_DIR/../.clang-format:/opt/ros/klask_ws/.clang-format:rw" \
+            --volume="$SCRIPT_DIR/../.flake8:/opt/ros/klask_ws/.flake8:rw" \
+            --volume="$SCRIPT_DIR/../pyproject.toml:/opt/ros/klask_ws/pyproject.toml:rw" \
             --volume="${CONTAINER_NAME}_build:/opt/ros/klask_ws/build:rw" \
             --volume="${CONTAINER_NAME}_install:/opt/ros/klask_ws/install:rw" \
             --volume="${CONTAINER_NAME}_log:/opt/ros/klask_ws/log:rw" \
