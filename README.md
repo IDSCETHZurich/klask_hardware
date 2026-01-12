@@ -128,11 +128,9 @@ See our [Contributing Guide](https://IDSCETHZurich.github.io/klask_hardware/cont
 
 ## License
 
-**TL;DR:** Code — Apache-2.0 • Hardware — CERN-OHL-S v2 • Docs — CC BY 4.0
-
-- ROS2 code and software is licensed under **Apache License 2.0**
-- Hardware designs (CAD, mechanical) are under **CERN-OHL-S v2**
-- Documentation and tutorials are under **CC BY 4.0**
+- ROS2 code and software is licensed under [**AGPL-3.0**](LICENSE-AGPL-3.0)
+- Hardware designs (CAD, mechanical) are under [**CERN-OHL-S v2**](LICENSE-CERN-OHL-S-2.0)
+- Documentation and tutorials are under [**CC BY 4.0**](LICENSE-CC-BY-4.0)
 
 ### Third-party Components
 
