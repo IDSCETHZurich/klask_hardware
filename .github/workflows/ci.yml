@@ -20,15 +20,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build packages
-        run: colcon build
+        run: |
+          . /opt/ros/${ROS_DISTRO}/setup.sh
+          colcon build
 
       - name: Run tests
         run: |
+          . /opt/ros/${ROS_DISTRO}/setup.sh
           . install/setup.sh
           colcon test
 
       - name: Test results
         if: always()
         run: |
+          . /opt/ros/${ROS_DISTRO}/setup.sh
           . install/setup.sh
           colcon test-result --verbose
