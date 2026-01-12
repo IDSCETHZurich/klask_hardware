@@ -17,7 +17,7 @@ RUN apt update && apt install -y \
 
 # install python packages
 RUN pip install --upgrade pip
-COPY ros_env/requirements.txt /tmp/requirements.txt
+COPY ros_env/res/requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
 
 # setup colcon extensions
@@ -31,7 +31,7 @@ RUN mkdir -p $OVERLAY_WS/.vscode
 RUN mkdir -p $OVERLAY_WS/third_party
 
 # import third party repos into workspace
-COPY ros_env/third_party.repos /tmp/third_party.repos
+COPY ros_env/res/third_party.repos /tmp/third_party.repos
 RUN vcs import $OVERLAY_WS/third_party < /tmp/third_party.repos
 # Ignore packages that are not needed / cause trouble in the SDK 
 RUN touch $OVERLAY_WS/third_party/ros_odrive/odrive_ros2_control/COLCON_IGNORE || true

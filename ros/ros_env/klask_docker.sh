@@ -59,7 +59,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 print_usage() {
-    echo "Usage: $0 [--runtime|-r] <command>"
+    echo "Usage: $0 [--runtime|-r] <command> [args...]"
     echo ""
     echo "Flags:"
     echo "  --runtime, -r  Use Runtime container instead of SDK (default: SDK)"
@@ -67,14 +67,18 @@ print_usage() {
     echo "Commands:"
     echo "  build    Build the Docker image"
     echo "  run      Run the container (detached)"
+    echo "           For Runtime mode, additional args are passed to the launch file"
     echo "  connect  Connect to the running container"
     echo "  stop     Stop the container"
     echo "  status   Show container status"
     echo ""
     echo "Examples:"
-    echo "  $0 build              # Build SDK image"
-    echo "  $0 --runtime build    # Build Runtime image"
-    echo "  $0 -r run             # Run Runtime container"
+    echo "  $0 build                              # Build SDK image"
+    echo "  $0 --runtime build                    # Build Runtime image"
+    echo "  $0 -r run                             # Run Runtime container with defaults"
+    echo "  $0 -r run --player left               # Run with left player only"
+    echo "  $0 -r run --player right --no-viewer  # Run right player without viewer"
+    echo "  $0 -r run --no-viewer                 # Run both players without viewer"
     echo ""
 }
 
@@ -98,6 +102,10 @@ cmd_run() {
 
     if [[ "$MODE" == "runtime" ]]; then
         # Runtime container: pre-built workspace, minimal volumes
+        # Additional arguments are passed to the container entrypoint
+        if [ $# -gt 0 ]; then
+            echo -e "${GREEN}Passing arguments to container: $@${NC}"
+        fi
         xhost +local:root
         docker run -it -d --rm \
             --env="DISPLAY" \
@@ -109,7 +117,7 @@ cmd_run() {
             --cap-add=NET_ADMIN \
             --cap-add=NET_RAW \
             --name="${CONTAINER_NAME}" \
-            "${IMAGE_NAME}:${TAG}"
+            "${IMAGE_NAME}:${TAG}" "$@"
     else
         # SDK container: development mode with source mounts
         xhost +local:root
@@ -187,12 +195,15 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-case "$1" in
+COMMAND="$1"
+shift  # Remove command from arguments
+
+case "$COMMAND" in
     build)
         cmd_build
         ;;
     run)
-        cmd_run
+        cmd_run "$@"
         ;;
     connect)
         cmd_connect
@@ -207,7 +218,7 @@ case "$1" in
         print_usage
         ;;
     *)
-        echo -e "${RED}Unknown command: $1${NC}"
+        echo -e "${RED}Unknown command: $COMMAND${NC}"
         echo ""
         print_usage
         exit 1

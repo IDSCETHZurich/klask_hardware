@@ -17,7 +17,7 @@ EOF
 
 # Copy repository configuration files
 WORKDIR $OVERLAY_WS
-COPY ros_env/third_party.repos /tmp/third_party.repos
+COPY ros_env/res/third_party.repos /tmp/third_party.repos
 
 # Import third-party repositories
 RUN mkdir -p $OVERLAY_WS/third_party && \
@@ -80,7 +80,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY ros_env/requirements.txt /tmp/requirements.txt
+COPY ros_env/res/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
@@ -127,7 +127,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python runtime dependencies
-COPY ros_env/requirements.txt /tmp/requirements.txt
+COPY ros_env/res/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
@@ -145,7 +145,18 @@ RUN sed --in-place --expression \
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 RUN echo "source $OVERLAY_WS/install/setup.bash\n" >> ~/.bashrc
 
+# Copy and set up runtime entrypoint
+COPY ros_env/res/runtime_entrypoint.sh /runtime_entrypoint.sh
+RUN chmod +x /runtime_entrypoint.sh
+
 WORKDIR $OVERLAY_WS
 
-# Default command: launch state estimator
-CMD ["ros2", "launch", "klask_state_estimation_pkg", "state_estimation_launch.py"]
+# Default command: launch motor commander with camera and viewer
+# Usage: docker run <image> [--player left|right|both] [--viewer|--no-viewer]
+# Examples:
+#   docker run <image>                          # launches with player:=both, start_viewer:=true (defaults)
+#   docker run <image> --player left            # launches with player:=left, start_viewer:=true
+#   docker run <image> --player right --no-viewer   # launches with player:=right, start_viewer:=false
+#   docker run <image> --no-viewer              # launches with player:=both, start_viewer:=false
+#   docker run <image> --viewer --player left   # launches with player:=left, start_viewer:=true
+ENTRYPOINT ["/runtime_entrypoint.sh"]
