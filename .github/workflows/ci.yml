@@ -19,6 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Copy third-party packages to workspace
+        run: cp -r /opt/ros/klask_ws/third_party .
+
       - name: Build packages
         run: |
           . /opt/ros/${ROS_DISTRO}/setup.sh
