@@ -7,7 +7,7 @@
 set -e
 
 # Configuration
-GHCR_IMAGE_BASE="ghcr.io/USERNAME/klask_hardware_runtime"  # Update with your actual GHCR image path
+GHCR_IMAGE_BASE="ghcr.io/idscethzurich/klask_hardware/runtime"
 DEFAULT_TAG="latest"
 IMAGE_TAG="${DEFAULT_TAG}"
 CONTAINER_NAME="klask_hardware_runtime_container"
