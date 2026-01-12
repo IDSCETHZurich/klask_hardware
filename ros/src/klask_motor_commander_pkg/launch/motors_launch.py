@@ -15,6 +15,9 @@ Example usage:
     
     # Launch right player only without commander:
     ros2 launch klask_motor_commander_pkg motors_launch.py player:=right start_commander:=false
+    
+    # Launch with camera and image viewer:
+    ros2 launch klask_motor_commander_pkg motors_launch.py start_camera:=true start_viewer:=true
 """
 
 from launch_ros.actions import Node
@@ -29,6 +32,8 @@ def launch_setup(context, *args, **kwargs):
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
     start_commander = LaunchConfiguration("start_commander").perform(context)
+    start_camera = LaunchConfiguration("start_camera").perform(context)
+    start_viewer = LaunchConfiguration("start_viewer").perform(context)
 
     # Get path to parameter file
     pkg_share = get_package_share_directory("klask_motor_commander_pkg")
@@ -42,10 +47,27 @@ def launch_setup(context, *args, **kwargs):
     motor_commander_params_file = os.path.join(
         pkg_share, "config", "motor_commander_params.yaml"
     )
+    
+    # Get imaging package config files
+    imaging_pkg_share = get_package_share_directory("klask_imaging_pkg")
+    camera_params_file = os.path.join(imaging_pkg_share, "config", "camera_node_params.yaml")
+    image_viewer_params_file = os.path.join(imaging_pkg_share, "config", "image_viewer_params.yaml")
 
     nodes_to_launch = []
 
-    # CAN interface setup (commented out by default)
+    # Camera node
+    if start_camera == "true":
+        nodes_to_launch.append(
+            Node(
+                package="klask_imaging_pkg",
+                executable="camera_node",
+                name="camera_node",
+                parameters=[camera_params_file],
+                output="screen",
+            )
+        )
+
+    # CAN interface setup
     nodes_to_launch.append(
         ExecuteProcess(cmd=["ip", "link", "set", "can0", "down"], output="screen")
     )
@@ -138,6 +160,18 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
+    # Image viewer node
+    if start_viewer == "true":
+        nodes_to_launch.append(
+            Node(
+                package="klask_imaging_pkg",
+                executable="image_viewer",
+                name="image_viewer",
+                parameters=[image_viewer_params_file],
+                output="screen",
+            )
+        )
+
     return nodes_to_launch
 
 
@@ -155,6 +189,24 @@ def generate_launch_description():
         description='Whether to start the motor commander node: "true" (default) or "false"',
     )
 
+    start_camera_arg = DeclareLaunchArgument(
+        "start_camera",
+        default_value="false",
+        description='Whether to start the camera node: "true" or "false" (default)',
+    )
+
+    start_viewer_arg = DeclareLaunchArgument(
+        "start_viewer",
+        default_value="false",
+        description='Whether to start the image viewer node: "true" or "false" (default)',
+    )
+
     return LaunchDescription(
-        [player_arg, start_commander_arg, OpaqueFunction(function=launch_setup)]
+        [
+            player_arg,
+            start_commander_arg,
+            start_camera_arg,
+            start_viewer_arg,
+            OpaqueFunction(function=launch_setup),
+        ]
     )
