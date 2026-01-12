@@ -38,6 +38,39 @@ KLASK is a popular magnetic table game where players control magnetic pegs to hi
 
 This repository contains the hardware and software components required to build and operate the KLASK robotic system. The inference node running the RL agent is hosted in the separated [klask_software](https://github.com/IDSCETHZurich/klask_software) repository.
 
+```mermaid
+flowchart LR
+  subgraph HW["**klask_hardware Repo**"]
+    direction TB
+    HW_HARD["**Hardware**<br/>- CAD files<br/>- Assembly instructions"]
+
+    subgraph HW_CONT["Container"]
+      direction TB
+      HW_SW["**ROS Stack**<br/>- Motor Driver Node<br/>- Camera Node"]
+    end
+
+    HW_HARD --- HW_SW
+  end
+
+  subgraph SW["**klask_software Repo**"]
+    direction TB
+
+    subgraph SW_CONT["Container"]
+      direction TB
+      SE["**State Estimator**"]
+      PLAYER["**Policy Inference Node**"]
+      SE -- State --> PLAYER
+    end
+  end
+
+  HW_SW -- Image --> SE
+  PLAYER -- Action --> HW_SW
+
+  PB[("**Polybox**")]
+  PLAYER -. Weights .- PB
+```
+
+
 ## System Architecture
 
 The system consists of three main ROS2 packages:
