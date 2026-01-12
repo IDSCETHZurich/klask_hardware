@@ -12,14 +12,15 @@
 #include <algorithm>
 #include <vector>
 
-namespace klask_motor_commander {
+namespace klask_motor_commander
+{
 
 /**
  * @brief ODrive motor control mode constants.
  */
 enum class ODriveControlMode : int
 {
-    VELOCITY_CONTROL = 2  ///< Velocity control mode
+    VELOCITY_CONTROL = 2 ///< Velocity control mode
 };
 
 /**
@@ -27,7 +28,7 @@ enum class ODriveControlMode : int
  */
 enum class ODriveInputMode : int
 {
-    VEL_RAMP = 1  ///< Velocity ramp input mode
+    VEL_RAMP = 1 ///< Velocity ramp input mode
 };
 
 /**
@@ -35,8 +36,8 @@ enum class ODriveInputMode : int
  */
 enum class ODriveAxisState : int
 {
-    IDLE = 1,                ///< Motor idle state
-    CLOSED_LOOP_CONTROL = 8  ///< Closed loop control state
+    IDLE = 1,               ///< Motor idle state
+    CLOSED_LOOP_CONTROL = 8 ///< Closed loop control state
 };
 
 /**
@@ -71,7 +72,10 @@ public:
      *
      * @return PlayerSide The side this player controls.
      */
-    PlayerSide get_side() const { return side_; }
+    PlayerSide get_side() const
+    {
+        return side_;
+    }
 
     /**
      * @brief Send velocity commands to motors.
@@ -86,14 +90,14 @@ public:
      *
      * @param peg_pos Peg position from camera/vision system.
      */
-    void calibrate(const geometry_msgs::msg::Point &peg_pos);
+    void calibrate(const geometry_msgs::msg::Point& peg_pos);
 
     /**
      * @brief Change motor state (idle, closed loop control, etc.).
      *
      * @param des_state Desired motor state.
      */
-    void change_motor_state(const int &des_state);
+    void change_motor_state(const int& des_state);
 
     // Public state variables
 
@@ -192,7 +196,7 @@ private:
      * @param v_x Reference to x-velocity, modified in place.
      * @param v_y Reference to y-velocity, modified in place.
      */
-    void deacceleration_profile(float &v_x, float &v_y);
+    void deacceleration_profile(float& v_x, float& v_y);
 
     /**
      * @brief Update magnet position estimate from encoder values.
@@ -221,6 +225,6 @@ private:
     void set_motor_state(int state);
 };
 
-}  // namespace klask_motor_commander
+} // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__PLAYER_HPP_
