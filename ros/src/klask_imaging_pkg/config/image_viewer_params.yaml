@@ -20,10 +20,10 @@ image_viewer:
     # State is received in engineering units (meters, m/s) and must be
     # converted back to pixels for overlay visualization.
     # Board pixel dimensions are determined automatically from the received image.
-    
+
     # Board physical dimensions in meters (must match state_estimator)
-    board_width_meters: 0.42   # Physical board width (default: 0.42m)
-    board_height_meters: 0.32  # Physical board height (default: 0.32m)
+    board_width_meters: 0.42 # Physical board width (default: 0.42m)
+    board_height_meters: 0.32 # Physical board height (default: 0.32m)
     # Conversion factors are computed automatically from actual image dimensions:
     # meter_to_pixel_x = image_width / board_width_meters
     # meter_to_pixel_y = image_height / board_height_meters
@@ -55,9 +55,9 @@ image_viewer:
     overlay_ball_velocity_scale: 0.2
 
     # Cmd_vel overlay (BGR)
-    overlay_cmd_vel_left_arrow_color: [255, 100, 255]  # Magenta for left player
+    overlay_cmd_vel_left_arrow_color: [255, 100, 255] # Magenta for left player
     overlay_cmd_vel_left_velocity_scale: 0.5
-    overlay_cmd_vel_right_arrow_color: [255, 255, 100]  # Cyan for right player
+    overlay_cmd_vel_right_arrow_color: [255, 255, 100] # Cyan for right player
     overlay_cmd_vel_right_velocity_scale: 0.5
     overlay_cmd_vel_arrow_thickness: 3
     overlay_cmd_vel_arrow_tip_length: 0.2
@@ -66,4 +66,4 @@ image_viewer:
     overlay_status_font_scale: 0.7
     overlay_status_font_thickness: 2
     overlay_status_text_color: [0, 255, 255]
-    overlay_status_margin: 10  # Distance from edge in pixels
+    overlay_status_margin: 10 # Distance from edge in pixels
