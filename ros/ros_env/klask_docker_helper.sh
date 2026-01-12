@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Klask Docker management script for SDK and Runtime containers
-# Usage: ./klask_docker.sh [--runtime|-r] <command>
+# Usage: ./klask_docker_helper.sh [--runtime|-r] <command>
 
 # To enable tab completion, add this to your ~/.bashrc 
 # or execute it in your shell for to have it for the current session:
-#     source /path/to/klask_docker.sh --completion
+#     source /path/to/klask_docker_helper.sh --completion
 
 NS="hardware"
 
@@ -16,10 +16,10 @@ if [[ "$1" == "--completion" ]]; then
         COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[1]}"))
     }
     # Register for various ways the script might be called
-    complete -F _klask_docker_completions klask_docker.sh
-    complete -F _klask_docker_completions ./klask_docker.sh
-    complete -F _klask_docker_completions ./ros/env/klask_docker.sh
-    complete -F _klask_docker_completions ros/env/klask_docker.sh
+    complete -F _klask_docker_completions klask_docker_helper.sh
+    complete -F _klask_docker_completions ./klask_docker_helper.sh
+    complete -F _klask_docker_completions ./ros/ros_env/klask_docker_helper.sh
+    complete -F _klask_docker_completions ros/ros_env/klask_docker_helper.sh
     return 0 2>/dev/null || exit 0
 fi
 
