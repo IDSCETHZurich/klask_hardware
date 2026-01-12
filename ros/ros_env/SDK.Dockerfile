@@ -12,7 +12,8 @@ RUN apt update && apt install -y \
     python3-pip \
     python3-opencv \
     iproute2 \
-    can-utils && \
+    can-utils \
+    clang-format && \
     rm -rf /var/lib/apt/lists/*
 
 # install python packages
