@@ -16,6 +16,7 @@
 
 from ament_flake8.main import main_with_errors
 import pytest
+from pathlib import Path
 
 
 @pytest.mark.flake8
@@ -23,5 +24,6 @@ import pytest
 def test_flake8():
     """Test that the code conforms to flake8 style guidelines."""
     # Use the workspace .flake8 configuration
-    rc, errors = main_with_errors(argv=["--config", "/opt/ros/klask_ws/.flake8"])
+    config_path = Path(__file__).parent.parent.parent.parent / ".flake8"
+    rc, errors = main_with_errors(argv=["--config", str(config_path)])
     assert rc == 0, "Found %d code style errors / warnings:\n" % len(errors) + "\n".join(errors)

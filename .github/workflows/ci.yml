@@ -31,7 +31,7 @@ jobs:
         run: |
           . /opt/ros/${ROS_DISTRO}/setup.sh
           . install/setup.sh
-          colcon test
+          colcon test --packages-select klask_imaging_pkg klask_interfaces klask_motor_commander_pkg # only test our packages
 
       - name: Test results
         if: always()
