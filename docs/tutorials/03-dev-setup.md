@@ -76,3 +76,48 @@ If you are an IDSC student working on the idsc4gpu machine using the `student` u
     git config user.name "Alex Student"
     git config user.email "alex.student@example.com"
     ```
+
+## Additional Resources for Maintainers
+
+### Creating a New Release
+
+Releases are used to publish versioned runtime containers to GitHub Container Registry (GHCR). When you create a release, a GitHub Actions workflow automatically builds and publishes the runtime container image.
+
+#### Release Process
+
+1. **Navigate to Releases**
+   - Go to the GitHub repository
+   - Click on **"Releases"** in the right sidebar
+
+2. **Create a New Release**
+   - Click **"Draft a new release"**
+
+3. **Choose or Create a Tag**
+   - Click **"Choose a tag"**
+   - Type a new version tag following semantic versioning (e.g., `v1.0.0`, `v1.2.3`)
+   - Click **"Create new tag: vX.Y.Z on publish"**
+
+4. **Add Release Information**
+   - **Release title**: Use a descriptive title (e.g., "Release v1.0.0" or "Initial Public Release")
+   - **Release description**: Add release notes describing what changed:
+     - New features
+     - Bug fixes
+     - Breaking changes
+     - Known issues
+
+5. **Publish the Release**
+   - Click **"Publish release"**
+   - The GitHub Actions workflow will automatically:
+     - Build the runtime container
+     - Push it to GHCR with multiple tags:
+       - `ghcr.io/idscethzurich/klask_hardware/runtime:latest`
+       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0.0`
+       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0`
+
+#### Version Numbering Guidelines
+
+Follow [Semantic Versioning](https://semver.org/):
+
+- **Major version** (v**X**.0.0): Breaking changes that require user action
+- **Minor version** (v1.**X**.0): New features that are backward compatible
+- **Patch version** (v1.0.**X**): Bug fixes and minor improvements

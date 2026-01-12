@@ -70,7 +70,6 @@ flowchart LR
   PLAYER -. Weights .- PB
 ```
 
-
 ## System Architecture
 
 The system consists of three main ROS2 packages:
