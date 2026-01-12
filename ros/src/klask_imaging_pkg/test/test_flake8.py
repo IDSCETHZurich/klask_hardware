@@ -1,3 +1,5 @@
+"""Test script for verifying flake8 style guidelines."""
+
 # Copyright 2017 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,5 +21,7 @@ import pytest
 @pytest.mark.flake8
 @pytest.mark.linter
 def test_flake8():
-    rc, errors = main_with_errors(argv=[])
+    """Test that the code conforms to flake8 style guidelines."""
+    # Use the workspace .flake8 configuration
+    rc, errors = main_with_errors(argv=["--config", "/opt/ros/klask_ws/.flake8"])
     assert rc == 0, "Found %d code style errors / warnings:\n" % len(errors) + "\n".join(errors)
