@@ -56,9 +56,7 @@ class ImageViewer(Node):
         self.board_width_meters = float(self.get_parameter("board_width_meters").value)
 
         self.declare_parameter("board_height_meters", 0.32)
-        self.board_height_meters = float(
-            self.get_parameter("board_height_meters").value
-        )
+        self.board_height_meters = float(self.get_parameter("board_height_meters").value)
 
         # Current image dimensions (updated each frame)
         self.current_image_width: float = 0.0
@@ -73,117 +71,75 @@ class ImageViewer(Node):
         self.overlay_goal_color = self._color_param("overlay_goal_color", (140, 255, 0))
 
         self.declare_parameter("overlay_goal_center_radius", 5)
-        self.overlay_goal_center_radius = int(
-            self.get_parameter("overlay_goal_center_radius").value
-        )
+        self.overlay_goal_center_radius = int(self.get_parameter("overlay_goal_center_radius").value)
 
         self.declare_parameter("overlay_goal_circle_thickness", 2)
-        self.overlay_goal_circle_thickness = int(
-            self.get_parameter("overlay_goal_circle_thickness").value
-        )
+        self.overlay_goal_circle_thickness = int(self.get_parameter("overlay_goal_circle_thickness").value)
 
         self.declare_parameter("overlay_dot_radius", 5)
         self.overlay_dot_radius = int(self.get_parameter("overlay_dot_radius").value)
 
         self.declare_parameter("overlay_arrow_thickness", 2)
-        self.overlay_arrow_thickness = int(
-            self.get_parameter("overlay_arrow_thickness").value
-        )
+        self.overlay_arrow_thickness = int(self.get_parameter("overlay_arrow_thickness").value)
 
         self.declare_parameter("overlay_arrow_tip_length", 0.3)
-        self.overlay_arrow_tip_length = float(
-            self.get_parameter("overlay_arrow_tip_length").value
-        )
+        self.overlay_arrow_tip_length = float(self.get_parameter("overlay_arrow_tip_length").value)
 
         # Object colors/scales (BGR)
         self.declare_parameter("overlay_left_peg_dot_color", [255, 0, 0])
-        self.overlay_left_peg_dot_color = self._color_param(
-            "overlay_left_peg_dot_color", (255, 0, 0)
-        )
+        self.overlay_left_peg_dot_color = self._color_param("overlay_left_peg_dot_color", (255, 0, 0))
         self.declare_parameter("overlay_left_peg_arrow_color", [248, 193, 110])
-        self.overlay_left_peg_arrow_color = self._color_param(
-            "overlay_left_peg_arrow_color", (248, 193, 110)
-        )
+        self.overlay_left_peg_arrow_color = self._color_param("overlay_left_peg_arrow_color", (248, 193, 110))
         self.declare_parameter("overlay_left_peg_velocity_scale", 0.5)
-        self.overlay_left_peg_velocity_scale = float(
-            self.get_parameter("overlay_left_peg_velocity_scale").value
-        )
+        self.overlay_left_peg_velocity_scale = float(self.get_parameter("overlay_left_peg_velocity_scale").value)
 
         self.declare_parameter("overlay_right_peg_dot_color", [0, 100, 0])
-        self.overlay_right_peg_dot_color = self._color_param(
-            "overlay_right_peg_dot_color", (0, 100, 0)
-        )
+        self.overlay_right_peg_dot_color = self._color_param("overlay_right_peg_dot_color", (0, 100, 0))
         self.declare_parameter("overlay_right_peg_arrow_color", [144, 238, 144])
-        self.overlay_right_peg_arrow_color = self._color_param(
-            "overlay_right_peg_arrow_color", (144, 238, 144)
-        )
+        self.overlay_right_peg_arrow_color = self._color_param("overlay_right_peg_arrow_color", (144, 238, 144))
         self.declare_parameter("overlay_right_peg_velocity_scale", 0.5)
-        self.overlay_right_peg_velocity_scale = float(
-            self.get_parameter("overlay_right_peg_velocity_scale").value
-        )
+        self.overlay_right_peg_velocity_scale = float(self.get_parameter("overlay_right_peg_velocity_scale").value)
 
         self.declare_parameter("overlay_ball_dot_color", [0, 0, 255])
-        self.overlay_ball_dot_color = self._color_param(
-            "overlay_ball_dot_color", (0, 0, 255)
-        )
+        self.overlay_ball_dot_color = self._color_param("overlay_ball_dot_color", (0, 0, 255))
         self.declare_parameter("overlay_ball_arrow_color", [0, 165, 255])
-        self.overlay_ball_arrow_color = self._color_param(
-            "overlay_ball_arrow_color", (0, 165, 255)
-        )
+        self.overlay_ball_arrow_color = self._color_param("overlay_ball_arrow_color", (0, 165, 255))
         self.declare_parameter("overlay_ball_velocity_scale", 0.2)
-        self.overlay_ball_velocity_scale = float(
-            self.get_parameter("overlay_ball_velocity_scale").value
-        )
+        self.overlay_ball_velocity_scale = float(self.get_parameter("overlay_ball_velocity_scale").value)
 
         # Cmd_vel overlay appearance
         self.declare_parameter("overlay_cmd_vel_left_arrow_color", [255, 100, 255])
-        self.overlay_cmd_vel_left_arrow_color = self._color_param(
-            "overlay_cmd_vel_left_arrow_color", (255, 100, 255)
-        )
+        self.overlay_cmd_vel_left_arrow_color = self._color_param("overlay_cmd_vel_left_arrow_color", (255, 100, 255))
         self.declare_parameter("overlay_cmd_vel_left_velocity_scale", 0.5)
         self.overlay_cmd_vel_left_velocity_scale = float(
             self.get_parameter("overlay_cmd_vel_left_velocity_scale").value
         )
 
         self.declare_parameter("overlay_cmd_vel_right_arrow_color", [255, 255, 100])
-        self.overlay_cmd_vel_right_arrow_color = self._color_param(
-            "overlay_cmd_vel_right_arrow_color", (255, 255, 100)
-        )
+        self.overlay_cmd_vel_right_arrow_color = self._color_param("overlay_cmd_vel_right_arrow_color", (255, 255, 100))
         self.declare_parameter("overlay_cmd_vel_right_velocity_scale", 0.5)
         self.overlay_cmd_vel_right_velocity_scale = float(
             self.get_parameter("overlay_cmd_vel_right_velocity_scale").value
         )
 
         self.declare_parameter("overlay_cmd_vel_arrow_thickness", 3)
-        self.overlay_cmd_vel_arrow_thickness = int(
-            self.get_parameter("overlay_cmd_vel_arrow_thickness").value
-        )
+        self.overlay_cmd_vel_arrow_thickness = int(self.get_parameter("overlay_cmd_vel_arrow_thickness").value)
 
         self.declare_parameter("overlay_cmd_vel_arrow_tip_length", 0.3)
-        self.overlay_cmd_vel_arrow_tip_length = float(
-            self.get_parameter("overlay_cmd_vel_arrow_tip_length").value
-        )
+        self.overlay_cmd_vel_arrow_tip_length = float(self.get_parameter("overlay_cmd_vel_arrow_tip_length").value)
 
         # Status overlay appearance
         self.declare_parameter("overlay_status_font_scale", 0.7)
-        self.overlay_status_font_scale = float(
-            self.get_parameter("overlay_status_font_scale").value
-        )
+        self.overlay_status_font_scale = float(self.get_parameter("overlay_status_font_scale").value)
 
         self.declare_parameter("overlay_status_font_thickness", 2)
-        self.overlay_status_font_thickness = int(
-            self.get_parameter("overlay_status_font_thickness").value
-        )
+        self.overlay_status_font_thickness = int(self.get_parameter("overlay_status_font_thickness").value)
 
         self.declare_parameter("overlay_status_text_color", [0, 255, 255])
-        self.overlay_status_text_color = self._color_param(
-            "overlay_status_text_color", (0, 255, 255)
-        )
+        self.overlay_status_text_color = self._color_param("overlay_status_text_color", (0, 255, 255))
 
         self.declare_parameter("overlay_status_margin", 10)
-        self.overlay_status_margin = int(
-            self.get_parameter("overlay_status_margin").value
-        )
+        self.overlay_status_margin = int(self.get_parameter("overlay_status_margin").value)
 
         # CV Bridge for image conversion
         self.bridge = CvBridge()
@@ -194,9 +150,7 @@ class ImageViewer(Node):
         )
 
         # Subscribe to estimated state topic
-        self.state_subscription = self.create_subscription(
-            State, self.board_state_topic, self.state_callback, 10
-        )
+        self.state_subscription = self.create_subscription(State, self.board_state_topic, self.state_callback, 10)
 
         self.latest_state: State | None = None
 
@@ -212,8 +166,7 @@ class ImageViewer(Node):
         self.latest_cmd_vel_right: Twist | None = None
 
         info_msg = (
-            f"Image viewer node started. "
-            f"Subscribing to '{self.board_image_topic}' and '{self.board_state_topic}'"
+            f"Image viewer node started. " f"Subscribing to '{self.board_image_topic}' and '{self.board_state_topic}'"
         )
         if self.show_cmd_vel_overlay:
             info_msg += f", '{self.cmd_vel_left_player_topic}', '{self.cmd_vel_right_player_topic}'"
@@ -233,9 +186,7 @@ class ImageViewer(Node):
         """Callback for receiving compressed images."""
         try:
             # Convert ROS CompressedImage message to OpenCV image
-            cv_image = self.bridge.compressed_imgmsg_to_cv2(
-                msg, desired_encoding="bgr8"
-            )
+            cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
             # Store current image dimensions for EU-to-pixel conversion
             # (image size can vary each frame due to rotation/cropping)
@@ -279,9 +230,7 @@ class ImageViewer(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
 
-    def _color_param(
-        self, name: str, default_value: tuple[int, int, int]
-    ) -> tuple[int, int, int]:
+    def _color_param(self, name: str, default_value: tuple[int, int, int]) -> tuple[int, int, int]:
         """Parse color parameter from ROS parameter.
 
         Args:
@@ -295,9 +244,7 @@ class ImageViewer(Node):
         try:
             values = [int(v) for v in value]
         except Exception:
-            self.get_logger().warn(
-                f"Parameter '{name}' must be a list of 3 ints; using default {list(default_value)}"
-            )
+            self.get_logger().warn(f"Parameter '{name}' must be a list of 3 ints; using default {list(default_value)}")
             return default_value
 
         if len(values) != 3:
@@ -332,18 +279,14 @@ class ImageViewer(Node):
             return self.current_image_height / self.board_height_meters
         return 0.0
 
-    def _convert_position_to_pixels(
-        self, x_meters: float, y_meters: float
-    ) -> tuple[float, float]:
+    def _convert_position_to_pixels(self, x_meters: float, y_meters: float) -> tuple[float, float]:
         """Convert position from EU (meters) to pixels."""
         return (
             x_meters * self._get_meter_to_pixel_x(),
             y_meters * self._get_meter_to_pixel_y(),
         )
 
-    def _convert_velocity_to_pixels(
-        self, vx_meters: float, vy_meters: float
-    ) -> tuple[float, float]:
+    def _convert_velocity_to_pixels(self, vx_meters: float, vy_meters: float) -> tuple[float, float]:
         """Convert velocity from EU (m/s) to pixels/s."""
         return (
             vx_meters * self._get_meter_to_pixel_x(),
@@ -358,12 +301,8 @@ class ImageViewer(Node):
         """
 
         # Convert goal positions from EU to pixels
-        left_goal_px = self._convert_position_to_pixels(
-            state.left_goal_pos.x, state.left_goal_pos.y
-        )
-        right_goal_px = self._convert_position_to_pixels(
-            state.right_goal_pos.x, state.right_goal_pos.y
-        )
+        left_goal_px = self._convert_position_to_pixels(state.left_goal_pos.x, state.left_goal_pos.y)
+        right_goal_px = self._convert_position_to_pixels(state.right_goal_pos.x, state.right_goal_pos.y)
 
         left_goal = (int(left_goal_px[0]), int(left_goal_px[1]))
         right_goal = (int(right_goal_px[0]), int(right_goal_px[1]))
@@ -398,24 +337,12 @@ class ImageViewer(Node):
         )
 
         # Convert object positions and velocities from EU to pixels
-        left_peg_pos_px = self._convert_position_to_pixels(
-            state.left_peg.position.x, state.left_peg.position.y
-        )
-        left_peg_vel_px = self._convert_velocity_to_pixels(
-            state.left_peg.velocity.x, state.left_peg.velocity.y
-        )
-        right_peg_pos_px = self._convert_position_to_pixels(
-            state.right_peg.position.x, state.right_peg.position.y
-        )
-        right_peg_vel_px = self._convert_velocity_to_pixels(
-            state.right_peg.velocity.x, state.right_peg.velocity.y
-        )
-        ball_pos_px = self._convert_position_to_pixels(
-            state.ball.position.x, state.ball.position.y
-        )
-        ball_vel_px = self._convert_velocity_to_pixels(
-            state.ball.velocity.x, state.ball.velocity.y
-        )
+        left_peg_pos_px = self._convert_position_to_pixels(state.left_peg.position.x, state.left_peg.position.y)
+        left_peg_vel_px = self._convert_velocity_to_pixels(state.left_peg.velocity.x, state.left_peg.velocity.y)
+        right_peg_pos_px = self._convert_position_to_pixels(state.right_peg.position.x, state.right_peg.position.y)
+        right_peg_vel_px = self._convert_velocity_to_pixels(state.right_peg.velocity.x, state.right_peg.velocity.y)
+        ball_pos_px = self._convert_position_to_pixels(state.ball.position.x, state.ball.position.y)
+        ball_vel_px = self._convert_velocity_to_pixels(state.ball.velocity.x, state.ball.velocity.y)
 
         # Draw objects with velocity arrows (now in pixel coordinates)
         self._draw_object_with_velocity(
@@ -478,9 +405,7 @@ class ImageViewer(Node):
             tipLength=self.overlay_arrow_tip_length,
         )
 
-    def _overlay_cmd_vel(
-        self, frame: np.ndarray, state: State
-    ) -> None:
+    def _overlay_cmd_vel(self, frame: np.ndarray, state: State) -> None:
         """Draw cmd_vel command vectors for left and right players.
 
         Command velocities are in m/s and are converted to pixel coordinates
@@ -488,9 +413,7 @@ class ImageViewer(Node):
         """
         # Draw left player cmd_vel
         if self.latest_cmd_vel_left is not None:
-            left_peg_pos_px = self._convert_position_to_pixels(
-                state.left_peg.position.x, state.left_peg.position.y
-            )
+            left_peg_pos_px = self._convert_position_to_pixels(state.left_peg.position.x, state.left_peg.position.y)
             # cmd_vel.linear.x and .y are in m/s
             left_cmd_vel_px = self._convert_velocity_to_pixels(
                 self.latest_cmd_vel_left.linear.x,
@@ -513,9 +436,7 @@ class ImageViewer(Node):
 
         # Draw right player cmd_vel
         if self.latest_cmd_vel_right is not None:
-            right_peg_pos_px = self._convert_position_to_pixels(
-                state.right_peg.position.x, state.right_peg.position.y
-            )
+            right_peg_pos_px = self._convert_position_to_pixels(state.right_peg.position.x, state.right_peg.position.y)
             # cmd_vel.linear.x and .y are in m/s
             right_cmd_vel_px = self._convert_velocity_to_pixels(
                 self.latest_cmd_vel_right.linear.x,
@@ -543,7 +464,7 @@ class ImageViewer(Node):
         - READY/UNKNOWN: centered at bottom
         - Left player flags (ball/peg in left goal): bottom left corner
         - Right player flags (ball/peg in right goal): bottom right corner
-        
+
         Only active flags are displayed.
         """
         status_value = state.status.data

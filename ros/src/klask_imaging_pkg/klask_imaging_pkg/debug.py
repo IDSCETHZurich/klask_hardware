@@ -79,9 +79,7 @@ def print_segment_debug_view(
         warped_from_corners (np.ndarray): The warped image from fitted corners.
     """
     # Display warped image from fitted corners
-    cv2.imshow(
-        "Initial Board Analysis - Warped from Fitted Corners", warped_from_corners
-    )
+    cv2.imshow("Initial Board Analysis - Warped from Fitted Corners", warped_from_corners)
 
     # Draw all border segment polygons on the original frame
     frame_with_polygons = frame_rec.copy()
@@ -135,14 +133,10 @@ def print_segment_debug_view(
         cv2.imshow(f"Initial Board Analysis - Aligned Segment {i}", aligned_mask)
 
     # Prepare frame with edge points and fitted lines
-    frame_with_edges = _prepare_frame_with_lines(
-        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
-    )
+    frame_with_edges = _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
+    cv2.imshow("Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges)
     cv2.imshow(
-        f"Initial Board Analysis - Edge Points and Fitted Lines", frame_with_edges
-    )
-    cv2.imshow(
-        f"Initial Board Analysis - Border Segment Flood Mask",
+        "Initial Board Analysis - Border Segment Flood Mask",
         merged_flood_mask,
     )
     # Display border segment
@@ -151,9 +145,7 @@ def print_segment_debug_view(
     cv2.imshow("Initial Board Analysis - Border Segments Overlay", frame_with_polygons)
 
 
-def _prepare_frame_with_lines(
-    frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
-):
+def _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines):
     frame_with_edges = frame_rec.copy()
     for (
         edge_points_original,
@@ -276,9 +268,7 @@ def show_online_boarders(
         fps_display: Current frames per second for display.
         title: Window title for display.
     """
-    frame_with_edges = _prepare_frame_with_lines(
-        frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines
-    )
+    frame_with_edges = _prepare_frame_with_lines(frame_rec, boarder_segment_edge_points, boarder_segment_edge_lines)
 
     show_final_output(frame_with_edges, fps_display, title)
 
@@ -338,7 +328,7 @@ def print_profiling_stats(profiler, top_functions: int) -> None:
     ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
 
     print("\n" + "=" * 80)
-    print(f"cProfile Statistics")
+    print("cProfile Statistics")
     print("=" * 80)
 
     # Print stats to string buffer

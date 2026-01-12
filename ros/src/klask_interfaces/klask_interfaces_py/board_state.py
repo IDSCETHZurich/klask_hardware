@@ -5,9 +5,10 @@ from enum import IntFlag
 
 class BoardState(IntFlag):
     """Board state flags encoded as bit flags.
-    
+
     These flags match the status field encoding in State.msg:
     """
+
     UNKNOWN = 0
     READY = 1 << 0
     BALL_IN_LEFT_GOAL = 1 << 1

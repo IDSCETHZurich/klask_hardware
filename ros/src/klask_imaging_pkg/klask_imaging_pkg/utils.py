@@ -35,9 +35,7 @@ def load_calibration_data(
         return data["mtx"], data["dist"]
 
 
-def apply_ema_filter(
-    current_value: np.ndarray, previous_value: np.ndarray | None, alpha: float = 0.1
-) -> np.ndarray:
+def apply_ema_filter(current_value: np.ndarray, previous_value: np.ndarray | None, alpha: float = 0.1) -> np.ndarray:
     """
     Apply Exponential Moving Average (EMA) filter for smoothing.
 

@@ -3,19 +3,19 @@
 Example usage:
     # Launch both players with motor commander:
     ros2 launch klask_motor_commander_pkg motors_launch.py
-    
+
     # Launch only right player:
     ros2 launch klask_motor_commander_pkg motors_launch.py player:=right
-    
+
     # Launch only left player:
     ros2 launch klask_motor_commander_pkg motors_launch.py player:=left
-    
+
     # Launch ODrive nodes without motor commander:
     ros2 launch klask_motor_commander_pkg motors_launch.py start_commander:=false
-    
+
     # Launch right player only without commander:
     ros2 launch klask_motor_commander_pkg motors_launch.py player:=right start_commander:=false
-    
+
     # Launch with camera and image viewer:
     ros2 launch klask_motor_commander_pkg motors_launch.py start_camera:=true start_viewer:=true
 """
@@ -38,16 +38,10 @@ def launch_setup(context, *args, **kwargs):
     # Get path to parameter file
     pkg_share = get_package_share_directory("klask_motor_commander_pkg")
     player_params_file = os.path.join(pkg_share, "config", "player_params.yaml")
-    open_loop_params_file = os.path.join(
-        pkg_share, "config", "open_loop_controller_params.yaml"
-    )
-    odrive_params_file = os.path.join(
-        pkg_share, "config", "odrive_controller_params.yaml"
-    )
-    motor_commander_params_file = os.path.join(
-        pkg_share, "config", "motor_commander_params.yaml"
-    )
-    
+    open_loop_params_file = os.path.join(pkg_share, "config", "open_loop_controller_params.yaml")
+    odrive_params_file = os.path.join(pkg_share, "config", "odrive_controller_params.yaml")
+    motor_commander_params_file = os.path.join(pkg_share, "config", "motor_commander_params.yaml")
+
     # Get imaging package config files
     imaging_pkg_share = get_package_share_directory("klask_imaging_pkg")
     camera_params_file = os.path.join(imaging_pkg_share, "config", "camera_node_params.yaml")
@@ -68,9 +62,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
     # CAN interface setup
-    nodes_to_launch.append(
-        ExecuteProcess(cmd=["ip", "link", "set", "can0", "down"], output="screen")
-    )
+    nodes_to_launch.append(ExecuteProcess(cmd=["ip", "link", "set", "can0", "down"], output="screen"))
 
     nodes_to_launch.append(
         ExecuteProcess(
@@ -87,9 +79,7 @@ def launch_setup(context, *args, **kwargs):
                 executable="odrive_can_node",
                 name="can_node_0",
                 namespace="odrive_axis0",
-                parameters=[
-                    {"node_id": 0, "interface": "can0", "axis_idle_on_shutdown": True}
-                ],
+                parameters=[{"node_id": 0, "interface": "can0", "axis_idle_on_shutdown": True}],
                 output="screen",
             )
         )
@@ -100,9 +90,7 @@ def launch_setup(context, *args, **kwargs):
                 executable="odrive_can_node",
                 name="can_node_1",
                 namespace="odrive_axis1",
-                parameters=[
-                    {"node_id": 1, "interface": "can0", "axis_idle_on_shutdown": True}
-                ],
+                parameters=[{"node_id": 1, "interface": "can0", "axis_idle_on_shutdown": True}],
                 output="screen",
             )
         )
@@ -115,9 +103,7 @@ def launch_setup(context, *args, **kwargs):
                 executable="odrive_can_node",
                 name="can_node_2",
                 namespace="odrive_axis2",
-                parameters=[
-                    {"node_id": 2, "interface": "can0", "axis_idle_on_shutdown": True}
-                ],
+                parameters=[{"node_id": 2, "interface": "can0", "axis_idle_on_shutdown": True}],
                 output="screen",
             )
         )
@@ -128,9 +114,7 @@ def launch_setup(context, *args, **kwargs):
                 executable="odrive_can_node",
                 name="can_node_3",
                 namespace="odrive_axis3",
-                parameters=[
-                    {"node_id": 3, "interface": "can0", "axis_idle_on_shutdown": True}
-                ],
+                parameters=[{"node_id": 3, "interface": "can0", "axis_idle_on_shutdown": True}],
                 output="screen",
             )
         )
