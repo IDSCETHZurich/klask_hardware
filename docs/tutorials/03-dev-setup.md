@@ -86,33 +86,33 @@ Releases are used to publish versioned runtime containers to GitHub Container Re
 #### Release Process
 
 1. **Navigate to Releases**
-   - Go to the GitHub repository
-   - Click on **"Releases"** in the right sidebar
+    - Go to the GitHub repository
+    - Click on **"Releases"** in the right sidebar
 
 2. **Create a New Release**
-   - Click **"Draft a new release"**
+    - Click **"Draft a new release"**
 
 3. **Choose or Create a Tag**
-   - Click **"Choose a tag"**
-   - Type a new version tag following semantic versioning (e.g., `v1.0.0`, `v1.2.3`)
-   - Click **"Create new tag: vX.Y.Z on publish"**
+    - Click **"Choose a tag"**
+    - Type a new version tag following semantic versioning (e.g., `v1.0.0`, `v1.2.3`)
+    - Click **"Create new tag: vX.Y.Z on publish"**
 
 4. **Add Release Information**
-   - **Release title**: Use a descriptive title (e.g., "Release v1.0.0" or "Initial Public Release")
-   - **Release description**: Add release notes describing what changed:
-     - New features
-     - Bug fixes
-     - Breaking changes
-     - Known issues
+    - **Release title**: Use a descriptive title (e.g., "Release v1.0.0" or "Initial Public Release")
+    - **Release description**: Add release notes describing what changed:
+        - New features
+        - Bug fixes
+        - Breaking changes
+        - Known issues
 
 5. **Publish the Release**
-   - Click **"Publish release"**
-   - The GitHub Actions workflow will automatically:
-     - Build the runtime container
-     - Push it to GHCR with multiple tags:
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:latest`
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0.0`
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0`
+    - Click **"Publish release"**
+    - The GitHub Actions workflow will automatically:
+        - Build the runtime container
+        - Push it to GHCR with multiple tags:
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:latest`
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0.0`
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0`
 
 #### Version Numbering Guidelines
 
