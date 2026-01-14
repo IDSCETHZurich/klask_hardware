@@ -2,25 +2,105 @@
 
 This tutorial provides step-by-step instructions for assembling the KLASK Hardware components. Follow these steps carefully to ensure proper assembly and functionality.
 
+## Overview
+
+The KLASK robotic system consists of three main assembly groups, the **board frame** fixing the playing field, the **gantry system** providing the motion mechanism for each player side, and the **camera mount** mounting the camera and the lights above the board.
+
+![global assembly](../res/imgs/tutorials/hw-assembly/global_assembly_iso.png){width="800"}
+
+The following sections provide detailed assembly instructions for each of these groups. The CAD models shown here and the files for 3D printing can be found in this repo under `hardware/cad/`.
+
+## Board Frame
+
+![board frame](../res/imgs/tutorials/hw-assembly/board_frame_w_board_iso.png){width="800"}
+
+### Bill of Materials (BOM) for the Board Frame
+
+The board frame consists of the following parts:
+
+| Position | Name                         | Description | Quantity | Link                                                                  |
+| -------- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
+| 1        | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 2        | V-Slot 20x20 Linear Rail     | L = 340     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 3        | Frame Centering Bridge       | 3D-Print    | 4        |                                                                       |
+| 4        | Black Angle Corner Connector |             | 4        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
+| 5        | End Cap                      |             | 4        | [Link](https://openbuildspartstore.com/end-cap/)                      |
+| 6        | Low Profile Screw            | M5x8        | 12       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 7        | Tee Nut                      | M5          | 12       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
+
+### Assembly Instructions for the Board Frame
+
+The assembly of the board frame is straightforward. Start by cutting the V-slot beams to the specified lengths if not already done and print the frame centering bridges. Once all parts are ready you can simply assemble them as shown in the image below. Make sure that the KLASK board fits tightly into the frame. The exact positioning of the frame centering bridges can be adjusted later.
+
+![board frame assembly](../res/imgs/tutorials/hw-assembly/board_frame_iso.png){width="800"}
+
+Thats all for the board frame assembly! Wuhoo! You've built the first part of your KLASK robot.
+
+## Camera Mount
+
+![camera mount](../res/imgs/tutorials/hw-assembly/camera_mount_iso.png){width="800"}
+
+### BOM for the Camera Mount
+
+The camera mount consists of the following parts:
+
+| Position | Name                         | Description | Quantity | Link                                                                  |
+| -------- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
+| 1        | V-Slot 20x20 Linear Rail     | L = 660     | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 2        | V-Slot 20x20 Linear Rail     | L = 600     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 3        | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 4        | Black Angle Corner Connector |             | 6        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
+| 5        | End Cap                      |             | 6        | [Link](https://openbuildspartstore.com/end-cap/)                      |
+| 6        | Low Profile Screw            | M5x8        | 16       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 7        | Tee Nut                      | M5          | 16       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
+| 8        | Rubber Foot                  |             | 4        | [Link](https://us.openbuilds.com/rubber-feet-set-4-pack/)             |
+| 9        | Camera                       |             | 1        |                                                                       |
+| 10       | Camera Mounting Plate        | 3D-Print    | 1        |                                                                       |
+| 11       | Nanlite Compac 24B           |             | 2        |                                                                       |
+
+### Assembly Instructions for the Camera Mount
+
+As with the board frame the camera mount assembly is quite simple. Start by cutting the V-slot beams to the specified lengths if not already done and then assemble the parts as shown in the image above.
+
+To achieve the most robust scene lightning we recommend to set the `DIM`and `CCT` turning knobs on the Nanlite Compac 24B lights to maximum `+`.
+
+## Gantry System
+
+![gantry system](../res/imgs/tutorials/hw-assembly/gantry_iso.png){width="800"}
+
+Now the most complex part of the assembly, the gantry system. This part provides the motion mechanism for the KLASK robot.
+
+### Bill of Materials (BOM) for the Gantry System
+
+The gantry system consists of the following parts:
+
+| Position | Name | Description | Quantity | Link |
+| -------- | ---- | ----------- | -------- | ---- |
+
+### Assembly Instructions for the Gantry System
+
+
+
+
 ## Cutting the V-Slot Beams
 
 ### Lateral frame beams
 
 Two **360 mm** v-slot beams
 
-![42.png](res/imgs/42.png)
+![42.png](../res/imgs/tutorials/hw-assembly/42.png)
 
 ### Back frame beam
 
 One **550 mm** v-slot beam
 
-![44.png](res/imgs/44.png)
+![44.png](../res/imgs/tutorials/hw-assembly/44.png)
 
 ### Bridge main beam
 
 One **462.7 mm** v-slot beam
 
-![43.png](res/imgs/43.png)
+![43.png](../res/imgs/tutorials/hw-assembly/43.png)
 
 ### Camera holder
 
@@ -32,7 +112,7 @@ If the camera is to be placed exactly above the center of the board, then the le
 
 We rely on a $50\text{ mm}\times 50\text{ mm}$ square base plate. So the beam length should be $360+25=385\text{ mm}$.
 
-![46a.png](res/imgs/46a.png)
+![46a.png](../res/imgs/tutorials/hw-assembly/46a.png)
 
 Let $L^{Cam}_2$ be the distance of the camera from the board. That is, the distance between the playing plane of the Klask board and the bottom plane of the camera assembly. If this distance is defined from the objective of the camera, then the additional offset between the camera’s objective and its bottom plane needs to be taken into account.
 
@@ -40,7 +120,7 @@ The length of the vertical beam should be $100.63+L^{Cam}_2\ \text{[mm]}$.
 
 We suggest $L_2^{Cam}=365\text{ mm}$ yielding a beam length of $465.63\text{ mm}$. This dimension can benefit from a margin, so we increase it to $480\text{ mm}.$
 
-![45a.png](res/imgs/45a.png)
+![45a.png](../res/imgs/tutorials/hw-assembly/45a.png)
 
 ### Controller
 
@@ -57,25 +137,25 @@ To spare raw material, here is how the beams should be cut out of 1 m parts in t
 
 The image below depicts the and serves as a reference for the final assembly
 
-![33.png](res/imgs/33.png)
+![33.png](../res/imgs/tutorials/hw-assembly/33.png)
 
 The gantry decomposes into four main parts.
 
 ### **The main frame**
 
-![37.png](res/imgs/37.png)
+![37.png](../res/imgs/tutorials/hw-assembly/37.png)
 
 ### **The bridge**
 
-![34.png](res/imgs/34.png)
+![34.png](../res/imgs/tutorials/hw-assembly/34.png)
 
 ### **The controller**
 
-![35.png](res/imgs/35.png)
+![35.png](../res/imgs/tutorials/hw-assembly/35.png)
 
 ### **The camera holder**
 
-![36.png](res/imgs/36.png)
+![36.png](../res/imgs/tutorials/hw-assembly/36.png)
 
 Below are the assembly instructions for each stage.
 
@@ -85,52 +165,52 @@ We recommend following the tutorial in the same order as it is shown here.
 
 Start by building the motor mounts. The steppers are fixed onto the motor mount plates. The timing pulleys need to be mounted in opposing direction to fit the two belt circuits. Insert four tee nuts into the beam before tightening the motor mounts onto the back frame beam. Two will serve for the single idler pulleys, and two for the camera truss. Mount each single idler at different heights. Use angle connectors to attach the Y axis beams to the back frame beam. Finally, add the rubber feet.
 
-![1.png](res/imgs/1.png)
+![1.png](../res/imgs/tutorials/hw-assembly/1.png)
 
 Build **(4x)** side connectors:
 
-![39.png](res/imgs/39.png)
+![39.png](../res/imgs/tutorials/hw-assembly/39.png)
 
-| Idler pulley plate | 4 |
-| --- | --- |
-| Rubber foot | 4 |
-| Aluminum spacer 6mm | 4 |
-| L bracket | 4 |
-| M5x12 | 4 |
-| M5x25 | 4 |
-| M5 Lock nut | 8 |
+| Idler pulley plate  | 4   |
+| ------------------- | --- |
+| Rubber foot         | 4   |
+| Aluminum spacer 6mm | 4   |
+| L bracket           | 4   |
+| M5x12               | 4   |
+| M5x25               | 4   |
+| M5 Lock nut         | 8   |
 
-![40a.png](res/imgs/40a.png)
+![40a.png](../res/imgs/tutorials/hw-assembly/40a.png)
 
 ## Carriage
 
 The carriage is built around a Mini-V kit. Two angle connectors facing opposing directions are mounted using angle connectors. The belt attachments consist of a stack of shims and spacers. The peg is held by the clamp that is mounted on the front (longer) carriage beam.
 
-![2.png](res/imgs/2.png)
+![2.png](../res/imgs/tutorials/hw-assembly/2.png)
 
 ## Bridge
 
 Slide the carriage onto the bridge beam. On each end of the bridge beam, assemble a cross plate with two idler pulleys that lie on different planes. On the bottom side, attach Mini-V kits.
 
-![3.png](res/imgs/3.png)
+![3.png](../res/imgs/tutorials/hw-assembly/3.png)
 
 ## Bridge and carriage
 
 The final assembly of the bridge with its carriage should look like this:
 
-![4.png](res/imgs/4.png)
+![4.png](../res/imgs/tutorials/hw-assembly/4.png)
 
 ## Y axis assembly
 
 On the front of the Y axis beams, mount the three following subassemblies. Using two idler mount plates, create the lateral board spacer and the double idler mount, that both have an L-connector carrying a rubber foot. On the bottom of the beam, mount a rubber foot. On only one of the Y axis assemblies, add the dual connector.
 
-![5.png](res/imgs/5.png)
+![5.png](../res/imgs/tutorials/hw-assembly/5.png)
 
 ## Full frame
 
 Slide two Y axis beam assemblies through the Mini-V kits on the bridge. Tightly connect with the back frame assembly using both interior and exterior angle connectors. Route both belt circuits (Section 6.4) around all pulleys and the timing gears for a fully assembled frame:
 
-![6.png](res/imgs/6.png)
+![6.png](../res/imgs/tutorials/hw-assembly/6.png)
 
 ## Relevant assembly offsets
 
@@ -140,25 +220,25 @@ For the main frame, the offsets provided here are meant to guide the constructio
 
 The width of the cross plates is 60 mm, so its center line is at 30 mm. The idler pulley is located on the center of the V-slot beam and has diameter 17.5 mm. The thickness of the belts is 1.5 mm, including the teeth. The shift between the idlers therefore needs to be 17.5 + 1.5 = 19 mm. This yields an offset between the cross plate and the end of the bridge beam of 30 − 19 = 11 mm.
 
-![7.png](res/imgs/7.png)
+![7.png](../res/imgs/tutorials/hw-assembly/7.png)
 
 ### Offset between the stepper motor and the back frame beam
 
 The stepper motor has width 42.22 mm. Its shaft should be aligned with the beam axis at 20 mm. The offset needs to be −1.11 mm.
 
-![8.png](res/imgs/8.png)
+![8.png](../res/imgs/tutorials/hw-assembly/8.png)
 
 ### Offset between the back frame beam and the Y axis beam
 
 The alignment of the stepper shaft and the idler pulley is at 20 + 10 = 30 mm. The idler pulley has radius 8.75 mm and the timing gear has radius 6.16 mm. The needed offset is 2.65 mm. Include an additional 1 mm accounting for the thickness of the belt. The total offset is 30 + 2.65 + 1 = 33.65 mm.
 
-![9.png](res/imgs/9.png)
+![9.png](../res/imgs/tutorials/hw-assembly/9.png)
 
 ### Offset of the back frame idler pulley and the frame
 
 The idler pulley that sits on the back frame needs to be aligned with the idler pulley on the cross plate of the bridge. The offset is 9 mm to the inner of the gantry.
 
-![10.png](res/imgs/10.png)
+![10.png](../res/imgs/tutorials/hw-assembly/10.png)
 
 ## Belt tensioning procedure
 
