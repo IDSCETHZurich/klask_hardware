@@ -8,7 +8,7 @@ The KLASK robotic system consists of three main assembly groups, the **board fra
 
 ![global assembly](../res/imgs/tutorials/hw-assembly/global_assembly_iso.png){width="800"}
 
-The following sections provide detailed assembly instructions for each of these groups. The CAD models shown here and the files for 3D printing can be found in this repo under `hardware/cad/`.
+The following sections provide detailed assembly instructions for each of these groups. The CAD models shown here and the files for 3D printing can be found in this repo under `hardware/cad/`. A complete Bill of Materials (BOM) for all parts needed for the assembly is provided at the end of this tutorial.
 
 ## Board Frame
 
@@ -18,19 +18,19 @@ The following sections provide detailed assembly instructions for each of these 
 
 The board frame consists of the following parts:
 
-| Position | Name                         | Description | Quantity | Link                                                                  |
-| -------- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
-| 1        | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
-| 2        | V-Slot 20x20 Linear Rail     | L = 340     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
-| 3        | Frame Centering Bridge       | 3D-Print    | 4        |                                                                       |
-| 4        | Black Angle Corner Connector |             | 4        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
-| 5        | End Cap                      |             | 4        | [Link](https://openbuildspartstore.com/end-cap/)                      |
-| 6        | Low Profile Screw            | M5x8        | 12       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
-| 7        | Tee Nut                      | M5          | 12       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
+| Pos. | Name                         | Description | Quantity | Link                                                                  |
+| ---- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
+| 1    | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 2    | V-Slot 20x20 Linear Rail     | L = 340     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 3    | Frame Centering Bridge       | 3D-Print    | 4        |                                                                       |
+| 4    | Black Angle Corner Connector |             | 4        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
+| 5    | End Cap                      |             | 4        | [Link](https://openbuildspartstore.com/end-cap/)                      |
+| 6    | Low Profile Screw            | M5x8        | 12       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 7    | Tee Nut                      | M5          | 12       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
 
 ### Assembly Instructions for the Board Frame
 
-The assembly of the board frame is straightforward. Start by cutting the V-slot beams to the specified lengths if not already done and print the frame centering bridges. Once all parts are ready you can simply assemble them as shown in the image below. Make sure that the KLASK board fits tightly into the frame. The exact positioning of the frame centering bridges can be adjusted later.
+The assembly of the board frame is straightforward. Start by cutting the V-slot beams to the specified lengths if not already done and print the frame centering bridges. Once all parts are ready you can simply assemble them as shown in the image below. Make sure that the KLASK board fits tightly into the frame. The exact Pos.ing of the frame centering bridges can be adjusted later.
 
 ![board frame assembly](../res/imgs/tutorials/hw-assembly/board_frame_iso.png){width="800"}
 
@@ -44,19 +44,19 @@ Thats all for the board frame assembly! Wuhoo! You've built the first part of yo
 
 The camera mount consists of the following parts:
 
-| Position | Name                         | Description | Quantity | Link                                                                  |
-| -------- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
-| 1        | V-Slot 20x20 Linear Rail     | L = 660     | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
-| 2        | V-Slot 20x20 Linear Rail     | L = 600     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
-| 3        | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
-| 4        | Black Angle Corner Connector |             | 6        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
-| 5        | End Cap                      |             | 6        | [Link](https://openbuildspartstore.com/end-cap/)                      |
-| 6        | Low Profile Screw            | M5x8        | 16       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
-| 7        | Tee Nut                      | M5          | 16       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
-| 8        | Rubber Foot                  |             | 4        | [Link](https://us.openbuilds.com/rubber-feet-set-4-pack/)             |
-| 9        | Camera                       |             | 1        |                                                                       |
-| 10       | Camera Mounting Plate        | 3D-Print    | 1        |                                                                       |
-| 11       | Nanlite Compac 24B           |             | 2        |                                                                       |
+| Pos. | Name                         | Description | Quantity | Link                                                                  |
+| ---- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
+| 1    | V-Slot 20x20 Linear Rail     | L = 660     | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 2    | V-Slot 20x20 Linear Rail     | L = 600     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 3    | V-Slot 20x20 Linear Rail     | L = 500     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 4    | Black Angle Corner Connector |             | 6        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
+| 5    | End Cap                      |             | 6        | [Link](https://openbuildspartstore.com/end-cap/)                      |
+| 6    | Low Profile Screw            | M5x8        | 16       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 7    | Tee Nut                      | M5          | 16       | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
+| 8    | Rubber Foot                  |             | 4        | [Link](https://us.openbuilds.com/rubber-feet-set-4-pack/)             |
+| 9    | Camera                       |             | 1        |                                                                       |
+| 10   | Camera Mounting Plate        | 3D-Print    | 1        |                                                                       |
+| 11   | Nanlite Compac 24B           |             | 2        |                                                                       |
 
 ### Assembly Instructions for the Camera Mount
 
@@ -80,23 +80,23 @@ First we start with the controller assembly that mounts the magnet to play the g
 
 The parts needed for that are listed below.
 
-| Position | Name                         | Description | Quantity | Link                                                                     |
-| -------- | ---------------------------- | ----------- | -------- | ------------------------------------------------------------------------ |
-| 1        | Mini V Gantry Kit            |             | 1        | [Link](https://openbuildspartstore.com/mini-v-gantry-kit/)               |
-| 2        | V-Slot 20x20 Linear Rail     | L = 26.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
-| 3        | V-Slot 20x20 Linear Rail     | L = 31.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
-| 4        | Black Angle Corner Connector |             | 2        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/)    |
-| 5        | End Cap                      |             | 2        | [Link](https://openbuildspartstore.com/end-cap/)                         |
-| 6        | Low Profile Screw            | M5x8        | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
-| 7        | Low Profile Screw            | M5x30       | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
-| 8        | Self Tapping Screw           |             | 3        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)           |
-| 9        | Tee Nut                      | M5          | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                      |
-| 10       | Slot Washer - 15x5x2mm       |             | 8        | [Link](https://openbuildspartstore.com/slot-washer-15x5x2mm-10-pack/)    |
-| 11       | Precision Shim - 10x5x1mm    |             | 8        | [Link](https://openbuildspartstore.com/precision-shim-10x5x1mm-10-pack/) |
-| 12       | Aluminum Spacers             | 3mm         | 6        | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)        |
-| 13       | Peg Holder                   | 3D-Print    | 1        |                                                                          |
+| Pos. | Name                         | Description | Quantity | Link                                                                     |
+| ---- | ---------------------------- | ----------- | -------- | ------------------------------------------------------------------------ |
+| 1    | Mini V Gantry Kit            |             | 1        | [Link](https://openbuildspartstore.com/mini-v-gantry-kit/)               |
+| 2    | V-Slot 20x20 Linear Rail     | L = 26.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
+| 3    | V-Slot 20x20 Linear Rail     | L = 31.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
+| 4    | Black Angle Corner Connector |             | 2        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/)    |
+| 5    | End Cap                      |             | 2        | [Link](https://openbuildspartstore.com/end-cap/)                         |
+| 6    | Low Profile Screw            | M5x8        | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
+| 7    | Low Profile Screw            | M5x30       | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
+| 8    | Self Tapping Screw           |             | 3        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)           |
+| 9    | Tee Nut                      | M5          | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                      |
+| 10   | Slot Washer - 15x5x2mm       |             | 8        | [Link](https://openbuildspartstore.com/slot-washer-15x5x2mm-10-pack/)    |
+| 11   | Precision Shim - 10x5x1mm    |             | 8        | [Link](https://openbuildspartstore.com/precision-shim-10x5x1mm-10-pack/) |
+| 12   | Aluminum Spacers             | 3mm         | 6        | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)        |
+| 13   | Peg Holder                   | 3D-Print    | 1        |                                                                          |
 
-The explosion view below shows how the controller is assembled.
+The explosion view below shows how the controller is assembled. The Mini V Gantry Kit comes pre-assembled. Ant the longer of the two V-Slot beams is used on the side where the magnet is mounted.
 
 ![controller explosion](../res/imgs/tutorials/hw-assembly/controller_iso_exp.png){width="800"}
 
@@ -104,76 +104,100 @@ The explosion view below shows how the controller is assembled.
 
 ### Bridge
 
-| Position | Name | Description | Quantity | Link |
-| -------- | ---- | ----------- | -------- | ---- |
-| 1        |      |             |          |      |
-| 2        |      |             |          |      |
-| 3        |      |             |          |      |
-| 4        |      |             |          |      |
-| 5        |      |             |          |      |
-| 6        |      |             |          |      |
-| 7        |      |             |          |      |
-| 8        |      |             |          |      |
-| 9        |      |             |          |      |
-| 10       |      |             |          |      |
+The bridge assembly carries the controller that moves along the Y axis.
+
+![bridge](../res/imgs/tutorials/hw-assembly/bridge_iso.png){width="800"}
+
+The parts needed for the bridge assembly are listed below.
+
+| Pos. | Name                         | Description | Quantity | Link                                                                  |
+| ---- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------- |
+| 1    | V-Slot 20x20 Linear Rail     | L = 462.7   | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)     |
+| 2    | Mini V Gantry Kit            |             | 2        | [Link](https://openbuildspartstore.com/mini-v-gantry-kit/)            |
+| 3    | Black Angle Corner Connector |             | 2        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/) |
+| 4    | Cross Joining Plate          |             | 2        | [Link](https://openbuildspartstore.com/cross-joining-plate/)          |
+| 5    | Smooth Idler Pulley Kit      |             | 4        | [Link](https://openbuildspartstore.com/smooth-idler-pulley-kit/)      |
+| 6    | Low Profile Screw            | M5x8        | 8        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 7    | Low Profile Screw            | M5x25       | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 8    | Low Profile Screw            | M5x30       | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)         |
+| 9    | Tee Nut                      | M5          | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                   |
+| 10   | Double Tee Nut               | M5          | 2        | [Link](https://openbuildspartstore.com/double-tee-nut/)               |
+| 11   | Self Tapping Screw           |             | 2        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)        |
+| 12   | End Cap                      |             | 2        | [Link](https://openbuildspartstore.com/end-cap/)                      |
 
 ### Board Frame Support
 
-| Position | Name | Description | Quantity | Link |
-| -------- | ---- | ----------- | -------- | ---- |
-| 1        |      |             |          |      |
-| 2        |      |             |          |      |
-| 3        |      |             |          |      |
-| 4        |      |             |          |      |
-| 5        |      |             |          |      |
-| 6        |      |             |          |      |
-| 7        |      |             |          |      |
-| 8        |      |             |          |      |
-| 9        |      |             |          |      |
-| 10       |      |             |          |      |
+The board frame support connects the gantry system to the board frame.
+
+![board frame support](../res/imgs/tutorials/hw-assembly/frame_support_iso.png){width="800"}
+
+It consists of the following parts:
+
+| Pos. | Name              | Description                      | Quantity | Link                                                                                          |
+| ---- | ----------------- | -------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| 1    | Ground Plate      | 3D-Print                         | 4        |                                                                                               |
+| 2    | Center Plate      | 3D-Print                         | 4        |                                                                                               |
+| 3    | Mounting Bracket  | 3D-Print                         | 4        |                                                                                               |
+| 4    | Limit Switch      | Würth WS-MITV THT (463093370402) | 4        | [Link](https://www.digikey.ch/de/products/detail/w%C3%BCrth-elektronik/463093370402/10056400) |
+| 5    | Socket Head Screw | M2x12                            | 8        |                                                                                               |
+| 6    | Socket Head Screw | M5x30                            | 8        |                                                                                               |
+| 7    | Countersunk Screw | M3x25                            | 12       |                                                                                               |
+| 8    | Hex Nut           | M2                               | 8        |                                                                                               |
+| 9    | Hex Nut           | M3                               | 12       |                                                                                               |
+| 10   | Tee Nut           | M5                               | 8        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
 
 ### Limit Switch Mount
 
-| Position | Name | Description | Quantity | Link |
-| -------- | ---- | ----------- | -------- | ---- |
-| 1        |      |             |          |      |
-| 2        |      |             |          |      |
-| 3        |      |             |          |      |
-| 4        |      |             |          |      |
-| 5        |      |             |          |      |
-| 6        |      |             |          |      |
-| 7        |      |             |          |      |
-| 8        |      |             |          |      |
-| 9        |      |             |          |      |
-| 10       |      |             |          |      |
+The limit switch mount holds the limit switches for the axis end stops.
+
+![limit switch mount](../res/imgs/tutorials/hw-assembly/limit_switch_l_iso.png){width="800"}
+
+You need two of them a normal and a mirrored one. The parts needed are listed below.
+
+| Pos. | Name              | Description                      | Quantity | Link                                                                                          |
+| ---- | ----------------- | -------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| 1    | Mount             | 3D-Print                         | 1        |                                                                                               |
+| 2    | Mount mirrored    | 3D-Print                         | 1        |                                                                                               |
+| 3    | Cover             | 3D-Print                         | 1        |                                                                                               |
+| 4    | Cover mirrored    | 3D-Print                         | 1        |                                                                                               |
+| 5    | Limit Switch      | Würth WS-MITV THT (463093370402) | 2        | [Link](https://www.digikey.ch/de/products/detail/w%C3%BCrth-elektronik/463093370402/10056400) |
+| 6    | Countersunk Screw | M2x12                            | 4        |                                                                                               |
+| 7    | Countersunk Screw | M5x18                            | 2        |                                                                                               |
+| 8    | Hex Nut           | M2                               | 4        |                                                                                               |
+| 9    | Tee Nut           | M5                               | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
 
 ### Gantry Frame
 
-| Position | Name | Description | Quantity | Link |
-| -------- | ---- | ----------- | -------- | ---- |
-| 1        |      |             |          |      |
-| 2        |      |             |          |      |
-| 3        |      |             |          |      |
-| 4        |      |             |          |      |
-| 5        |      |             |          |      |
-| 6        |      |             |          |      |
-| 7        |      |             |          |      |
-| 8        |      |             |          |      |
-| 9        |      |             |          |      |
-| 10       |      |             |          |      |
+And now the part that holds everything together, the gantry frame.
 
+![gantry frame](../res/imgs/tutorials/hw-assembly/gantry_frame_iso.png){width="800"}
 
-belt
-duality connector
+The parts needed for the gantry frame are listed below.
 
-
-
-
-
-
-
-
-
+| Pos. | Name                            | Description | Quantity | Link                                                                            |
+| ---- | ------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------- |
+| 1    | V-Slot 20x20 Linear Rail        | L = 550     | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)               |
+| 2    | V-Slot 20x20 Linear Rail        | L = 360     | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)               |
+| 3    | Inside Hidden Corner Bracket    |             | 2        | [Link](https://openbuildspartstore.com/inside-hidden-corner-bracket/)           |
+| 4    | Double Tee Nut                  | M5          | 5        | [Link](https://openbuildspartstore.com/double-tee-nut/)                         |
+| 5    | Low Profile Screw               | M5x8        | 18       | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)                   |
+| 6    | GT2-2M Timing Pulley - 20 Tooth |             | 2        | [Link](https://openbuildspartstore.com/gt2-2m-timing-pulley-20-tooth/)          |
+| 7    | Idler Pulley Plate              |             | 2        | [Link](https://openbuildspartstore.com/idler-pulley-plate/)                     |
+| 8    | Smooth Idler Pulley Kit         |             | 6        | [Link](https://openbuildspartstore.com/smooth-idler-pulley-kit/)                |
+| 9    | Tee Nut                         | M5          | 8        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                             |
+| 10   | Black Angle Corner Connector    |             | 2        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/)           |
+| 11   | End Cap                         |             | 4        | [Link](https://openbuildspartstore.com/end-cap/)                                |
+| 12   | Precision Shim - 10x5x1mm       |             | 6        | [Link](https://openbuildspartstore.com/precision-shim-10x5x1mm-10-pack/)        |
+| 13   | Aluminum Spacers                | 9mm         | 3        | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)               |
+| 14   | GT2-2M Timing Belt              | 4 m = 13 ft | 1        | [Link](https://openbuildspartstore.com/gt2-2m-timing-belt-by-the-foot/)         |
+| 15   | Nylon Insert Hex Locknut        | M5          | 2        | [Link](https://openbuildspartstore.com/nylon-insert-hex-locknut---m5-10-pack-/) |
+| 16   | Self Tapping Screw              |             | 2        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)                  |
+| 17   | Rubber Foot                     |             | 4        | [Link](https://us.openbuilds.com/rubber-feet-set-4-pack/)                       |
+| 18   | Motor Connector                 | 3D-Print    | 2        |                                                                                 |
+| 19   | Motor Enclosure Bottom          | 3D-Print    | 2        |                                                                                 |
+| 20   | Motor Enclosure Top             | 3D-Print    | 2        |                                                                                 |
+| 21   | ODrive S1 and M8325s Motor Kit  |             | 2        | [Link](https://shop.odriverobotics.com/products/s1-and-m8325s-start-kit)        |
+| 22   | Socket Head Screw               | M4x20       | 8        |                                                                                 |
 
 ## Cutting the V-Slot Beams
 
@@ -314,10 +338,18 @@ The frame of the gantry provides the necessary degrees of freedom that allow the
 
 1. Move the double idler mounts about 5 mm inwards, towards the bridge. This will later allow for further tightening of the belts.
 2. Permanently attach the belts to the attachments on the front of the carriage which carries the peg clamp.
-3. Repeat for both sides: wind the belt around the double idler mount. Adjust the lateral position of the cross plate such that the belt is parallel to the beam below. Tighten the cross plate on the bridge.
-4. Repeat for both sides: straighten the belt all the way to the timing gear. Adjust the lateral position of the motor mount such that the belt is parallel to the Y axis beam below. Tighten the motor mount.
-5. Cross both belts from the timing gears to the single idler on the back beam of the frame. Repeat for both sides: from there, reach the pulley on the opposite side of the cross plates. Adjust the lateral position of the single idler on the back beam such that the belt is parallel to the Y axis beam below. Tighten the single idler.
+3. Repeat for both sides: wind the belt around the double idler mount. Adjust the lateral Pos. of the cross plate such that the belt is parallel to the beam below. Tighten the cross plate on the bridge.
+4. Repeat for both sides: straighten the belt all the way to the timing gear. Adjust the lateral Pos. of the motor mount such that the belt is parallel to the Y axis beam below. Tighten the motor mount.
+5. Cross both belts from the timing gears to the single idler on the back beam of the frame. Repeat for both sides: from there, reach the pulley on the opposite side of the cross plates. Adjust the lateral Pos. of the single idler on the back beam such that the belt is parallel to the Y axis beam below. Tighten the single idler.
 6. Pull the belts towards the carriage and apply tension. Make sure to have similar tension on both belts. Fasten the belts with the brass rings.
 7. If more tension is required, loosen the mount plate of the double idler, pull away from the bridge, and tighten again.
 
 Now the gantry is fully assembled and ready for integration with the electronics and software components as described in the subsequent tutorials.
+
+
+## Overall BOM
+
+A summary of all parts needed to build the KLASK hardware gantry system is provided below.
+
+| Pos. | Name | Description | Quantity | Link |
+| ---- | ---- | ----------- | -------- | ---- |
