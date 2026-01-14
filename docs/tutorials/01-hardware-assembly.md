@@ -269,7 +269,62 @@ Finally tension the belt by pulling the loose idler pulley away from the center 
 
 ## Overall BOM
 
-A summary of all parts needed to build the KLASK hardware gantry system is provided below.
+A summary of all parts needed to build the complete KLASK hardware system is provided below. Quantities are for 1 camera mount + 1 board frame + 1 gantry system (with quantities for 2 gantry systems shown in brackets).
 
-| Pos. | Name | Description | Quantity | Link |
-| ---- | ---- | ----------- | -------- | ---- |
+| Pos. | Name                            | Description                      | Quantity | Link                                                                                          |
+| ---- | ------------------------------- | -------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+|      | V-Slot 20x20 Linear Rail        | L = 660                          | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 600                          | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 550                          | 1 (2)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 500                          | 6 (8)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 462.7                        | 1 (2)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 360                          | 4 (6)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 340                          | 2        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 31.5                         | 1 (2)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | V-Slot 20x20 Linear Rail        | L = 26.5                         | 1 (2)    | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)                             |
+|      | Mini V Gantry Kit               |                                  | 3 (6)    | [Link](https://openbuildspartstore.com/mini-v-gantry-kit/)                                    |
+|      | Black Angle Corner Connector    |                                  | 18 (26)  | [Link](https://openbuildspartstore.com/black-angle-corner-connector/)                         |
+|      | End Cap                         |                                  | 18 (26)  | [Link](https://openbuildspartstore.com/end-cap/)                                              |
+|      | Inside Hidden Corner Bracket    |                                  | 2 (4)    | [Link](https://openbuildspartstore.com/inside-hidden-corner-bracket/)                         |
+|      | Cross Joining Plate             |                                  | 2 (4)    | [Link](https://openbuildspartstore.com/cross-joining-plate/)                                  |
+|      | Low Profile Screw               | M5x8                             | 58 (88)  | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)                                 |
+|      | Low Profile Screw               | M5x25                            | 2 (4)    | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)                                 |
+|      | Low Profile Screw               | M5x30                            | 4 (8)    | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)                                 |
+|      | Tee Nut                         | M5                               | 50 (72)  | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
+|      | Double Tee Nut                  | M5                               | 7 (14)   | [Link](https://openbuildspartstore.com/double-tee-nut/)                                       |
+|      | Self Tapping Screw              |                                  | 7 (14)   | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)                                |
+|      | Slot Washer - 15x5x2mm          |                                  | 8 (16)   | [Link](https://openbuildspartstore.com/slot-washer-15x5x2mm-10-pack/)                         |
+|      | Precision Shim - 10x5x1mm       |                                  | 14 (28)  | [Link](https://openbuildspartstore.com/precision-shim-10x5x1mm-10-pack/)                      |
+|      | Aluminum Spacers                | 3mm                              | 6 (12)   | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)                             |
+|      | Aluminum Spacers                | 9mm                              | 3 (6)    | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)                             |
+|      | Smooth Idler Pulley Kit         |                                  | 10 (20)  | [Link](https://openbuildspartstore.com/smooth-idler-pulley-kit/)                              |
+|      | GT2-2M Timing Pulley - 20 Tooth |                                  | 2 (4)    | [Link](https://openbuildspartstore.com/gt2-2m-timing-pulley-20-tooth/)                        |
+|      | Idler Pulley Plate              |                                  | 2 (4)    | [Link](https://openbuildspartstore.com/idler-pulley-plate/)                                   |
+|      | GT2-2M Timing Belt              | 4 m = 13 ft                      | 1 (2)    | [Link](https://openbuildspartstore.com/gt2-2m-timing-belt-by-the-foot/)                       |
+|      | Nylon Insert Hex Locknut        | M5                               | 2 (4)    | [Link](https://openbuildspartstore.com/nylon-insert-hex-locknut---m5-10-pack-/)               |
+|      | Rubber Foot                     |                                  | 8 (12)   | [Link](https://us.openbuilds.com/rubber-feet-set-4-pack/)                                     |
+|      | Limit Switch                    | Würth WS-MITV THT (463093370402) | 6 (12)   | [Link](https://www.digikey.ch/de/products/detail/w%C3%BCrth-elektronik/463093370402/10056400) |
+|      | Socket Head Screw               | M2x12                            | 8 (16)   |                                                                                               |
+|      | Socket Head Screw               | M4x20                            | 8 (16)   |                                                                                               |
+|      | Socket Head Screw               | M5x30                            | 8 (16)   |                                                                                               |
+|      | Countersunk Screw               | M2x12                            | 4 (8)    |                                                                                               |
+|      | Countersunk Screw               | M3x25                            | 12 (24)  |                                                                                               |
+|      | Countersunk Screw               | M5x18                            | 2 (4)    |                                                                                               |
+|      | Hex Nut                         | M2                               | 12 (24)  |                                                                                               |
+|      | Hex Nut                         | M3                               | 12 (24)  |                                                                                               |
+|      | ODrive S1 and M8325s Motor Kit  |                                  | 2 (4)    | [Link](https://shop.odriverobotics.com/products/s1-and-m8325s-start-kit)                      |
+|      | Camera                          |                                  | 1        |                                                                                               |
+|      | Nanlite Compac 24B              |                                  | 2        |                                                                                               |
+|      | Frame Centering Bridge          | 3D-Print                         | 4        |                                                                                               |
+|      | Camera Mounting Plate           | 3D-Print                         | 1        |                                                                                               |
+|      | Peg Holder                      | 3D-Print                         | 1 (2)    |                                                                                               |
+|      | Ground Plate                    | 3D-Print                         | 4 (8)    |                                                                                               |
+|      | Center Plate                    | 3D-Print                         | 4 (8)    |                                                                                               |
+|      | Mounting Bracket                | 3D-Print                         | 4 (8)    |                                                                                               |
+|      | Mount                           | 3D-Print                         | 1 (2)    |                                                                                               |
+|      | Mount mirrored                  | 3D-Print                         | 1 (2)    |                                                                                               |
+|      | Cover                           | 3D-Print                         | 1 (2)    |                                                                                               |
+|      | Cover mirrored                  | 3D-Print                         | 1 (2)    |                                                                                               |
+|      | Motor Connector                 | 3D-Print                         | 2 (4)    |                                                                                               |
+|      | Motor Enclosure Bottom          | 3D-Print                         | 2 (4)    |                                                                                               |
+|      | Motor Enclosure Top             | 3D-Print                         | 2 (4)    |                                                                                               |
