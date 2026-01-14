@@ -27,6 +27,11 @@
   <img alt="Contributors" src="https://img.shields.io/github/contributors/IDSCETHZurich/klask_hardware">
 </a>
 
+<!-- Releases -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/releases">
+  <img alt="Release" src="https://img.shields.io/github/v/release/IDSCETHZurich/klask_hardware?sort=semver">
+</a>
+
 ## Documentation & Tutorials
 
 All documentation lives at [https://IDSCETHZurich.github.io/klask_hardware/](https://IDSCETHZurich.github.io/klask_hardware/). You'll find guides for:
