@@ -7,45 +7,45 @@
     # === Motor Configuration ===
     # ODrive motor axis indices for each player side
     right_player:
-      motor_index_right: 0  # Right motor axis for right player
-      motor_index_left: 1   # Left motor axis for right player
-    
+      motor_index_right: 0 # Right motor axis for right player
+      motor_index_left: 1 # Left motor axis for right player
+
     left_player:
-      motor_index_right: 2  # Right motor axis for left player
-      motor_index_left: 3   # Left motor axis for left player
-    
+      motor_index_right: 2 # Right motor axis for left player
+      motor_index_left: 3 # Left motor axis for left player
+
     # === Field Boundaries (meters) ===
     # Playing field boundaries in image coordinates (y=0 is top of image)
     # Format: [left, right, bottom, top]
-    right_player_edge: [0.23, 0.42, 0.32, 0.0]  # Right player field boundaries
-    left_player_edge: [0.0, 0.19, 0.32, 0.0]    # Left player field boundaries
-    
+    right_player_edge: [0.23, 0.42, 0.32, 0.0] # Right player field boundaries
+    left_player_edge: [0.0, 0.19, 0.32, 0.0] # Left player field boundaries
+
     # === Physical Constants ===
-    distance_per_revolution: 0.04  # Distance traveled per motor revolution (meters)
-    max_velocity: 0.2              # Maximum allowed peg velocity (m/s)
-    deceleration_distance: 0.05    # Distance from edge to start deceleration (meters)
-    peg_radius: 0.0075             # Physical peg radius (meters)
-    
+    distance_per_revolution: 0.04 # Distance traveled per motor revolution (meters)
+    max_velocity: 0.2 # Maximum allowed peg velocity (m/s)
+    deceleration_distance: 0.05 # Distance from edge to start deceleration (meters)
+    peg_radius: 0.0075 # Physical peg radius (meters)
+
     # === Motion Control Parameters ===
-    min_clearance_factor: 2.0      # Safety factor for minimum clearance (multiplied by peg_radius)
-    corner_x_margin: 0.03          # X-axis margin for unreachable corners (meters)
-    corner_y_margin: 0.01          # Y-axis margin for unreachable corners (meters)
-    
+    min_clearance_factor: 2.0 # Safety factor for minimum clearance (multiplied by peg_radius)
+    corner_x_margin: 0.03 # X-axis margin for unreachable corners (meters)
+    corner_y_margin: 0.01 # Y-axis margin for unreachable corners (meters)
+
     # === Topic Names ===
     # Topic name templates (will be formatted with motor index)
     control_message_topic: "/odrive_axis{}/control_message"
     controller_status_topic: "/odrive_axis{}/controller_status"
     axis_state_service: "/odrive_axis{}/request_axis_state"
-    magnet_position_topic: "/{}_magnet_position"  # Formatted with player name
-    
+    magnet_position_topic: "/{}_magnet_position" # Formatted with player name
+
     # === QoS Settings ===
-    qos_control_history_depth: 10  # Keep-all uses this as hint
-    qos_reliable_history_depth: 1  # Keep-last depth for reliable messages
-    
+    qos_control_history_depth: 10 # Keep-all uses this as hint
+    qos_reliable_history_depth: 1 # Keep-last depth for reliable messages
+
     # === Monitoring and Diagnostics ===
-    frequency_log_interval: 100    # Log command frequency every N callbacks
-    error_throttle_duration: 5000  # Throttle error logging (milliseconds)
-    
+    frequency_log_interval: 100 # Log command frequency every N callbacks
+    error_throttle_duration: 5000 # Throttle error logging (milliseconds)
+
     # === Service Timeouts ===
-    service_wait_timeout: 1        # Service availability wait timeout (seconds)
-    max_service_wait_attempts: 5   # Maximum attempts to wait for service
+    service_wait_timeout: 1 # Service availability wait timeout (seconds)
+    max_service_wait_attempts: 5 # Maximum attempts to wait for service

@@ -17,7 +17,8 @@
 #include <string>
 #include <atomic>
 
-namespace klask_motor_commander {
+namespace klask_motor_commander
+{
 
 /**
  * @brief Main controller node for managing ODrive motors and player pegs.
@@ -163,9 +164,8 @@ private:
      * @param request Shared pointer to request containing peg positions.
      * @param response Shared pointer to response with success status.
      */
-    void calibrate_encoders_callback(
-        const std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Request> request,
-        std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Response> response);
+    void calibrate_encoders_callback(const std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Request> request,
+                                     std::shared_ptr<klask_interfaces::srv::CalibrateEncoders::Response> response);
 
     /**
      * @brief Service callback for motor state change.
@@ -175,9 +175,8 @@ private:
      * @param request Shared pointer to request containing desired state.
      * @param response Shared pointer to response with success status.
      */
-    void set_motor_state_callback(
-        const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
-        std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
+    void set_motor_state_callback(const std::shared_ptr<klask_interfaces::srv::SetMotorState::Request> request,
+                                  std::shared_ptr<klask_interfaces::srv::SetMotorState::Response> response);
 
     /**
      * @brief Service callback for calibration status query.
@@ -199,9 +198,8 @@ private:
      * @param request Shared pointer to request (empty).
      * @param response Shared pointer to response with success status.
      */
-    void home_and_calibrate_callback(
-        const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
-        std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response);
+    void home_and_calibrate_callback(const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
+                                     std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response);
 
     /**
      * @brief Generic callback for player velocity commands.
@@ -211,10 +209,9 @@ private:
      * @param msg Twist message containing velocity commands.
      * @param player_name Name of the player ("right_player" or "left_player")
      */
-    void player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg, 
-                                  const std::string& player_name);
+    void player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg, const std::string& player_name);
 };
 
-}  // namespace klask_motor_commander
+} // namespace klask_motor_commander
 
 #endif // KLASK_MOTOR_COMMANDER_PKG__ODRIVE_CONTROLLER_HPP_

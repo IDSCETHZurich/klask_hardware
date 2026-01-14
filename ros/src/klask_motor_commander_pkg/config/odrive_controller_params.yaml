@@ -5,19 +5,19 @@
 /**:
   ros__parameters:
     # === Topic Names ===
-    cmd_vel_right_player: "/cmd_vel/right_player"  # Velocity command topic for right player
-    cmd_vel_left_player: "/cmd_vel/left_player"    # Velocity command topic for left player
-    
+    cmd_vel_right_player: "/cmd_vel/right_player" # Velocity command topic for right player
+    cmd_vel_left_player: "/cmd_vel/left_player" # Velocity command topic for left player
+
     # === Service Names ===
-    calibrate_encoders_service: "calibrate_encoders"  # Service for encoder calibration
-    get_calibration_status_service: "get_calibration_status"  # Service for querying calibration status
-    home_and_calibrate_service: "home_and_calibrate"  # Service for homing and calibration sequence
-    set_motor_state_service: "set_motor_state"        # Service for motor state changes
-    
+    calibrate_encoders_service: "calibrate_encoders" # Service for encoder calibration
+    get_calibration_status_service: "get_calibration_status" # Service for querying calibration status
+    home_and_calibrate_service: "home_and_calibrate" # Service for homing and calibration sequence
+    set_motor_state_service: "set_motor_state" # Service for motor state changes
+
     # === QoS Settings ===
-    cmd_vel_qos_depth: 1        # QoS history depth for velocity command subscriptions
-    
+    cmd_vel_qos_depth: 1 # QoS history depth for velocity command subscriptions
+
     # === Initial Motor State ===
     # Note: This parameter tracks the expected motor state but does not initialize motors at startup.
     # Motors are initialized to CLOSED_LOOP_CONTROL in klask_motor_commander after executor starts.
-    initial_motor_state: 8      # Expected motor state (8 = closed loop control)
+    initial_motor_state: 8 # Expected motor state (8 = closed loop control)

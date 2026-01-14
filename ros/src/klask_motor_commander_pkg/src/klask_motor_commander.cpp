@@ -31,7 +31,7 @@ using namespace klask_motor_commander;
  * @param argv Array of command-line arguments.
  * @return int Exit status (0 for success).
  */
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // Initialize ROS2
     rclcpp::init(argc, argv);
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     {
         player_config = player_side_from_string(player_str);
     }
-    catch (const std::invalid_argument &e)
+    catch (const std::invalid_argument& e)
     {
         RCLCPP_ERROR(rclcpp::get_logger("klask_motor_commander"), "%s", e.what());
         rclcpp::shutdown();
@@ -79,19 +79,20 @@ int main(int argc, char *argv[])
     std::string calibrate_service = controller_node->get_parameter("calibrate_encoders_service").as_string();
 
     // Build list of active players from controller node
-    const auto &all_players = controller_node->get_all_players();
+    const auto& all_players = controller_node->get_all_players();
 
     RCLCPP_INFO(controller_node->get_logger(),
                 "Player configuration: %s (%zu player(s) active), Homing: %s",
-                player_side_to_string(player_config).c_str(), all_players.size(),
+                player_side_to_string(player_config).c_str(),
+                all_players.size(),
                 enable_homing ? "ENABLED" : "DISABLED");
-    
+
     // Create multi-threaded executor for concurrent callback processing
     rclcpp::executors::MultiThreadedExecutor executor;
 
     // Add all nodes to the executor
     executor.add_node(controller_node);
-    for (const auto &[player_name, player_node] : all_players)
+    for (const auto& [player_name, player_node] : all_players)
     {
         executor.add_node(player_node);
     }
@@ -99,8 +100,7 @@ int main(int argc, char *argv[])
     RCLCPP_INFO(controller_node->get_logger(), "Motor commander system initialized.");
 
     // Spin executor in a separate thread to process callbacks
-    std::thread spin_thread([&executor]()
-                            { executor.spin(); });
+    std::thread spin_thread([&executor]() { executor.spin(); });
 
     // Delay to ensure action servers and services are ready
     std::this_thread::sleep_for(std::chrono::milliseconds(startup_delay));
@@ -113,8 +113,8 @@ int main(int argc, char *argv[])
         // Call home_and_calibrate service
         RCLCPP_INFO(controller_node->get_logger(), "Calling home_and_calibrate service...");
 
-        auto home_calibrate_client = controller_node->create_client<klask_interfaces::srv::HomeAndCalibrate>(
-            "home_and_calibrate");
+        auto home_calibrate_client =
+            controller_node->create_client<klask_interfaces::srv::HomeAndCalibrate>("home_and_calibrate");
 
         // Wait for service to be available
         if (!home_calibrate_client->wait_for_service(std::chrono::seconds(5)))
@@ -136,13 +136,13 @@ int main(int argc, char *argv[])
                 auto response = result.get();
                 if (response->success)
                 {
-                    RCLCPP_INFO(controller_node->get_logger(), "Home and calibrate successful: %s",
-                                response->message.c_str());
+                    RCLCPP_INFO(
+                        controller_node->get_logger(), "Home and calibrate successful: %s", response->message.c_str());
                 }
                 else
                 {
-                    RCLCPP_ERROR(controller_node->get_logger(), "Home and calibrate failed: %s",
-                                 response->message.c_str());
+                    RCLCPP_ERROR(
+                        controller_node->get_logger(), "Home and calibrate failed: %s", response->message.c_str());
                 }
             }
             else
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 
     RCLCPP_INFO(controller_node->get_logger(), "Shutting down motor commander system...");
 
-    for (const auto &[player_name, player_node] : all_players)
+    for (const auto& [player_name, player_node] : all_players)
     {
         executor.remove_node(player_node);
     }

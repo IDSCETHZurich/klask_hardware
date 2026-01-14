@@ -38,6 +38,38 @@ KLASK is a popular magnetic table game where players control magnetic pegs to hi
 
 This repository contains the hardware and software components required to build and operate the KLASK robotic system. The inference node running the RL agent is hosted in the separated [klask_software](https://github.com/IDSCETHZurich/klask_software) repository.
 
+```mermaid
+flowchart LR
+  subgraph HW["**klask_hardware Repo**"]
+    direction TB
+    HW_HARD["**Hardware**<br/>- CAD files<br/>- Assembly instructions"]
+
+    subgraph HW_CONT["Container"]
+      direction TB
+      HW_SW["**ROS Stack**<br/>- Motor Driver Node<br/>- Camera Node"]
+    end
+
+    HW_HARD --- HW_SW
+  end
+
+  subgraph SW["**klask_software Repo**"]
+    direction TB
+
+    subgraph SW_CONT["Container"]
+      direction TB
+      SE["**State Estimator**"]
+      PLAYER["**Policy Inference Node**"]
+      SE -- State --> PLAYER
+    end
+  end
+
+  HW_SW -- Image --> SE
+  PLAYER -- Action --> HW_SW
+
+  PB[("**Polybox**")]
+  PLAYER -. Weights .- PB
+```
+
 ## System Architecture
 
 The system consists of three main ROS2 packages:
@@ -95,11 +127,9 @@ See our [Contributing Guide](https://IDSCETHZurich.github.io/klask_hardware/cont
 
 ## License
 
-**TL;DR:** Code — Apache-2.0 • Hardware — CERN-OHL-S v2 • Docs — CC BY 4.0
-
-- ROS2 code and software is licensed under **Apache License 2.0**
-- Hardware designs (CAD, mechanical) are under **CERN-OHL-S v2**
-- Documentation and tutorials are under **CC BY 4.0**
+- ROS2 code and software is licensed under [**AGPL-3.0**](LICENSE-AGPL-3.0)
+- Hardware designs (CAD, mechanical) are under [**CERN-OHL-S v2**](LICENSE-CERN-OHL-S-2.0)
+- Documentation and tutorials are under [**CC BY 4.0**](LICENSE-CC-BY-4.0)
 
 ### Third-party Components
 
