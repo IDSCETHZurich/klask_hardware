@@ -70,14 +70,107 @@ To achieve the most robust scene lightning we recommend to set the `DIM`and `CCT
 
 Now the most complex part of the assembly, the gantry system. This part provides the motion mechanism for the KLASK robot.
 
-### Bill of Materials (BOM) for the Gantry System
+The parts needed to build **one** gantry system are listed below. We divide the BOM and the instructions into different sections for each sub-assembly.
 
-The gantry system consists of the following parts:
+### Controller
+
+First we start with the controller assembly that mounts the magnet to play the game.
+
+![controller](../res/imgs/tutorials/hw-assembly/controller_iso.png){width="800"}
+
+The parts needed for that are listed below.
+
+| Position | Name                         | Description | Quantity | Link                                                                     |
+| -------- | ---------------------------- | ----------- | -------- | ------------------------------------------------------------------------ |
+| 1        | Mini V Gantry Kit            |             | 1        | [Link](https://openbuildspartstore.com/mini-v-gantry-kit/)               |
+| 2        | V-Slot 20x20 Linear Rail     | L = 26.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
+| 3        | V-Slot 20x20 Linear Rail     | L = 31.5    | 1        | [Link](https://openbuildspartstore.com/v-slot-20x20-linear-rail/)        |
+| 4        | Black Angle Corner Connector |             | 2        | [Link](https://openbuildspartstore.com/black-angle-corner-connector/)    |
+| 5        | End Cap                      |             | 2        | [Link](https://openbuildspartstore.com/end-cap/)                         |
+| 6        | Low Profile Screw            | M5x8        | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
+| 7        | Low Profile Screw            | M5x30       | 2        | [Link](https://us.openbuilds.com/low-profile-screws-10-pack/)            |
+| 8        | Self Tapping Screw           |             | 3        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)           |
+| 9        | Tee Nut                      | M5          | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                      |
+| 10       | Slot Washer - 15x5x2mm       |             | 8        | [Link](https://openbuildspartstore.com/slot-washer-15x5x2mm-10-pack/)    |
+| 11       | Precision Shim - 10x5x1mm    |             | 8        | [Link](https://openbuildspartstore.com/precision-shim-10x5x1mm-10-pack/) |
+| 12       | Aluminum Spacers             | 3mm         | 6        | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)        |
+| 13       | Peg Holder                   | 3D-Print    | 1        |                                                                          |
+
+The explosion view below shows how the controller is assembled.
+
+![controller explosion](../res/imgs/tutorials/hw-assembly/controller_iso_exp.png){width="800"}
+
+![controller assembly bottom](../res/imgs/tutorials/hw-assembly/controller_iso_b.png){width="800"}
+
+### Bridge
 
 | Position | Name | Description | Quantity | Link |
 | -------- | ---- | ----------- | -------- | ---- |
+| 1        |      |             |          |      |
+| 2        |      |             |          |      |
+| 3        |      |             |          |      |
+| 4        |      |             |          |      |
+| 5        |      |             |          |      |
+| 6        |      |             |          |      |
+| 7        |      |             |          |      |
+| 8        |      |             |          |      |
+| 9        |      |             |          |      |
+| 10       |      |             |          |      |
 
-### Assembly Instructions for the Gantry System
+### Board Frame Support
+
+| Position | Name | Description | Quantity | Link |
+| -------- | ---- | ----------- | -------- | ---- |
+| 1        |      |             |          |      |
+| 2        |      |             |          |      |
+| 3        |      |             |          |      |
+| 4        |      |             |          |      |
+| 5        |      |             |          |      |
+| 6        |      |             |          |      |
+| 7        |      |             |          |      |
+| 8        |      |             |          |      |
+| 9        |      |             |          |      |
+| 10       |      |             |          |      |
+
+### Limit Switch Mount
+
+| Position | Name | Description | Quantity | Link |
+| -------- | ---- | ----------- | -------- | ---- |
+| 1        |      |             |          |      |
+| 2        |      |             |          |      |
+| 3        |      |             |          |      |
+| 4        |      |             |          |      |
+| 5        |      |             |          |      |
+| 6        |      |             |          |      |
+| 7        |      |             |          |      |
+| 8        |      |             |          |      |
+| 9        |      |             |          |      |
+| 10       |      |             |          |      |
+
+### Gantry Frame
+
+| Position | Name | Description | Quantity | Link |
+| -------- | ---- | ----------- | -------- | ---- |
+| 1        |      |             |          |      |
+| 2        |      |             |          |      |
+| 3        |      |             |          |      |
+| 4        |      |             |          |      |
+| 5        |      |             |          |      |
+| 6        |      |             |          |      |
+| 7        |      |             |          |      |
+| 8        |      |             |          |      |
+| 9        |      |             |          |      |
+| 10       |      |             |          |      |
+
+
+belt
+duality connector
+
+
+
+
+
+
 
 
 
@@ -102,36 +195,11 @@ One **462.7 mm** v-slot beam
 
 ![43.png](../res/imgs/tutorials/hw-assembly/43.png)
 
-### Camera holder
-
-The lengths of the two camera holder beams can be calculated as follows:
-
-Let $L^{Cam}_1$ be the axial length that is occupied on the horizontal beam by the camera assembly, say for the purpose of a mounting plate, space for screws and nuts, etc.
-
-If the camera is to be placed exactly above the center of the board, then the length of the horizontal beam should be $360+L^{Cam}_1/2\ \text{[mm]}$.
-
-We rely on a $50\text{ mm}\times 50\text{ mm}$ square base plate. So the beam length should be $360+25=385\text{ mm}$.
-
-![46a.png](../res/imgs/tutorials/hw-assembly/46a.png)
-
-Let $L^{Cam}_2$ be the distance of the camera from the board. That is, the distance between the playing plane of the Klask board and the bottom plane of the camera assembly. If this distance is defined from the objective of the camera, then the additional offset between the camera’s objective and its bottom plane needs to be taken into account.
-
-The length of the vertical beam should be $100.63+L^{Cam}_2\ \text{[mm]}$.
-
-We suggest $L_2^{Cam}=365\text{ mm}$ yielding a beam length of $465.63\text{ mm}$. This dimension can benefit from a margin, so we increase it to $480\text{ mm}.$
-
-![45a.png](../res/imgs/tutorials/hw-assembly/45a.png)
 
 ### Controller
 
 With the remaining of the cut beams, provide one 26.5 mm and one 31.5 mm.
 
-### Cutting recommendation
-
-To spare raw material, here is how the beams should be cut out of 1 m parts in the most optimal way:
-
-550+360+26.5+31.5 = 968 mm
-360+462.7 = 822.7 mm
 
 ## Full assembly
 
