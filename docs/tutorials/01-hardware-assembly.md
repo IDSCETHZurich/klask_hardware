@@ -96,7 +96,7 @@ The parts needed for that are listed below.
 | 12   | Aluminum Spacers             | 3mm         | 6        | [Link](https://openbuildspartstore.com/aluminum-spacers-10-pack/)        |
 | 13   | Peg Holder                   | 3D-Print    | 1        |                                                                          |
 
-The explosion view below shows how the controller is assembled. The Mini V Gantry Kit comes pre-assembled. Ant the longer of the two V-Slot beams is used on the side where the magnet is mounted.
+The explosion view below shows how the controller is assembled. The Mini V Gantry Kit comes pre-assembled and the longer of the two V-Slot beams is used on the side where the magnet is mounted.
 
 ![controller explosion](../res/imgs/tutorials/hw-assembly/controller_iso_exp.png){width="800"}
 
@@ -128,6 +128,12 @@ The parts needed for the bridge assembly are listed below.
 The following explosion view shows how the bridge is assembled.
 
 ![bridge explosion](../res/imgs/tutorials/hw-assembly/bridge_iso_exp.png){width="800"}
+
+First assemble one side, then slide the controller onto the bridge beam, and finally assemble the other side.
+
+To later have an aligned idler wheel with the motor wheel, mount the cross plate with a distance of 11 mm from the end of the bridge beam as shown in the image below.
+
+![bridge beam distance](../res/imgs/tutorials/hw-assembly/bridge_beam_dist.png){width="800"}
 
 ### Board Frame Support
 
@@ -215,153 +221,51 @@ The parts needed for the gantry frame are listed below.
 | 21   | ODrive S1 and M8325s Motor Kit  |             | 2        | [Link](https://shop.odriverobotics.com/products/s1-and-m8325s-start-kit)        |
 | 22   | Socket Head Screw               | M4x20       | 8        |                                                                                 |
 
-## Cutting the V-Slot Beams
+Start by assembling the main frame structure as shown im the image below.
 
-### Lateral frame beams
+![gantry frame main structure](../res/imgs/tutorials/hw-assembly/gantry_frame_main_iso.png){width="800"}
 
-Two **360 mm** v-slot beams
+![gantry frame main structure explosion](../res/imgs/tutorials/hw-assembly/gantry_frame_main_iso_exp.png){width="800"}
 
-![42.png](../res/imgs/tutorials/hw-assembly/42.png)
+The distance between the x-beam and the y-beam is 33.7.
 
-### Back frame beam
+![gantry frame y dist](../res/imgs/tutorials/hw-assembly/gantry_frame_y_dist.png){width="800"}
 
-One **550 mm** v-slot beam
+Next we build the motor mounts.
 
-![44.png](../res/imgs/tutorials/hw-assembly/44.png)
+![motor mount](../res/imgs/tutorials/hw-assembly/motor_mount_iso.png){width="600"}
 
-### Bridge main beam
+The explosion view below shows how to assemble the motor mounts.
 
-One **462.7 mm** v-slot beam
+![motor mount explosion](../res/imgs/tutorials/hw-assembly/motor_mount_iso_exp.png){width="400"}
 
-![43.png](../res/imgs/tutorials/hw-assembly/43.png)
+Now you can fix the motor mounts to the previously assembled main frame structure. After that you can slide the bridge onto the gantry frame.
 
+![gantry frame bridge mounting](../res/imgs/tutorials/hw-assembly/gantry_frame_bridge_mounting.png){width="800"}
 
-### Controller
+Now you can finish the frame structure by adding the idler wheels and the feet.
 
-With the remaining of the cut beams, provide one 26.5 mm and one 31.5 mm.
+![gantry frame front mounting](../res/imgs/tutorials/hw-assembly/gantry_frame_front_mounting.png){width="400"}
 
+With the gantry frame structure finishes we can now add the board frame support and the limit switch mounts.
 
-## Full assembly
+![gantry frame final mounting](../res/imgs/tutorials/hw-assembly/gantry_frame_final_mounting.png){width="800"}
 
-The image below depicts the and serves as a reference for the final assembly
+### Belt Tensioning
 
-![33.png](../res/imgs/tutorials/hw-assembly/33.png)
+To mount and tension the belts properly we recommend to first loosen the idler pulleys indicated in the image below.
 
-The gantry decomposes into four main parts.
+![belt tensioning](../res/imgs/tutorials/hw-assembly/belt_tensioning_1.png){width="800"}
 
-### **The main frame**
+Now fix one end of the first belt to the controller and rout it around the pulleys as shown in the image below.
 
-![37.png](../res/imgs/tutorials/hw-assembly/37.png)
+![belt routing](../res/imgs/tutorials/hw-assembly/belt_tensioning_2.png){width="800"}
 
-### **The bridge**
+Repeat the same for the second belt.
 
-![34.png](../res/imgs/tutorials/hw-assembly/34.png)
+![belt routing](../res/imgs/tutorials/hw-assembly/belt_tensioning_3.png){width="800"}
 
-### **The controller**
-
-![35.png](../res/imgs/tutorials/hw-assembly/35.png)
-
-### **The camera holder**
-
-![36.png](../res/imgs/tutorials/hw-assembly/36.png)
-
-Below are the assembly instructions for each stage.
-
-We recommend following the tutorial in the same order as it is shown here.
-
-## The main frame
-
-Start by building the motor mounts. The steppers are fixed onto the motor mount plates. The timing pulleys need to be mounted in opposing direction to fit the two belt circuits. Insert four tee nuts into the beam before tightening the motor mounts onto the back frame beam. Two will serve for the single idler pulleys, and two for the camera truss. Mount each single idler at different heights. Use angle connectors to attach the Y axis beams to the back frame beam. Finally, add the rubber feet.
-
-![1.png](../res/imgs/tutorials/hw-assembly/1.png)
-
-Build **(4x)** side connectors:
-
-![39.png](../res/imgs/tutorials/hw-assembly/39.png)
-
-| Idler pulley plate  | 4   |
-| ------------------- | --- |
-| Rubber foot         | 4   |
-| Aluminum spacer 6mm | 4   |
-| L bracket           | 4   |
-| M5x12               | 4   |
-| M5x25               | 4   |
-| M5 Lock nut         | 8   |
-
-![40a.png](../res/imgs/tutorials/hw-assembly/40a.png)
-
-## Carriage
-
-The carriage is built around a Mini-V kit. Two angle connectors facing opposing directions are mounted using angle connectors. The belt attachments consist of a stack of shims and spacers. The peg is held by the clamp that is mounted on the front (longer) carriage beam.
-
-![2.png](../res/imgs/tutorials/hw-assembly/2.png)
-
-## Bridge
-
-Slide the carriage onto the bridge beam. On each end of the bridge beam, assemble a cross plate with two idler pulleys that lie on different planes. On the bottom side, attach Mini-V kits.
-
-![3.png](../res/imgs/tutorials/hw-assembly/3.png)
-
-## Bridge and carriage
-
-The final assembly of the bridge with its carriage should look like this:
-
-![4.png](../res/imgs/tutorials/hw-assembly/4.png)
-
-## Y axis assembly
-
-On the front of the Y axis beams, mount the three following subassemblies. Using two idler mount plates, create the lateral board spacer and the double idler mount, that both have an L-connector carrying a rubber foot. On the bottom of the beam, mount a rubber foot. On only one of the Y axis assemblies, add the dual connector.
-
-![5.png](../res/imgs/tutorials/hw-assembly/5.png)
-
-## Full frame
-
-Slide two Y axis beam assemblies through the Mini-V kits on the bridge. Tightly connect with the back frame assembly using both interior and exterior angle connectors. Route both belt circuits (Section 6.4) around all pulleys and the timing gears for a fully assembled frame:
-
-![6.png](../res/imgs/tutorials/hw-assembly/6.png)
-
-## Relevant assembly offsets
-
-For the main frame, the offsets provided here are meant to guide the construction of the gantry.
-
-### Offset between the cross plate and the bridge beam
-
-The width of the cross plates is 60 mm, so its center line is at 30 mm. The idler pulley is located on the center of the V-slot beam and has diameter 17.5 mm. The thickness of the belts is 1.5 mm, including the teeth. The shift between the idlers therefore needs to be 17.5 + 1.5 = 19 mm. This yields an offset between the cross plate and the end of the bridge beam of 30 − 19 = 11 mm.
-
-![7.png](../res/imgs/tutorials/hw-assembly/7.png)
-
-### Offset between the stepper motor and the back frame beam
-
-The stepper motor has width 42.22 mm. Its shaft should be aligned with the beam axis at 20 mm. The offset needs to be −1.11 mm.
-
-![8.png](../res/imgs/tutorials/hw-assembly/8.png)
-
-### Offset between the back frame beam and the Y axis beam
-
-The alignment of the stepper shaft and the idler pulley is at 20 + 10 = 30 mm. The idler pulley has radius 8.75 mm and the timing gear has radius 6.16 mm. The needed offset is 2.65 mm. Include an additional 1 mm accounting for the thickness of the belt. The total offset is 30 + 2.65 + 1 = 33.65 mm.
-
-![9.png](../res/imgs/tutorials/hw-assembly/9.png)
-
-### Offset of the back frame idler pulley and the frame
-
-The idler pulley that sits on the back frame needs to be aligned with the idler pulley on the cross plate of the bridge. The offset is 9 mm to the inner of the gantry.
-
-![10.png](../res/imgs/tutorials/hw-assembly/10.png)
-
-## Belt tensioning procedure
-
-The frame of the gantry provides the necessary degrees of freedom that allow the fine tuning of the belt alignments. The following procedure is recommended for installing the belts.
-
-1. Move the double idler mounts about 5 mm inwards, towards the bridge. This will later allow for further tightening of the belts.
-2. Permanently attach the belts to the attachments on the front of the carriage which carries the peg clamp.
-3. Repeat for both sides: wind the belt around the double idler mount. Adjust the lateral Pos. of the cross plate such that the belt is parallel to the beam below. Tighten the cross plate on the bridge.
-4. Repeat for both sides: straighten the belt all the way to the timing gear. Adjust the lateral Pos. of the motor mount such that the belt is parallel to the Y axis beam below. Tighten the motor mount.
-5. Cross both belts from the timing gears to the single idler on the back beam of the frame. Repeat for both sides: from there, reach the pulley on the opposite side of the cross plates. Adjust the lateral Pos. of the single idler on the back beam such that the belt is parallel to the Y axis beam below. Tighten the single idler.
-6. Pull the belts towards the carriage and apply tension. Make sure to have similar tension on both belts. Fasten the belts with the brass rings.
-7. If more tension is required, loosen the mount plate of the double idler, pull away from the bridge, and tighten again.
-
-Now the gantry is fully assembled and ready for integration with the electronics and software components as described in the subsequent tutorials.
-
+Finally tension the belt by pulling the loose idler pulley away from the center and re-tighten it.
 
 ## Overall BOM
 
