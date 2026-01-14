@@ -2,6 +2,11 @@
 
 **Autonomous robotic KLASK game platform for reinforcement learning research and education.** This repository contains everything you need to build and control a robotic KLASK table: ROS2 nodes for vision processing and motor control, CAD files for mechanical components, and comprehensive documentation.
 
+<!-- CI pipeline (Colcon build and test) -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/ci.yml">
+  <img alt="CI pipeline" src="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/ci.yml/badge.svg">
+</a>
+
 <!-- Docs pipeline (MkDocs/Doxygen build) -->
 <a href="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/docs.yml">
   <img alt="Docs pipeline" src="https://github.com/IDSCETHZurich/klask_hardware/actions/workflows/docs.yml/badge.svg">
@@ -22,9 +27,14 @@
   <img alt="Contributors" src="https://img.shields.io/github/contributors/IDSCETHZurich/klask_hardware">
 </a>
 
+<!-- Releases -->
+<a href="https://github.com/IDSCETHZurich/klask_hardware/releases">
+  <img alt="Release" src="https://img.shields.io/github/v/release/IDSCETHZurich/klask_hardware?sort=semver">
+</a>
+
 ## Documentation & Tutorials
 
-All documentation lives at [https://IDSCETHZurich.github.io/klask_hardware/](https://IDSCETHZurich.github.io/klask_hardware/). You'll find comprehensive guides for:
+All documentation lives at [https://IDSCETHZurich.github.io/klask_hardware/](https://IDSCETHZurich.github.io/klask_hardware/). You'll find guides for:
 
 - **Hardware Assembly:** Mechanical assembly, wiring, and component installation
 - **Runtime Startup:** Launching the system and running the autonomous game

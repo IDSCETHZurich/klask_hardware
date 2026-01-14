@@ -6,7 +6,101 @@ This tutorial will guide you through setting up your development environment for
 
 You need a fully assembled KLASK Hardware system as described in the [Hardware Assembly Tutorial](01-hardware-assembly.md). Additionally, ensure that you are also able to run the Runtime-Container as described in the [Runtime Startup Tutorial](02-runtime-startup.md). To clone the repository you need to have [Git](https://git-scm.com/) and [Git LFS](https://git-lfs.com/) installed on your machine. The only additional software you need is an IDE. We recommend using [Visual Studio Code](https://code.visualstudio.com/) since we provide a ready-to-use configuration for it but you can use any IDE of your choice.
 
-## TODO: FINISH THIS SECTION
+## Cloning the Repository
+
+First, clone the `klask_hardware` repository to your local machine. If you are an IDSC student working on the idsc4gpu machine, please refer to the [Additional Resources for IDSC Students](#additional-resources-for-idsc-students) section at the end of this tutorial for hints.
+
+All you need to develop on the KLASK Hardware is provided in the docker containers so you don't need to install any additional dependencies on your host machine.
+
+The script `./ros/ros_env/klask_docker_helper.sh` warps common docker commands to make it easier to work with the containers and the `.devcontainer/devcontainer.json` file provides a ready-to-use configuration for Visual Studio Code.
+
+There are two main containers you will be working with:
+
+- **SDK Container**: Used for development, building, and testing code. This container includes all necessary development and debugging tools.
+- **Runtime Container**: Used for running the KLASK Hardware system. This container is optimized for performance and includes only the necessary runtime components.
+
+## Working with the Containers
+
+### Building the Containers
+
+Before you can start developing, you need to build the container. From the root of the repository, run:
+
+```bash
+# Build the SDK container
+./ros/ros_env/klask_docker_helper.sh build
+
+# (Optional) Build the Runtime container
+./ros/ros_env/klask_docker_helper.sh -r build
+```
+
+### Running the Containers
+
+When working with the SDK container, you have two main options:
+
+#### 1. Using Visual Studio Code Dev Containers
+
+If you are using Visual Studio Code, you can open the repository folder and use the Dev Containers feature to open the project inside the SDK container. This provides a seamless development experience with access to all tools and extensions configured in the container.
+
+1. Open Visual Studio Code.
+2. Open the `klask_hardware` folder.
+3. You should see a prompt to reopen the folder in a container. Click **"Reopen in Container"**.
+4. Visual Studio Code will build and start the SDK container if it is not already running, and open the project inside it.
+5. You can now use the integrated terminal, debugger, and other features of Visual Studio Code within the container environment. We already configured debugging configurations so that you can directly start debugging the different components of the KLASK Hardware system.
+
+If the reopen prompt does not appear, you can manually open the command palette (Ctrl+Shift+P or Cmd+Shift+P) and select **"Dev Containers: Reopen in Container"** or click on the bottom-left icon "><" to open the "Remote Window" menu and select **"Reopen in Container"**.
+
+#### 2. Using the Command Line
+
+You can also run the SDK container directly from the command line using the helper script. This is useful if you prefer working in a terminal or are using a different IDE.
+
+```bash
+# Run the SDK container
+./ros/ros_env/klask_docker_helper.sh run
+```
+
+Now you can connect your IDE to the running container or use the terminal inside the container for development with:
+
+```bash
+# Connect to the running SDK container
+./ros/ros_env/klask_docker_helper.sh connect
+```
+
+If you want to shutdown the container, you can do so with:
+
+```bash
+# Stop the SDK container
+./ros/ros_env/klask_docker_helper.sh stop
+```
+
+The helper script also provides other usefull commands. You can see all available options with:
+
+```bash
+./ros/ros_env/klask_docker_helper.sh --help
+```
+
+#### 3. Working with the Runtime Container
+
+Since the Runtime container is optimized for performance and does not include development tools, it is typically only used for running the KLASK Hardware system. You can start the Runtime container using the helper script:
+
+```bash
+# Run the Runtime container
+./ros/ros_env/klask_docker_helper.sh -r run
+```
+
+All the commands from the SDK container helper also work for the Runtime container by adding the `-r` flag. Additionally, you can pass ROS arguments to the container with:
+
+```bash
+# Run the left player only (default is both)
+./ros/ros_env/klask_docker_helper.sh -r run --player left
+# Run the right player only without the image viewer
+./ros/ros_env/klask_docker_helper.sh -r run --player right --no-viewer
+```
+
+For a list of all available options for the Runtime container, use:
+
+```bash
+./ros/ros_env/klask_docker_helper.sh --help
+```
 
 ## Documentation
 
@@ -86,33 +180,33 @@ Releases are used to publish versioned runtime containers to GitHub Container Re
 #### Release Process
 
 1. **Navigate to Releases**
-   - Go to the GitHub repository
-   - Click on **"Releases"** in the right sidebar
+    - Go to the GitHub repository
+    - Click on **"Releases"** in the right sidebar
 
 2. **Create a New Release**
-   - Click **"Draft a new release"**
+    - Click **"Draft a new release"**
 
 3. **Choose or Create a Tag**
-   - Click **"Choose a tag"**
-   - Type a new version tag following semantic versioning (e.g., `v1.0.0`, `v1.2.3`)
-   - Click **"Create new tag: vX.Y.Z on publish"**
+    - Click **"Choose a tag"**
+    - Type a new version tag following semantic versioning (e.g., `v1.0.0`, `v1.2.3`)
+    - Click **"Create new tag: vX.Y.Z on publish"**
 
 4. **Add Release Information**
-   - **Release title**: Use a descriptive title (e.g., "Release v1.0.0" or "Initial Public Release")
-   - **Release description**: Add release notes describing what changed:
-     - New features
-     - Bug fixes
-     - Breaking changes
-     - Known issues
+    - **Release title**: Use a descriptive title (e.g., "Release v1.0.0" or "Initial Public Release")
+    - **Release description**: Add release notes describing what changed:
+        - New features
+        - Bug fixes
+        - Breaking changes
+        - Known issues
 
 5. **Publish the Release**
-   - Click **"Publish release"**
-   - The GitHub Actions workflow will automatically:
-     - Build the runtime container
-     - Push it to GHCR with multiple tags:
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:latest`
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0.0`
-       - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0`
+    - Click **"Publish release"**
+    - The GitHub Actions workflow will automatically:
+        - Build the runtime container
+        - Push it to GHCR with multiple tags:
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:latest`
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0.0`
+           - `ghcr.io/idscethzurich/klask_hardware/runtime:1.0`
 
 #### Version Numbering Guidelines
 
