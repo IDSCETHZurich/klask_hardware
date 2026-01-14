@@ -125,6 +125,10 @@ The parts needed for the bridge assembly are listed below.
 | 11   | Self Tapping Screw           |             | 2        | [Link](https://us.openbuilds.com/self-tapping-screws-10-pack/)        |
 | 12   | End Cap                      |             | 2        | [Link](https://openbuildspartstore.com/end-cap/)                      |
 
+The following explosion view shows how the bridge is assembled.
+
+![bridge explosion](../res/imgs/tutorials/hw-assembly/bridge_iso_exp.png){width="800"}
+
 ### Board Frame Support
 
 The board frame support connects the gantry system to the board frame.
@@ -146,6 +150,12 @@ It consists of the following parts:
 | 9    | Hex Nut           | M3                               | 12       |                                                                                               |
 | 10   | Tee Nut           | M5                               | 8        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
 
+It is rather simple to assemble as you can see from the explosion view below.
+
+![frame support explosion](../res/imgs/tutorials/hw-assembly/frame_support_iso_exp.png){width="800"}
+
+The hight of the limit switch has to be adjusted such that the actuator on the switch is pressed when the centering bridge of the board frame (which is the counter part of the cone shape) rests in it.
+
 ### Limit Switch Mount
 
 The limit switch mount holds the limit switches for the axis end stops.
@@ -165,6 +175,12 @@ You need two of them a normal and a mirrored one. The parts needed are listed be
 | 7    | Countersunk Screw | M5x18                            | 2        |                                                                                               |
 | 8    | Hex Nut           | M2                               | 4        |                                                                                               |
 | 9    | Tee Nut           | M5                               | 2        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
+
+The following explosion view shows how to assemble the casing.
+
+![limit switch mount explosion](../res/imgs/tutorials/hw-assembly/limit_switch_l_iso_exp.png){width="800"}
+
+![limit switch mount assembly](../res/imgs/tutorials/hw-assembly/limit_switch_r_iso.png){width="800"}
 
 ### Gantry Frame
 
