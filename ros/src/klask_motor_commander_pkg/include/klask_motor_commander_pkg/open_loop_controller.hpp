@@ -61,9 +61,6 @@ private:
     /// Flag indicating new state received
     std::atomic<bool> state_received_{false};
 
-    /// Default home position
-    geometry_msgs::msg::Point default_home_;
-
     // === Parameters (loaded from ROS parameters) ===
 
     /// Homing motion parameters

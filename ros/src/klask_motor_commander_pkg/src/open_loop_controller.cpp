@@ -20,10 +20,6 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
 
     // === Declare and load ROS parameters ===
 
-    // Homing motion parameters
-    this->declare_parameter("homing_velocity", 0.01);
-    this->declare_parameter("position_tolerance", 0.03);
-
     // Movement validation parameters
     this->declare_parameter("movement_validation_duration", 2.0);
     this->declare_parameter("movement_threshold", 0.01);
@@ -35,36 +31,13 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     this->declare_parameter("initial_state_timeout", 5.0);
 
     // Load parameters
-    homing_velocity_ = static_cast<float>(this->get_parameter("homing_velocity").as_double());
-    position_tolerance_ = static_cast<float>(this->get_parameter("position_tolerance").as_double());
     validation_duration_ = static_cast<float>(this->get_parameter("movement_validation_duration").as_double());
     movement_threshold_ = static_cast<float>(this->get_parameter("movement_threshold").as_double());
     control_frequency_ = this->get_parameter("control_frequency").as_double();
     initial_state_timeout_ = this->get_parameter("initial_state_timeout").as_double();
     validation_active_ = false;
 
-    // Set default home position based on player
-    if (player_->get_side() == PlayerSide::RIGHT_PLAYER)
-    {
-        this->declare_parameter("right_player_home_x", 0.26);
-        this->declare_parameter("right_player_home_y", 0.16);
-        default_home_.x = this->get_parameter("right_player_home_x").as_double();
-        default_home_.y = this->get_parameter("right_player_home_y").as_double();
-    }
-    else
-    {
-        this->declare_parameter("left_player_home_x", 0.16);
-        this->declare_parameter("left_player_home_y", 0.16);
-        default_home_.x = this->get_parameter("left_player_home_x").as_double();
-        default_home_.y = this->get_parameter("left_player_home_y").as_double();
-    }
-    default_home_.z = 0.0;
-
-    RCLCPP_INFO(this->get_logger(),
-                "Loaded parameters: homing_vel=%.3f, pos_tol=%.3f, control_freq=%.1f Hz",
-                homing_velocity_,
-                position_tolerance_,
-                control_frequency_);
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: control_freq=%.1f Hz", control_frequency_);
     RCLCPP_INFO(this->get_logger(),
                 "Movement validation: duration=%.1fs, threshold=%.4fm",
                 validation_duration_,
@@ -93,11 +66,7 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
                                                            std::bind(&OpenLoopController::handle_cancel, this, _1),
                                                            std::bind(&OpenLoopController::handle_accepted, this, _1));
 
-    RCLCPP_INFO(this->get_logger(),
-                "OpenLoopController for %s initialized. Default home position: [%.3f, %.3f]",
-                player_name_.c_str(),
-                default_home_.x,
-                default_home_.y);
+    RCLCPP_INFO(this->get_logger(), "OpenLoopController for %s initialized", player_name_.c_str());
     RCLCPP_INFO(this->get_logger(), "Action server 'home_peg_%s' ready", player_name_.c_str());
 }
 
@@ -126,13 +95,20 @@ void OpenLoopController::handle_accepted(const std::shared_ptr<GoalHandleHomePeg
 
     const auto goal = goal_handle->get_goal();
 
-    // Use goal home position or default if not provided (0, 0, 0)
+    // Use goal home position provided by caller
     geometry_msgs::msg::Point target_home = goal->home_position;
-    if (target_home.x == 0.0 && target_home.y == 0.0 && target_home.z == 0.0)
-    {
-        target_home = default_home_;
-        RCLCPP_INFO(this->get_logger(), "%s: Using default home position", player_name_.c_str());
-    }
+
+    // Get homing parameters from goal
+    homing_velocity_ = goal->homing_velocity;
+    position_tolerance_ = goal->position_tolerance;
+
+    RCLCPP_INFO(this->get_logger(),
+                "%s: Homing to position [%.3f, %.3f] with velocity %.3f m/s, tolerance %.3f m",
+                player_name_.c_str(),
+                target_home.x,
+                target_home.y,
+                homing_velocity_,
+                position_tolerance_);
 
     // Set goal and activate homing
     target_goal_ = target_home;

@@ -51,14 +51,12 @@ print_usage() {
 }
 
 cmd_pull() {
-    local FULL_IMAGE="${GHCR_IMAGE_BASE}:${IMAGE_TAG}"
     echo -e "${GREEN}Pulling runtime image from GHCR: ${FULL_IMAGE}${NC}"
     docker pull "${FULL_IMAGE}"
     echo -e "${GREEN}Image pull complete!${NC}"
 }
 
-cmd_local FULL_IMAGE="${GHCR_IMAGE_BASE}:${IMAGE_TAG}"
-    
+cmd_run() {
     # Check if container is already running
     if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo -e "${YELLOW}Container '${CONTAINER_NAME}' is already running.${NC}"
@@ -87,8 +85,7 @@ cmd_local FULL_IMAGE="${GHCR_IMAGE_BASE}:${IMAGE_TAG}"
         --cap-add=NET_ADMIN \
         --cap-add=NET_RAW \
         --name="${CONTAINER_NAME}" \
-        "${FULL"${CONTAINER_NAME}" \
-        "${GHCR_IMAGE}" "$@"
+        "${FULL_IMAGE}" "$@"
     
     echo -e "${GREEN}Runtime container started!${NC}"
     echo -e "Container name: ${CONTAINER_NAME}"
@@ -129,6 +126,7 @@ cmd_stop() {
 # Main
 if [ $# -eq 0 ]; then
     # No arguments, just run with defaults
+    FULL_IMAGE="${GHCR_IMAGE_BASE}:${IMAGE_TAG}"
     cmd_run
     exit 0
 fi
@@ -176,6 +174,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Set the full image name after parsing arguments
+FULL_IMAGE="${GHCR_IMAGE_BASE}:${IMAGE_TAG}"
 
 # Pull image if requested
 if [ "$PULL_IMAGE" = true ]; then

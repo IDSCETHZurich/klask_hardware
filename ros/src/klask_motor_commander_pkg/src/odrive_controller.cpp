@@ -23,6 +23,7 @@ ODriveController::ODriveController(PlayerSide player_config)
     this->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
     this->declare_parameter("get_calibration_status_service", "get_calibration_status");
     this->declare_parameter("home_and_calibrate_service", "home_and_calibrate");
+    this->declare_parameter("is_player_homed_service", "is_player_homed");
     this->declare_parameter("set_motor_state_service", "set_motor_state");
 
     // Action names for homing
@@ -33,6 +34,14 @@ ODriveController::ODriveController(PlayerSide player_config)
     this->declare_parameter("action_server_wait_timeout", 5);
     this->declare_parameter("homing_action_timeout", 30);
     this->declare_parameter("inter_homing_delay", 500);
+
+    // Home position parameters
+    this->declare_parameter("right_player_home_x", 0.26);
+    this->declare_parameter("right_player_home_y", 0.16);
+    this->declare_parameter("left_player_home_x", 0.16);
+    this->declare_parameter("left_player_home_y", 0.16);
+    this->declare_parameter("position_tolerance", 0.01);
+    this->declare_parameter("homing_velocity", 0.03);
 
     // QoS settings
     this->declare_parameter("cmd_vel_qos_depth", 1);
@@ -46,6 +55,7 @@ ODriveController::ODriveController(PlayerSide player_config)
     std::string calibrate_service = this->get_parameter("calibrate_encoders_service").as_string();
     std::string calibration_status_service = this->get_parameter("get_calibration_status_service").as_string();
     std::string home_calibrate_service = this->get_parameter("home_and_calibrate_service").as_string();
+    std::string is_player_homed_service = this->get_parameter("is_player_homed_service").as_string();
     std::string motor_state_service = this->get_parameter("set_motor_state_service").as_string();
     std::string right_action_name = this->get_parameter("right_player_action_name").as_string();
     std::string left_action_name = this->get_parameter("left_player_action_name").as_string();
@@ -101,6 +111,11 @@ ODriveController::ODriveController(PlayerSide player_config)
         home_calibrate_service,
         std::bind(&ODriveController::home_and_calibrate_callback, this, std::placeholders::_1, std::placeholders::_2));
     RCLCPP_INFO(this->get_logger(), "Created service: %s", home_calibrate_service.c_str());
+
+    is_player_homed_service_ = this->create_service<klask_interfaces::srv::IsPlayerHomed>(
+        is_player_homed_service,
+        std::bind(&ODriveController::is_player_homed_callback, this, std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: %s", is_player_homed_service.c_str());
 
     // Create action clients for homing
     if (players_.find("right_player") != players_.end())
@@ -251,6 +266,95 @@ void ODriveController::get_calibration_status_callback(
                  response->is_calibrated ? "calibrated" : "not calibrated");
 }
 
+void ODriveController::is_player_homed_callback(
+    const std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Request> request,
+    std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Response> response)
+{
+    RCLCPP_DEBUG(this->get_logger(), "Is player homed service called for player: %s", request->player.c_str());
+
+    // Validate player name
+    if (request->player != "right_player" && request->player != "left_player")
+    {
+        response->is_homed = false;
+        response->message = "Invalid player name: '" + request->player + "'. Must be 'right_player' or 'left_player'";
+        response->distance = -1.0f;
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        return;
+    }
+
+    // Check if player exists
+    auto it = players_.find(request->player);
+    if (it == players_.end())
+    {
+        response->is_homed = false;
+        response->message = request->player + " is not active in this configuration";
+        response->distance = -1.0f;
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        return;
+    }
+
+    try
+    {
+        // Get home position for the player
+        float home_x, home_y;
+        if (request->player == "right_player")
+        {
+            home_x = static_cast<float>(this->get_parameter("right_player_home_x").as_double());
+            home_y = static_cast<float>(this->get_parameter("right_player_home_y").as_double());
+        }
+        else
+        {
+            home_x = static_cast<float>(this->get_parameter("left_player_home_x").as_double());
+            home_y = static_cast<float>(this->get_parameter("left_player_home_y").as_double());
+        }
+
+        // Get position tolerance
+        float tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+
+        // Get current magnet position from player
+        auto player_node = it->second;
+        if (player_node->magnet_position.size() < 2)
+        {
+            response->is_homed = false;
+            response->message = "Player position data not available";
+            response->distance = -1.0f;
+            RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        float current_x = player_node->magnet_position[0];
+        float current_y = player_node->magnet_position[1];
+
+        // Calculate distance from home
+        float dx = current_x - home_x;
+        float dy = current_y - home_y;
+        float distance = std::sqrt(dx * dx + dy * dy);
+
+        response->distance = distance;
+        response->is_homed = (distance <= tolerance);
+
+        if (response->is_homed)
+        {
+            response->message = request->player + " is at home position (distance: " + std::to_string(distance) +
+                                "m, tolerance: " + std::to_string(tolerance) + "m)";
+            RCLCPP_DEBUG(this->get_logger(), "%s", response->message.c_str());
+        }
+        else
+        {
+            response->message = request->player + " is NOT at home position (distance: " + std::to_string(distance) +
+                                "m, tolerance: " + std::to_string(tolerance) + "m)";
+            RCLCPP_DEBUG(this->get_logger(), "%s", response->message.c_str());
+        }
+    }
+    catch (const std::exception& e)
+    {
+        response->is_homed = false;
+        response->message = std::string("Error checking home status: ") + e.what();
+        response->distance = -1.0f;
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+    }
+}
+
 void ODriveController::home_and_calibrate_callback(
     const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
     std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response)
@@ -296,6 +400,10 @@ void ODriveController::home_and_calibrate_callback(
         RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
         return;
     }
+
+    // Reset calibration flag at the start of homing sequence
+    is_calibrated_.store(false);
+    RCLCPP_INFO(this->get_logger(), "Calibration flag reset - starting homing sequence");
 
     // Disable external commands during homing/calibration
     bool previously_enabled = external_commands_enabled_.load();
@@ -355,9 +463,21 @@ void ODriveController::home_and_calibrate_callback(
             RCLCPP_INFO(this->get_logger(), "Sending homing goal for %s...", player_data.name.c_str());
 
             auto goal = HomePeg::Goal();
-            goal.home_position.x = 0.0; // Use default
-            goal.home_position.y = 0.0;
+            // Set home position from parameters
+            if (player_data.name == "right_player")
+            {
+                goal.home_position.x = this->get_parameter("right_player_home_x").as_double();
+                goal.home_position.y = this->get_parameter("right_player_home_y").as_double();
+            }
+            else
+            {
+                goal.home_position.x = this->get_parameter("left_player_home_x").as_double();
+                goal.home_position.y = this->get_parameter("left_player_home_y").as_double();
+            }
             goal.home_position.z = 0.0;
+            // Set homing parameters
+            goal.homing_velocity = static_cast<float>(this->get_parameter("homing_velocity").as_double());
+            goal.position_tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
 
             auto goal_handle_future = player_data.homing_client->async_send_goal(goal);
 
