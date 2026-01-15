@@ -1,0 +1,10 @@
+# Goal: Initiate homing and calibration sequence
+# No parameters needed - the action server is specific to a player
+---
+# Result: Final calibration result
+bool success         # True if homing and calibration completed successfully
+string message       # Status message with details
+---
+# Feedback: Current progress during homing
+string current_phase      # Current phase: "homing", "calibrating"
+string status_message     # Detailed status message

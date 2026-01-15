@@ -70,10 +70,9 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     RCLCPP_INFO(this->get_logger(), "Action server 'home_peg_%s' ready", player_name_.c_str());
 }
 
-rclcpp_action::GoalResponse OpenLoopController::handle_goal(const rclcpp_action::GoalUUID& uuid,
+rclcpp_action::GoalResponse OpenLoopController::handle_goal(const rclcpp_action::GoalUUID& /* uuid */,
                                                             std::shared_ptr<const HomePeg::Goal> goal)
 {
-    (void)uuid;
     RCLCPP_INFO(this->get_logger(),
                 "%s: Received homing goal request to position [%.3f, %.3f]",
                 player_name_.c_str(),
@@ -82,9 +81,9 @@ rclcpp_action::GoalResponse OpenLoopController::handle_goal(const rclcpp_action:
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse OpenLoopController::handle_cancel(const std::shared_ptr<GoalHandleHomePeg> goal_handle)
+rclcpp_action::CancelResponse OpenLoopController::handle_cancel(
+    const std::shared_ptr<GoalHandleHomePeg> /* goal_handle */)
 {
-    (void)goal_handle;
     RCLCPP_INFO(this->get_logger(), "%s: Received cancel request", player_name_.c_str());
     return rclcpp_action::CancelResponse::ACCEPT;
 }
