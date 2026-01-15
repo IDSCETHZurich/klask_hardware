@@ -8,6 +8,7 @@
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
 #include <klask_interfaces/srv/get_calibration_status.hpp>
 #include <klask_interfaces/srv/home_and_calibrate.hpp>
+#include <klask_interfaces/srv/is_player_homed.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
 #include <klask_interfaces/action/home_peg.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
@@ -129,6 +130,9 @@ private:
     /// Service server for home and calibrate sequence
     rclcpp::Service<klask_interfaces::srv::HomeAndCalibrate>::SharedPtr home_and_calibrate_service_;
 
+    /// Service server for checking if player is homed
+    rclcpp::Service<klask_interfaces::srv::IsPlayerHomed>::SharedPtr is_player_homed_service_;
+
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
 
@@ -200,6 +204,17 @@ private:
      */
     void home_and_calibrate_callback(const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
                                      std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response);
+
+    /**
+     * @brief Service callback to check if a player is at home position.
+     *
+     * Checks if the specified player is within position tolerance of their home position.
+     *
+     * @param request Shared pointer to request containing player name.
+     * @param response Shared pointer to response with homing status and distance.
+     */
+    void is_player_homed_callback(const std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Request> request,
+                                  std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Response> response);
 
     /**
      * @brief Generic callback for player velocity commands.

@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CalibrateEncoders.srv"
   "srv/GetCalibrationStatus.srv"
   "srv/HomeAndCalibrate.srv"
+  "srv/IsPlayerHomed.srv"
   "srv/SetMotorState.srv"
   "action/HomePeg.action"
   DEPENDENCIES geometry_msgs std_msgs diagnostic_msgs

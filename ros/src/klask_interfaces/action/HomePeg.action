@@ -1,5 +1,7 @@
 # Goal: Initiate homing of a peg to home position
 geometry_msgs/Point home_position
+float32 homing_velocity        # Velocity for homing movement (m/s)
+float32 position_tolerance     # Distance tolerance to consider homing complete (meters)
 ---
 # Result: Final position after homing
 geometry_msgs/Point final_position
