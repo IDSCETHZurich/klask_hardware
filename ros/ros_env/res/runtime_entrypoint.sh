@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-# Source ROS environment
-source /ros_entrypoint.sh
-
 # Default values
 PLAYER="both"
 START_VIEWER="true"
@@ -30,6 +27,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Source ROS environment
+source /ros_entrypoint.sh
 
 # Launch with specified parameters
 exec ros2 launch klask_motor_commander_pkg motors_launch.py \
