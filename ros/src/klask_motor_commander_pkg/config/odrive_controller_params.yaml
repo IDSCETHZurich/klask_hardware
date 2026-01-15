@@ -11,9 +11,14 @@
     # === Service Names ===
     calibrate_encoders_service: "calibrate_encoders" # Service for encoder calibration
     get_calibration_status_service: "get_calibration_status" # Service for querying calibration status
-    home_and_calibrate_service: "home_and_calibrate" # Service for homing and calibration sequence
     is_player_homed_service: "is_player_homed" # Service for checking if player is at home position
     set_motor_state_service: "set_motor_state" # Service for motor state changes
+
+    # === Action Names ===
+    right_player_action_name: "home_peg_right_player" # Action for right player peg homing
+    left_player_action_name: "home_peg_left_player" # Action for left player peg homing
+    right_player_home_calibrate_action: "home_and_calibrate_right_player" # Action for right player home and calibrate
+    left_player_home_calibrate_action: "home_and_calibrate_left_player" # Action for left player home and calibrate
 
     # === Home Position Parameters ===
     # Default home positions for each player's field area (meters)

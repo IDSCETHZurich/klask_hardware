@@ -7,9 +7,9 @@
 #include <klask_interfaces/msg/state.hpp>
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
 #include <klask_interfaces/srv/get_calibration_status.hpp>
-#include <klask_interfaces/srv/home_and_calibrate.hpp>
 #include <klask_interfaces/srv/is_player_homed.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
+#include <klask_interfaces/action/home_and_calibrate.hpp>
 #include <klask_interfaces/action/home_peg.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
 #include "klask_motor_commander_pkg/player_side.hpp"
@@ -127,8 +127,12 @@ private:
     /// Service server for calibration status query
     rclcpp::Service<klask_interfaces::srv::GetCalibrationStatus>::SharedPtr get_calibration_status_service_;
 
-    /// Service server for home and calibrate sequence
-    rclcpp::Service<klask_interfaces::srv::HomeAndCalibrate>::SharedPtr home_and_calibrate_service_;
+    /// Action server for right player home and calibrate sequence
+    rclcpp_action::Server<klask_interfaces::action::HomeAndCalibrate>::SharedPtr
+        right_player_home_and_calibrate_server_;
+
+    /// Action server for left player home and calibrate sequence
+    rclcpp_action::Server<klask_interfaces::action::HomeAndCalibrate>::SharedPtr left_player_home_and_calibrate_server_;
 
     /// Service server for checking if player is homed
     rclcpp::Service<klask_interfaces::srv::IsPlayerHomed>::SharedPtr is_player_homed_service_;
@@ -195,15 +199,25 @@ private:
         std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response);
 
     /**
-     * @brief Service callback for home and calibrate sequence.
-     *
-     * Executes homing for all active players followed by calibration.
-     *
-     * @param request Shared pointer to request (empty).
-     * @param response Shared pointer to response with success status.
+     * @brief Action goal callback for home and calibrate sequence.
      */
-    void home_and_calibrate_callback(const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
-                                     std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response);
+    rclcpp_action::GoalResponse handle_home_and_calibrate_goal(
+        const rclcpp_action::GoalUUID& uuid,
+        std::shared_ptr<const klask_interfaces::action::HomeAndCalibrate::Goal> goal,
+        const std::string& player_name);
+
+    /**
+     * @brief Action cancel callback for home and calibrate sequence.
+     */
+    rclcpp_action::CancelResponse handle_home_and_calibrate_cancel(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle);
+
+    /**
+     * @brief Action accepted callback - executes homing for specified player followed by calibration.
+     */
+    void handle_home_and_calibrate_accepted(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
+        const std::string& player_name);
 
     /**
      * @brief Service callback to check if a player is at home position.

@@ -22,13 +22,14 @@ ODriveController::ODriveController(PlayerSide player_config)
     // Service names
     this->declare_parameter("calibrate_encoders_service", "calibrate_encoders");
     this->declare_parameter("get_calibration_status_service", "get_calibration_status");
-    this->declare_parameter("home_and_calibrate_service", "home_and_calibrate");
     this->declare_parameter("is_player_homed_service", "is_player_homed");
     this->declare_parameter("set_motor_state_service", "set_motor_state");
 
     // Action names for homing
     this->declare_parameter("right_player_action_name", "home_peg_right_player");
     this->declare_parameter("left_player_action_name", "home_peg_left_player");
+    this->declare_parameter("right_player_home_calibrate_action", "home_and_calibrate_right_player");
+    this->declare_parameter("left_player_home_calibrate_action", "home_and_calibrate_left_player");
 
     // Homing timeouts
     this->declare_parameter("action_server_wait_timeout", 5);
@@ -54,11 +55,12 @@ ODriveController::ODriveController(PlayerSide player_config)
     std::string cmd_vel_left_topic = this->get_parameter("cmd_vel_left_player").as_string();
     std::string calibrate_service = this->get_parameter("calibrate_encoders_service").as_string();
     std::string calibration_status_service = this->get_parameter("get_calibration_status_service").as_string();
-    std::string home_calibrate_service = this->get_parameter("home_and_calibrate_service").as_string();
     std::string is_player_homed_service = this->get_parameter("is_player_homed_service").as_string();
     std::string motor_state_service = this->get_parameter("set_motor_state_service").as_string();
     std::string right_action_name = this->get_parameter("right_player_action_name").as_string();
     std::string left_action_name = this->get_parameter("left_player_action_name").as_string();
+    std::string right_home_calibrate_action = this->get_parameter("right_player_home_calibrate_action").as_string();
+    std::string left_home_calibrate_action = this->get_parameter("left_player_home_calibrate_action").as_string();
     int qos_depth = this->get_parameter("cmd_vel_qos_depth").as_int();
     motor_state = this->get_parameter("initial_motor_state").as_int();
     action_server_wait_timeout_ = this->get_parameter("action_server_wait_timeout").as_int();
@@ -107,10 +109,38 @@ ODriveController::ODriveController(PlayerSide player_config)
             &ODriveController::get_calibration_status_callback, this, std::placeholders::_1, std::placeholders::_2));
     RCLCPP_INFO(this->get_logger(), "Created service: %s", calibration_status_service.c_str());
 
-    home_and_calibrate_service_ = this->create_service<klask_interfaces::srv::HomeAndCalibrate>(
-        home_calibrate_service,
-        std::bind(&ODriveController::home_and_calibrate_callback, this, std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(), "Created service: %s", home_calibrate_service.c_str());
+    // Create home and calibrate action servers for active players
+    if (players_.find("right_player") != players_.end())
+    {
+        right_player_home_and_calibrate_server_ =
+            rclcpp_action::create_server<klask_interfaces::action::HomeAndCalibrate>(
+                this,
+                right_home_calibrate_action,
+                [this](const rclcpp_action::GoalUUID& uuid,
+                       std::shared_ptr<const klask_interfaces::action::HomeAndCalibrate::Goal> goal)
+                { return this->handle_home_and_calibrate_goal(uuid, goal, "right_player"); },
+                std::bind(&ODriveController::handle_home_and_calibrate_cancel, this, std::placeholders::_1),
+                [this](
+                    const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>>
+                        goal_handle) { this->handle_home_and_calibrate_accepted(goal_handle, "right_player"); });
+        RCLCPP_INFO(this->get_logger(), "Created action server: %s", right_home_calibrate_action.c_str());
+    }
+
+    if (players_.find("left_player") != players_.end())
+    {
+        left_player_home_and_calibrate_server_ =
+            rclcpp_action::create_server<klask_interfaces::action::HomeAndCalibrate>(
+                this,
+                left_home_calibrate_action,
+                [this](const rclcpp_action::GoalUUID& uuid,
+                       std::shared_ptr<const klask_interfaces::action::HomeAndCalibrate::Goal> goal)
+                { return this->handle_home_and_calibrate_goal(uuid, goal, "left_player"); },
+                std::bind(&ODriveController::handle_home_and_calibrate_cancel, this, std::placeholders::_1),
+                [this](
+                    const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>>
+                        goal_handle) { this->handle_home_and_calibrate_accepted(goal_handle, "left_player"); });
+        RCLCPP_INFO(this->get_logger(), "Created action server: %s", left_home_calibrate_action.c_str());
+    }
 
     is_player_homed_service_ = this->create_service<klask_interfaces::srv::IsPlayerHomed>(
         is_player_homed_service,
@@ -248,10 +278,9 @@ void ODriveController::set_motor_state_callback(
 }
 
 void ODriveController::get_calibration_status_callback(
-    const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> request,
+    const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> /* request */,
     std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response)
 {
-    (void)request; // Unused parameter
     response->is_calibrated = is_calibrated_.load();
     if (response->is_calibrated)
     {
@@ -355,51 +384,44 @@ void ODriveController::is_player_homed_callback(
     }
 }
 
-void ODriveController::home_and_calibrate_callback(
-    const std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Request> request,
-    std::shared_ptr<klask_interfaces::srv::HomeAndCalibrate::Response> response)
+rclcpp_action::GoalResponse ODriveController::handle_home_and_calibrate_goal(
+    const rclcpp_action::GoalUUID& /* uuid */,
+    std::shared_ptr<const klask_interfaces::action::HomeAndCalibrate::Goal> /* goal */,
+    const std::string& player_name)
 {
-    RCLCPP_INFO(this->get_logger(), "Home and calibrate service called for player: %s", request->player.c_str());
+    RCLCPP_INFO(this->get_logger(), "Home and calibrate action goal received for player: %s", player_name.c_str());
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
 
-    // Parse player selection
-    std::vector<std::string> selected_players;
-    if (request->player == "both")
+rclcpp_action::CancelResponse ODriveController::handle_home_and_calibrate_cancel(
+    const std::shared_ptr<
+        rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> /* goal_handle */)
+{
+    RCLCPP_INFO(this->get_logger(), "Received cancel request for home and calibrate action");
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+void ODriveController::handle_home_and_calibrate_accepted(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
+    const std::string& player_name)
+{
+    using HomeAndCalibrate = klask_interfaces::action::HomeAndCalibrate;
+    auto result = std::make_shared<HomeAndCalibrate::Result>();
+    auto feedback = std::make_shared<HomeAndCalibrate::Feedback>();
+
+    RCLCPP_INFO(this->get_logger(), "Home and calibrate action executing for player: %s", player_name.c_str());
+
+    // Validate that player exists
+    if (players_.count(player_name) == 0)
     {
-        if (players_.count("right_player"))
-            selected_players.push_back("right_player");
-        if (players_.count("left_player"))
-            selected_players.push_back("left_player");
-    }
-    else if (request->player == "right_player" || request->player == "left_player")
-    {
-        if (players_.count(request->player))
-        {
-            selected_players.push_back(request->player);
-        }
-        else
-        {
-            response->success = false;
-            response->message = request->player + " is not active in this configuration";
-            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
-            return;
-        }
-    }
-    else
-    {
-        response->success = false;
-        response->message =
-            "Invalid player selection: '" + request->player + "'. Must be 'right_player', 'left_player', or 'both'";
-        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        result->success = false;
+        result->message = player_name + " is not active in this configuration";
+        RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+        goal_handle->abort(result);
         return;
     }
 
-    if (selected_players.empty())
-    {
-        response->success = false;
-        response->message = "No active players to home";
-        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
-        return;
-    }
+    std::vector<std::string> selected_players = {player_name};
 
     // Reset calibration flag at the start of homing sequence
     is_calibrated_.store(false);
@@ -458,28 +480,44 @@ void ODriveController::home_and_calibrate_callback(
         // Home all selected players
         for (size_t i = 0; i < players_to_home.size(); i++)
         {
+            // Check if action was cancelled
+            if (goal_handle->is_canceling())
+            {
+                result->success = false;
+                result->message = "Home and calibrate action cancelled";
+                RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
+                goal_handle->canceled(result);
+                set_external_commands_enabled(previously_enabled);
+                return;
+            }
+
             auto& player_data = players_to_home[i];
+
+            // Publish feedback
+            feedback->current_phase = "homing";
+            feedback->status_message = std::string("Homing ") + player_data.name;
+            goal_handle->publish_feedback(feedback);
 
             RCLCPP_INFO(this->get_logger(), "Sending homing goal for %s...", player_data.name.c_str());
 
-            auto goal = HomePeg::Goal();
+            auto homing_goal = HomePeg::Goal();
             // Set home position from parameters
             if (player_data.name == "right_player")
             {
-                goal.home_position.x = this->get_parameter("right_player_home_x").as_double();
-                goal.home_position.y = this->get_parameter("right_player_home_y").as_double();
+                homing_goal.home_position.x = this->get_parameter("right_player_home_x").as_double();
+                homing_goal.home_position.y = this->get_parameter("right_player_home_y").as_double();
             }
             else
             {
-                goal.home_position.x = this->get_parameter("left_player_home_x").as_double();
-                goal.home_position.y = this->get_parameter("left_player_home_y").as_double();
+                homing_goal.home_position.x = this->get_parameter("left_player_home_x").as_double();
+                homing_goal.home_position.y = this->get_parameter("left_player_home_y").as_double();
             }
-            goal.home_position.z = 0.0;
+            homing_goal.home_position.z = 0.0;
             // Set homing parameters
-            goal.homing_velocity = static_cast<float>(this->get_parameter("homing_velocity").as_double());
-            goal.position_tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+            homing_goal.homing_velocity = static_cast<float>(this->get_parameter("homing_velocity").as_double());
+            homing_goal.position_tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
 
-            auto goal_handle_future = player_data.homing_client->async_send_goal(goal);
+            auto goal_handle_future = player_data.homing_client->async_send_goal(homing_goal);
 
             // Wait for goal to be accepted
             if (goal_handle_future.wait_for(std::chrono::seconds(action_server_wait_timeout_)) !=
@@ -490,8 +528,8 @@ void ODriveController::home_and_calibrate_callback(
             }
             else
             {
-                auto goal_handle = goal_handle_future.get();
-                if (!goal_handle)
+                auto homing_goal_handle = goal_handle_future.get();
+                if (!homing_goal_handle)
                 {
                     RCLCPP_ERROR(this->get_logger(), "%s homing goal was rejected", player_data.name.c_str());
                     homing_success = false;
@@ -499,7 +537,7 @@ void ODriveController::home_and_calibrate_callback(
                 else
                 {
                     // Wait for result
-                    auto result_future = player_data.homing_client->async_get_result(goal_handle);
+                    auto result_future = player_data.homing_client->async_get_result(homing_goal_handle);
                     if (result_future.wait_for(std::chrono::seconds(homing_action_timeout_)) !=
                         std::future_status::ready)
                     {
@@ -508,10 +546,10 @@ void ODriveController::home_and_calibrate_callback(
                     }
                     else
                     {
-                        auto result = result_future.get();
-                        if (result.code == rclcpp_action::ResultCode::SUCCEEDED && result.result->success)
+                        auto homing_result = result_future.get();
+                        if (homing_result.code == rclcpp_action::ResultCode::SUCCEEDED && homing_result.result->success)
                         {
-                            player_data.final_position = result.result->final_position;
+                            player_data.final_position = homing_result.result->final_position;
                             RCLCPP_INFO(this->get_logger(),
                                         "%s peg homed at [%.3f, %.3f]",
                                         player_data.name.c_str(),
@@ -523,7 +561,7 @@ void ODriveController::home_and_calibrate_callback(
                             RCLCPP_ERROR(this->get_logger(),
                                          "%s homing failed: %s",
                                          player_data.name.c_str(),
-                                         result.result->message.c_str());
+                                         homing_result.result->message.c_str());
                             homing_success = false;
                         }
                     }
@@ -539,6 +577,11 @@ void ODriveController::home_and_calibrate_callback(
         }
 
         RCLCPP_INFO(this->get_logger(), "=== Peg Homing Complete ===");
+
+        // Publish calibration feedback
+        feedback->current_phase = "calibrating";
+        feedback->status_message = "Calibrating encoders";
+        goal_handle->publish_feedback(feedback);
 
         // Construct State message from homed positions (only for selected players)
         klask_interfaces::msg::State calibration_state;
@@ -568,16 +611,18 @@ void ODriveController::home_and_calibrate_callback(
             throw std::runtime_error("Calibration failed: " + calib_response->message);
         }
 
-        response->success = true;
-        response->message = "Homing and calibration completed successfully";
-        RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
+        result->success = true;
+        result->message = "Homing and calibration completed successfully";
+        RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
+        goal_handle->succeed(result);
     }
     catch (const std::exception& e)
     {
-        response->success = false;
-        response->message = std::string("Home and calibrate failed: ") + e.what();
-        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        result->success = false;
+        result->message = std::string("Home and calibrate failed: ") + e.what();
+        RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
         is_calibrated_.store(false);
+        goal_handle->abort(result);
     }
 
     // Restore external commands state

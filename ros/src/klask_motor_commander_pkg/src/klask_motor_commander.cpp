@@ -11,10 +11,10 @@
 #include "klask_motor_commander_pkg/open_loop_controller.hpp"
 #include "klask_motor_commander_pkg/player_side.hpp"
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <klask_interfaces/action/home_and_calibrate.hpp>
 #include <klask_interfaces/action/home_peg.hpp>
 #include <klask_interfaces/msg/state.hpp>
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
-#include <klask_interfaces/srv/home_and_calibrate.hpp>
 #include <memory>
 #include <atomic>
 
@@ -110,45 +110,107 @@ int main(int argc, char* argv[])
     // Execute homing sequence if enabled
     if (enable_homing)
     {
-        // Call home_and_calibrate service
-        RCLCPP_INFO(controller_node->get_logger(), "Calling home_and_calibrate service...");
+        // Call home_and_calibrate action for configured players
+        RCLCPP_INFO(controller_node->get_logger(), "Calling home_and_calibrate action...");
 
-        auto home_calibrate_client =
-            controller_node->create_client<klask_interfaces::srv::HomeAndCalibrate>("home_and_calibrate");
+        using HomeAndCalibrate = klask_interfaces::action::HomeAndCalibrate;
 
-        // Wait for service to be available
-        if (!home_calibrate_client->wait_for_service(std::chrono::seconds(5)))
+        // Determine which action(s) to call based on player configuration
+        std::vector<std::string> action_names;
+        if (has_player(player_config, PlayerSide::RIGHT_PLAYER))
         {
-            RCLCPP_ERROR(controller_node->get_logger(), "home_and_calibrate service not available");
+            action_names.push_back("home_and_calibrate_right_player");
         }
-        else
+        if (has_player(player_config, PlayerSide::LEFT_PLAYER))
         {
-            // Call service with player configuration
-            auto request = std::make_shared<klask_interfaces::srv::HomeAndCalibrate::Request>();
-            request->player = player_side_to_string(player_config);
+            action_names.push_back("home_and_calibrate_left_player");
+        }
 
-            auto result = home_calibrate_client->async_send_request(request);
+        bool all_succeeded = true;
+        for (const auto& action_name : action_names)
+        {
+            auto home_calibrate_client = rclcpp_action::create_client<HomeAndCalibrate>(controller_node, action_name);
 
-            // Wait for result with extended timeout (homing can take a while)
-            int total_timeout = homing_timeout * 2 + action_wait_timeout * 4 + calibration_timeout;
-            if (result.wait_for(std::chrono::seconds(total_timeout)) == std::future_status::ready)
+            // Wait for action server to be available
+            if (!home_calibrate_client->wait_for_action_server(std::chrono::seconds(5)))
             {
-                auto response = result.get();
-                if (response->success)
+                RCLCPP_ERROR(controller_node->get_logger(), "%s action server not available", action_name.c_str());
+                all_succeeded = false;
+                continue;
+            }
+
+            // Send action goal
+            auto goal = HomeAndCalibrate::Goal();
+
+            auto send_goal_options = rclcpp_action::Client<HomeAndCalibrate>::SendGoalOptions();
+            send_goal_options.feedback_callback =
+                [&controller_node, action_name](rclcpp_action::ClientGoalHandle<HomeAndCalibrate>::SharedPtr,
+                                                const std::shared_ptr<const HomeAndCalibrate::Feedback> feedback)
+            {
+                RCLCPP_INFO(controller_node->get_logger(),
+                            "[%s] Homing progress: %s - %s",
+                            action_name.c_str(),
+                            feedback->current_phase.c_str(),
+                            feedback->status_message.c_str());
+            };
+
+            auto goal_handle_future = home_calibrate_client->async_send_goal(goal, send_goal_options);
+
+            // Wait for goal to be accepted
+            if (goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) == std::future_status::ready)
+            {
+                auto goal_handle = goal_handle_future.get();
+                if (!goal_handle)
                 {
-                    RCLCPP_INFO(
-                        controller_node->get_logger(), "Home and calibrate successful: %s", response->message.c_str());
+                    RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal was rejected", action_name.c_str());
+                    all_succeeded = false;
                 }
                 else
                 {
-                    RCLCPP_ERROR(
-                        controller_node->get_logger(), "Home and calibrate failed: %s", response->message.c_str());
+                    // Wait for result with extended timeout (homing can take a while)
+                    auto result_future = home_calibrate_client->async_get_result(goal_handle);
+                    int total_timeout = homing_timeout * 2 + action_wait_timeout * 4 + calibration_timeout;
+
+                    if (result_future.wait_for(std::chrono::seconds(total_timeout)) == std::future_status::ready)
+                    {
+                        auto result = result_future.get();
+                        if (result.code == rclcpp_action::ResultCode::SUCCEEDED && result.result->success)
+                        {
+                            RCLCPP_INFO(controller_node->get_logger(),
+                                        "[%s] Successful: %s",
+                                        action_name.c_str(),
+                                        result.result->message.c_str());
+                        }
+                        else
+                        {
+                            RCLCPP_ERROR(controller_node->get_logger(),
+                                         "[%s] Failed: %s",
+                                         action_name.c_str(),
+                                         result.result->message.c_str());
+                            all_succeeded = false;
+                        }
+                    }
+                    else
+                    {
+                        RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action timed out", action_name.c_str());
+                        all_succeeded = false;
+                    }
                 }
             }
             else
             {
-                RCLCPP_ERROR(controller_node->get_logger(), "home_and_calibrate service call timed out");
+                RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal send timed out", action_name.c_str());
+                all_succeeded = false;
             }
+        }
+
+        if (!all_succeeded)
+        {
+            RCLCPP_WARN(controller_node->get_logger(), "One or more home_and_calibrate actions failed");
+        }
+        else
+        {
+            RCLCPP_INFO(controller_node->get_logger(), "All home_and_calibrate actions completed successfully");
         }
     }
     else
