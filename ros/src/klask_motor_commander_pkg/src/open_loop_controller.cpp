@@ -37,9 +37,7 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
     initial_state_timeout_ = this->get_parameter("initial_state_timeout").as_double();
     validation_active_ = false;
 
-    RCLCPP_INFO(this->get_logger(),
-                "Loaded parameters: control_freq=%.1f Hz",
-                control_frequency_);
+    RCLCPP_INFO(this->get_logger(), "Loaded parameters: control_freq=%.1f Hz", control_frequency_);
     RCLCPP_INFO(this->get_logger(),
                 "Movement validation: duration=%.1fs, threshold=%.4fm",
                 validation_duration_,
@@ -68,9 +66,7 @@ OpenLoopController::OpenLoopController(std::shared_ptr<Player> player)
                                                            std::bind(&OpenLoopController::handle_cancel, this, _1),
                                                            std::bind(&OpenLoopController::handle_accepted, this, _1));
 
-    RCLCPP_INFO(this->get_logger(),
-                "OpenLoopController for %s initialized",
-                player_name_.c_str());
+    RCLCPP_INFO(this->get_logger(), "OpenLoopController for %s initialized", player_name_.c_str());
     RCLCPP_INFO(this->get_logger(), "Action server 'home_peg_%s' ready", player_name_.c_str());
 }
 
@@ -101,13 +97,13 @@ void OpenLoopController::handle_accepted(const std::shared_ptr<GoalHandleHomePeg
 
     // Use goal home position provided by caller
     geometry_msgs::msg::Point target_home = goal->home_position;
-    
+
     // Get homing parameters from goal
     homing_velocity_ = goal->homing_velocity;
     position_tolerance_ = goal->position_tolerance;
-    
-    RCLCPP_INFO(this->get_logger(), 
-                "%s: Homing to position [%.3f, %.3f] with velocity %.3f m/s, tolerance %.3f m", 
+
+    RCLCPP_INFO(this->get_logger(),
+                "%s: Homing to position [%.3f, %.3f] with velocity %.3f m/s, tolerance %.3f m",
                 player_name_.c_str(),
                 target_home.x,
                 target_home.y,
