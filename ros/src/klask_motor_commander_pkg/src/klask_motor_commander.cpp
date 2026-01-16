@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     // Execute homing sequence if enabled
     if (enable_homing)
     {
-        // Call home_and_calibrate action for configured players
+        // Call home_and_calibrate action for configured players (in parallel)
         RCLCPP_INFO(controller_node->get_logger(), "Calling home_and_calibrate action...");
 
         using HomeAndCalibrate = klask_interfaces::action::HomeAndCalibrate;
@@ -120,80 +120,114 @@ int main(int argc, char* argv[])
             action_names.push_back("home_and_calibrate_left_player");
         }
 
-        bool all_succeeded = true;
+        // Structure to track each action's client and futures
+        struct ActionTracker
+        {
+            std::string name;
+            rclcpp_action::Client<HomeAndCalibrate>::SharedPtr client;
+            std::shared_future<rclcpp_action::ClientGoalHandle<HomeAndCalibrate>::SharedPtr> goal_handle_future;
+            std::shared_future<rclcpp_action::ClientGoalHandle<HomeAndCalibrate>::WrappedResult> result_future;
+            bool goal_accepted = false;
+        };
+
+        std::vector<ActionTracker> action_trackers;
+
+        // Step 1: Create clients and wait for servers
         for (const auto& action_name : action_names)
         {
-            auto home_calibrate_client = rclcpp_action::create_client<HomeAndCalibrate>(controller_node, action_name);
+            ActionTracker tracker;
+            tracker.name = action_name;
+            tracker.client = rclcpp_action::create_client<HomeAndCalibrate>(controller_node, action_name);
 
             // Wait for action server to be available
-            if (!home_calibrate_client->wait_for_action_server(std::chrono::seconds(5)))
+            if (!tracker.client->wait_for_action_server(std::chrono::seconds(5)))
             {
                 RCLCPP_ERROR(controller_node->get_logger(), "%s action server not available", action_name.c_str());
-                all_succeeded = false;
                 continue;
             }
 
-            // Send action goal
+            action_trackers.push_back(tracker);
+        }
+
+        // Step 2: Send all goals in parallel
+        for (auto& tracker : action_trackers)
+        {
             auto goal = HomeAndCalibrate::Goal();
 
             auto send_goal_options = rclcpp_action::Client<HomeAndCalibrate>::SendGoalOptions();
-            send_goal_options.feedback_callback =
-                [&controller_node, action_name](rclcpp_action::ClientGoalHandle<HomeAndCalibrate>::SharedPtr,
-                                                const std::shared_ptr<const HomeAndCalibrate::Feedback> feedback)
+            send_goal_options.feedback_callback = [&controller_node, name = tracker.name](
+                                                      rclcpp_action::ClientGoalHandle<HomeAndCalibrate>::SharedPtr,
+                                                      const std::shared_ptr<const HomeAndCalibrate::Feedback> feedback)
             {
                 RCLCPP_INFO(controller_node->get_logger(),
                             "[%s] Homing progress: %s - %s",
-                            action_name.c_str(),
+                            name.c_str(),
                             feedback->current_phase.c_str(),
                             feedback->status_message.c_str());
             };
 
-            auto goal_handle_future = home_calibrate_client->async_send_goal(goal, send_goal_options);
+            tracker.goal_handle_future = tracker.client->async_send_goal(goal, send_goal_options);
+        }
 
-            // Wait for goal to be accepted
-            if (goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) == std::future_status::ready)
+        // Step 3: Wait for all goals to be accepted and start result futures
+        for (auto& tracker : action_trackers)
+        {
+            if (tracker.goal_handle_future.wait_for(std::chrono::seconds(action_wait_timeout)) ==
+                std::future_status::ready)
             {
-                auto goal_handle = goal_handle_future.get();
+                auto goal_handle = tracker.goal_handle_future.get();
                 if (!goal_handle)
                 {
-                    RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal was rejected", action_name.c_str());
-                    all_succeeded = false;
+                    RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal was rejected", tracker.name.c_str());
                 }
                 else
                 {
-                    // Wait for result with extended timeout (homing can take a while)
-                    auto result_future = home_calibrate_client->async_get_result(goal_handle);
-                    int total_timeout = homing_timeout * 2 + action_wait_timeout * 4 + calibration_timeout;
-
-                    if (result_future.wait_for(std::chrono::seconds(total_timeout)) == std::future_status::ready)
-                    {
-                        auto result = result_future.get();
-                        if (result.code == rclcpp_action::ResultCode::SUCCEEDED && result.result->success)
-                        {
-                            RCLCPP_INFO(controller_node->get_logger(),
-                                        "[%s] Successful: %s",
-                                        action_name.c_str(),
-                                        result.result->message.c_str());
-                        }
-                        else
-                        {
-                            RCLCPP_ERROR(controller_node->get_logger(),
-                                         "[%s] Failed: %s",
-                                         action_name.c_str(),
-                                         result.result->message.c_str());
-                            all_succeeded = false;
-                        }
-                    }
-                    else
-                    {
-                        RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action timed out", action_name.c_str());
-                        all_succeeded = false;
-                    }
+                    tracker.goal_accepted = true;
+                    tracker.result_future = tracker.client->async_get_result(goal_handle);
+                    RCLCPP_INFO(
+                        controller_node->get_logger(), "[%s] Goal accepted, homing started", tracker.name.c_str());
                 }
             }
             else
             {
-                RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal send timed out", action_name.c_str());
+                RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action goal send timed out", tracker.name.c_str());
+            }
+        }
+
+        // Step 4: Wait for all results to complete
+        int total_timeout = homing_timeout * 2 + action_wait_timeout * 4 + calibration_timeout;
+        bool all_succeeded = true;
+
+        for (auto& tracker : action_trackers)
+        {
+            if (!tracker.goal_accepted)
+            {
+                all_succeeded = false;
+                continue;
+            }
+
+            if (tracker.result_future.wait_for(std::chrono::seconds(total_timeout)) == std::future_status::ready)
+            {
+                auto result = tracker.result_future.get();
+                if (result.code == rclcpp_action::ResultCode::SUCCEEDED && result.result->success)
+                {
+                    RCLCPP_INFO(controller_node->get_logger(),
+                                "[%s] Successful: %s",
+                                tracker.name.c_str(),
+                                result.result->message.c_str());
+                }
+                else
+                {
+                    RCLCPP_ERROR(controller_node->get_logger(),
+                                 "[%s] Failed: %s",
+                                 tracker.name.c_str(),
+                                 result.result->message.c_str());
+                    all_succeeded = false;
+                }
+            }
+            else
+            {
+                RCLCPP_ERROR(controller_node->get_logger(), "[%s] Action timed out", tracker.name.c_str());
                 all_succeeded = false;
             }
         }
