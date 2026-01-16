@@ -1,5 +1,7 @@
 # KLASK Robotic Hardware Stack
 
+<img src="docs/res//imgs/general/klask_robotic_system.png" alt="KLASK Robotic System" width="500"/>
+
 **Autonomous robotic KLASK game platform for reinforcement learning research and education.** This repository contains everything you need to build and control a robotic KLASK table: ROS2 nodes for vision processing and motor control, CAD files for mechanical components, and comprehensive documentation.
 
 <!-- CI pipeline (Colcon build and test) -->
