@@ -6,6 +6,8 @@ on:
     paths:
       - ros/ros_env/CI.Dockerfile
       - ".github/workflows/publish-ci-container.yml"
+      - ros/ros_env/res/requirements.txt
+      - ros/ros_env/res/third_party.repos
   workflow_dispatch:
 
 jobs:
