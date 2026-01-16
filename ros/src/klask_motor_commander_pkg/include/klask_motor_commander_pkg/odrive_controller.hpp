@@ -98,16 +98,6 @@ public:
         return external_commands_enabled_.load();
     }
 
-    /**
-     * @brief Get system calibration status.
-     *
-     * @return true if system has been calibrated, false otherwise.
-     */
-    bool is_calibrated() const
-    {
-        return is_calibrated_.load();
-    }
-
 private:
     /// Map of active player nodes (key: "right_player" or "left_player")
     std::map<std::string, Player::SharedPtr> players_;
@@ -146,8 +136,11 @@ private:
     /// Flag indicating if external cmd_vel commands are enabled
     std::atomic<bool> external_commands_enabled_;
 
-    /// Flag indicating if system has been calibrated
-    std::atomic<bool> is_calibrated_;
+    /// Flag indicating if the left side has been calibrated
+    std::atomic<bool> left_is_calibrated_;
+
+    /// Flag indicating if the right side has been calibrated
+    std::atomic<bool> right_is_calibrated_;
 
     /// Action client for right player homing
     rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr right_player_homing_client_;
@@ -216,6 +209,16 @@ private:
      * @brief Action accepted callback - executes homing for specified player followed by calibration.
      */
     void handle_home_and_calibrate_accepted(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
+        const std::string& player_name);
+
+    /**
+     * @brief Executes the actual homing and calibration sequence in a separate thread.
+     *
+     * This method is called from handle_home_and_calibrate_accepted in a detached thread
+     * to allow the action server to respond to the goal acceptance immediately.
+     */
+    void execute_home_and_calibrate(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
         const std::string& player_name);
 
