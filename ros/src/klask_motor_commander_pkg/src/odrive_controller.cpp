@@ -498,8 +498,6 @@ void ODriveController::execute_home_and_calibrate(
         return;
     }
 
-    std::vector<std::string> selected_players = {player_name};
-
     // Reset calibration flag for this specific player at the start of homing sequence
     if (player_name == "right_player")
     {
@@ -521,174 +519,122 @@ void ODriveController::execute_home_and_calibrate(
         we_disabled_commands = true;
     }
 
-    // Structure to hold player-specific data (matching motor_commander.cpp)
-    struct PlayerHomingData
-    {
-        std::string name;
-        Player::SharedPtr player_node;
-        std::shared_ptr<OpenLoopController> homing_controller;
-        rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr homing_client;
-        geometry_msgs::msg::Point final_position;
-        rclcpp::executors::SingleThreadedExecutor::SharedPtr executor;
-        std::unique_ptr<std::thread> spin_thread;
-    };
-
-    std::vector<PlayerHomingData> players_to_home;
+    // Variables to hold homing controller and executor
+    std::shared_ptr<OpenLoopController> homing_controller;
+    rclcpp::executors::SingleThreadedExecutor::SharedPtr executor;
+    std::unique_ptr<std::thread> spin_thread;
+    rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr homing_client;
+    geometry_msgs::msg::Point final_position;
 
     try
     {
         using HomePeg = klask_interfaces::action::HomePeg;
 
-        // Create open-loop controllers for homing (action servers) for selected players
-        RCLCPP_INFO(this->get_logger(), "Creating open-loop controllers for peg homing...");
-        for (const auto& player_name : selected_players)
-        {
-            PlayerHomingData player_data;
-            player_data.name = player_name;
-            player_data.player_node = players_[player_name];
-            player_data.homing_controller =
-                std::make_shared<OpenLoopController>(std::dynamic_pointer_cast<Player>(player_data.player_node));
+        // Create open-loop controller for homing (action server)
+        RCLCPP_INFO(this->get_logger(), "Creating open-loop controller for %s peg homing...", player_name.c_str());
 
-            // Create an executor for the homing controller and spin it in a separate thread
-            player_data.executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
-            player_data.executor->add_node(player_data.homing_controller);
-            player_data.spin_thread =
-                std::make_unique<std::thread>([executor = player_data.executor]() { executor->spin(); });
+        homing_controller =
+            std::make_shared<OpenLoopController>(std::dynamic_pointer_cast<Player>(players_[player_name]));
 
-            RCLCPP_INFO(this->get_logger(), "%s homing controller created", player_name.c_str());
-            players_to_home.push_back(std::move(player_data));
-        }
+        // Create an executor for the homing controller and spin it in a separate thread
+        executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+        executor->add_node(homing_controller);
+        spin_thread = std::make_unique<std::thread>([executor]() { executor->spin(); });
+
+        RCLCPP_INFO(this->get_logger(), "%s homing controller created", player_name.c_str());
 
         RCLCPP_INFO(this->get_logger(), "=== Starting Peg Homing Sequence ===");
 
-        // Create action clients for selected players and wait for servers
-        for (auto& player_data : players_to_home)
-        {
-            std::string action_name = "home_peg_" + player_data.name;
-            player_data.homing_client = rclcpp_action::create_client<HomePeg>(shared_from_this(), action_name);
+        // Create action client and wait for server
+        std::string action_name = "home_peg_" + player_name;
+        homing_client = rclcpp_action::create_client<HomePeg>(shared_from_this(), action_name);
 
-            if (!player_data.homing_client->wait_for_action_server(std::chrono::seconds(action_server_wait_timeout_)))
-            {
-                throw std::runtime_error(player_data.name + " homing action server not available");
-            }
+        if (!homing_client->wait_for_action_server(std::chrono::seconds(action_server_wait_timeout_)))
+        {
+            throw std::runtime_error(player_name + " homing action server not available");
         }
 
-        bool homing_success = true;
-
-        // Home all selected players
-        for (size_t i = 0; i < players_to_home.size(); i++)
+        // Check if action was cancelled
+        if (goal_handle->is_canceling())
         {
-            // Check if action was cancelled
-            if (goal_handle->is_canceling())
+            result->success = false;
+            result->message = "Home and calibrate action cancelled";
+            RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
+            goal_handle->canceled(result);
+            // Only restore external commands if we were the ones who disabled them
+            if (we_disabled_commands)
             {
-                result->success = false;
-                result->message = "Home and calibrate action cancelled";
-                RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
-                goal_handle->canceled(result);
-                // Only restore external commands if we were the ones who disabled them
-                if (we_disabled_commands)
-                {
-                    set_external_commands_enabled(true);
-                }
-                // Stop executors before returning
-                for (auto& pd : players_to_home)
-                {
-                    if (pd.executor)
-                    {
-                        pd.executor->cancel();
-                    }
-                    if (pd.spin_thread && pd.spin_thread->joinable())
-                    {
-                        pd.spin_thread->join();
-                    }
-                }
-                return;
+                set_external_commands_enabled(true);
             }
-
-            auto& player_data = players_to_home[i];
-
-            // Publish feedback
-            feedback->current_phase = "homing";
-            feedback->status_message = std::string("Homing ") + player_data.name;
-            goal_handle->publish_feedback(feedback);
-
-            RCLCPP_INFO(this->get_logger(), "Sending homing goal for %s...", player_data.name.c_str());
-
-            auto homing_goal = HomePeg::Goal();
-            // Set home position from parameters
-            if (player_data.name == "right_player")
+            // Stop executor before returning
+            if (executor)
             {
-                homing_goal.home_position.x = this->get_parameter("right_player_home_x").as_double();
-                homing_goal.home_position.y = this->get_parameter("right_player_home_y").as_double();
+                executor->cancel();
             }
-            else
+            if (spin_thread && spin_thread->joinable())
             {
-                homing_goal.home_position.x = this->get_parameter("left_player_home_x").as_double();
-                homing_goal.home_position.y = this->get_parameter("left_player_home_y").as_double();
+                spin_thread->join();
             }
-            homing_goal.home_position.z = 0.0;
-            // Set homing parameters
-            homing_goal.homing_velocity = static_cast<float>(this->get_parameter("homing_velocity").as_double());
-            homing_goal.position_tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
-
-            auto goal_handle_future = player_data.homing_client->async_send_goal(homing_goal);
-
-            // Wait for goal to be accepted
-            if (goal_handle_future.wait_for(std::chrono::seconds(action_server_wait_timeout_)) !=
-                std::future_status::ready)
-            {
-                RCLCPP_ERROR(this->get_logger(), "Failed to send %s homing goal - timeout", player_data.name.c_str());
-                homing_success = false;
-            }
-            else
-            {
-                auto homing_goal_handle = goal_handle_future.get();
-                if (!homing_goal_handle)
-                {
-                    RCLCPP_ERROR(this->get_logger(), "%s homing goal was rejected", player_data.name.c_str());
-                    homing_success = false;
-                }
-                else
-                {
-                    // Wait for result
-                    auto result_future = player_data.homing_client->async_get_result(homing_goal_handle);
-                    if (result_future.wait_for(std::chrono::seconds(homing_action_timeout_)) !=
-                        std::future_status::ready)
-                    {
-                        RCLCPP_ERROR(this->get_logger(), "%s homing action timed out", player_data.name.c_str());
-                        homing_success = false;
-                    }
-                    else
-                    {
-                        auto homing_result = result_future.get();
-                        if (homing_result.code == rclcpp_action::ResultCode::SUCCEEDED && homing_result.result->success)
-                        {
-                            player_data.final_position = homing_result.result->final_position;
-                            RCLCPP_INFO(this->get_logger(),
-                                        "%s peg homed at [%.3f, %.3f]",
-                                        player_data.name.c_str(),
-                                        player_data.final_position.x,
-                                        player_data.final_position.y);
-                        }
-                        else
-                        {
-                            RCLCPP_ERROR(this->get_logger(),
-                                         "%s homing failed: %s",
-                                         player_data.name.c_str(),
-                                         homing_result.result->message.c_str());
-                            homing_success = false;
-                        }
-                    }
-                }
-            }
-
-            if (!homing_success)
-            {
-                throw std::runtime_error(player_data.name + " homing failed");
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(inter_homing_delay_));
+            return;
         }
+
+        // Publish feedback
+        feedback->current_phase = "homing";
+        feedback->status_message = std::string("Homing ") + player_name;
+        goal_handle->publish_feedback(feedback);
+
+        RCLCPP_INFO(this->get_logger(), "Sending homing goal for %s...", player_name.c_str());
+
+        auto homing_goal = HomePeg::Goal();
+        // Set home position from parameters
+        if (player_name == "right_player")
+        {
+            homing_goal.home_position.x = this->get_parameter("right_player_home_x").as_double();
+            homing_goal.home_position.y = this->get_parameter("right_player_home_y").as_double();
+        }
+        else
+        {
+            homing_goal.home_position.x = this->get_parameter("left_player_home_x").as_double();
+            homing_goal.home_position.y = this->get_parameter("left_player_home_y").as_double();
+        }
+        homing_goal.home_position.z = 0.0;
+        // Set homing parameters
+        homing_goal.homing_velocity = static_cast<float>(this->get_parameter("homing_velocity").as_double());
+        homing_goal.position_tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+
+        auto goal_handle_future = homing_client->async_send_goal(homing_goal);
+
+        // Wait for goal to be accepted
+        if (goal_handle_future.wait_for(std::chrono::seconds(action_server_wait_timeout_)) != std::future_status::ready)
+        {
+            throw std::runtime_error("Failed to send " + player_name + " homing goal - timeout");
+        }
+
+        auto homing_goal_handle = goal_handle_future.get();
+        if (!homing_goal_handle)
+        {
+            throw std::runtime_error(player_name + " homing goal was rejected");
+        }
+
+        // Wait for result
+        auto result_future = homing_client->async_get_result(homing_goal_handle);
+        if (result_future.wait_for(std::chrono::seconds(homing_action_timeout_)) != std::future_status::ready)
+        {
+            throw std::runtime_error(player_name + " homing action timed out");
+        }
+
+        auto homing_result = result_future.get();
+        if (homing_result.code != rclcpp_action::ResultCode::SUCCEEDED || !homing_result.result->success)
+        {
+            throw std::runtime_error(player_name + " homing failed: " + homing_result.result->message);
+        }
+
+        final_position = homing_result.result->final_position;
+        RCLCPP_INFO(this->get_logger(),
+                    "%s peg homed at [%.3f, %.3f]",
+                    player_name.c_str(),
+                    final_position.x,
+                    final_position.y);
 
         RCLCPP_INFO(this->get_logger(), "=== Peg Homing Complete ===");
 
@@ -697,18 +643,15 @@ void ODriveController::execute_home_and_calibrate(
         feedback->status_message = "Calibrating encoders";
         goal_handle->publish_feedback(feedback);
 
-        // Construct State message from homed positions (only for selected players)
+        // Construct State message from homed position
         klask_interfaces::msg::State calibration_state;
-        for (const auto& player_data : players_to_home)
+        if (player_name == "right_player")
         {
-            if (player_data.name == "right_player")
-            {
-                calibration_state.right_peg.position = player_data.final_position;
-            }
-            else if (player_data.name == "left_player")
-            {
-                calibration_state.left_peg.position = player_data.final_position;
-            }
+            calibration_state.right_peg.position = final_position;
+        }
+        else if (player_name == "left_player")
+        {
+            calibration_state.left_peg.position = final_position;
         }
 
         // Call calibration with final homed state for the specific player
@@ -748,17 +691,14 @@ void ODriveController::execute_home_and_calibrate(
         goal_handle->abort(result);
     }
 
-    // Stop all executor threads and clean up homing controllers
-    for (auto& player_data : players_to_home)
+    // Stop executor thread and clean up homing controller
+    if (executor)
     {
-        if (player_data.executor)
-        {
-            player_data.executor->cancel();
-        }
-        if (player_data.spin_thread && player_data.spin_thread->joinable())
-        {
-            player_data.spin_thread->join();
-        }
+        executor->cancel();
+    }
+    if (spin_thread && spin_thread->joinable())
+    {
+        spin_thread->join();
     }
 
     // Restore external commands state only if we were the ones who disabled them
