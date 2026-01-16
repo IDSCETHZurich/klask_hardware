@@ -43,7 +43,7 @@ class CameraNode(Node):
         self.declare_parameter("calibration_file", "klask_imaging_pkg/data/calibration_data.npz")
 
         # Detection thresholds
-        self.declare_parameter("flood_threshold", 120)
+        self.declare_parameter("flood_threshold", 100)
         self.declare_parameter("goal_flood_threshold", 20)
 
         # Border segment settings

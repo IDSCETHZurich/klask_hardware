@@ -61,14 +61,8 @@ int main(int argc, char* argv[])
     auto controller_node = std::make_shared<ODriveController>(player_config);
 
     // === Load parameters from controller node ===
-    // Note: player parameter was already loaded and used to create controller_node
-    controller_node->declare_parameter("right_player_action_name", "home_peg_right_player");
-    controller_node->declare_parameter("left_player_action_name", "home_peg_left_player");
-    controller_node->declare_parameter("action_server_wait_timeout", 5);
-    controller_node->declare_parameter("homing_action_timeout", 30);
     controller_node->declare_parameter("calibration_service_timeout", 5);
     controller_node->declare_parameter("startup_delay", 1000);
-    controller_node->declare_parameter("inter_homing_delay", 500);
 
     std::string right_action_name = controller_node->get_parameter("right_player_action_name").as_string();
     std::string left_action_name = controller_node->get_parameter("left_player_action_name").as_string();

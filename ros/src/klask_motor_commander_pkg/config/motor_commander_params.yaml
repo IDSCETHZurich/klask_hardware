@@ -15,7 +15,7 @@
     left_player_action_name: "home_peg_left_player" # Action server name for left player homing
 
     # === Timeout Settings (seconds) ===
-    action_server_wait_timeout: 5 # Timeout waiting for action server availability
+    action_server_wait_timeout: 30 # Timeout waiting for action server availability
     homing_action_timeout: 30 # Timeout for homing action to complete
     calibration_service_timeout: 5 # Timeout for calibration service call
 
