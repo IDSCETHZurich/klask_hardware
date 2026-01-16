@@ -1,5 +1,6 @@
 #include "klask_motor_commander_pkg/odrive_controller.hpp"
 #include "klask_motor_commander_pkg/open_loop_controller.hpp"
+#include <thread>
 
 namespace klask_motor_commander
 {
@@ -7,7 +8,8 @@ namespace klask_motor_commander
 ODriveController::ODriveController(PlayerSide player_config)
     : Node("odrive_controller")
     , external_commands_enabled_(true)
-    , is_calibrated_(false)
+    , left_is_calibrated_(false)
+    , right_is_calibrated_(false)
 {
     RCLCPP_INFO(this->get_logger(),
                 "Initializing ODriveController node with player config: %s",
@@ -210,35 +212,59 @@ void ODriveController::calibrate_encoders_callback(
 {
     try
     {
-        // Extract peg positions from State message and calibrate active players
-        std::string calibrated_players;
+        // Validate player parameter
+        if (request->player != "right_player" && request->player != "left_player" && request->player != "both")
+        {
+            response->success = false;
+            response->message =
+                "Invalid player: '" + request->player + "'. Must be 'right_player', 'left_player', or 'both'";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
 
-        if (players_.find("right_player") != players_.end())
+        // Extract peg positions from State message and calibrate specified player(s)
+        std::string calibrated_players;
+        bool calibrated_any = false;
+
+        if ((request->player == "right_player" || request->player == "both") &&
+            players_.find("right_player") != players_.end())
         {
             const auto& right_peg_pos = request->state.right_peg.position;
             players_["right_player"]->calibrate(right_peg_pos);
             calibrated_players +=
                 "right=[" + std::to_string(right_peg_pos.x) + ", " + std::to_string(right_peg_pos.y) + "] ";
+            right_is_calibrated_.store(true);
+            calibrated_any = true;
         }
 
-        if (players_.find("left_player") != players_.end())
+        if ((request->player == "left_player" || request->player == "both") &&
+            players_.find("left_player") != players_.end())
         {
             const auto& left_peg_pos = request->state.left_peg.position;
             players_["left_player"]->calibrate(left_peg_pos);
             calibrated_players +=
                 "left=[" + std::to_string(left_peg_pos.x) + ", " + std::to_string(left_peg_pos.y) + "] ";
+            left_is_calibrated_.store(true);
+            calibrated_any = true;
         }
 
-        response->success = true;
-        response->message = "Encoders calibrated successfully for active players";
-        is_calibrated_.store(true);
-        RCLCPP_INFO(this->get_logger(), "Encoders calibrated: %s", calibrated_players.c_str());
+        if (calibrated_any)
+        {
+            response->success = true;
+            response->message = "Encoders calibrated successfully for " + calibrated_players;
+            RCLCPP_INFO(this->get_logger(), "Encoders calibrated: %s", calibrated_players.c_str());
+        }
+        else
+        {
+            response->success = false;
+            response->message = "Player '" + request->player + "' is not active in this configuration";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        }
     }
     catch (const std::exception& e)
     {
         response->success = false;
         response->message = std::string("Calibration failed: ") + e.what();
-        is_calibrated_.store(false);
         RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
     }
 }
@@ -278,21 +304,62 @@ void ODriveController::set_motor_state_callback(
 }
 
 void ODriveController::get_calibration_status_callback(
-    const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> /* request */,
+    const std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Request> request,
     std::shared_ptr<klask_interfaces::srv::GetCalibrationStatus::Response> response)
 {
-    response->is_calibrated = is_calibrated_.load();
-    if (response->is_calibrated)
+    // Validate player parameter
+    if (request->player != "right_player" && request->player != "left_player" && request->player != "both")
     {
-        response->message = "System is calibrated and ready";
+        response->is_calibrated = false;
+        response->message =
+            "Invalid player: '" + request->player + "'. Must be 'right_player', 'left_player', or 'both'";
+        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        return;
     }
-    else
+
+    bool all_calibrated = true;
+    std::string status_details;
+
+    if (request->player == "right_player" || request->player == "both")
     {
-        response->message = "System is not calibrated";
+        if (players_.find("right_player") != players_.end())
+        {
+            bool right_cal = right_is_calibrated_.load();
+            all_calibrated &= right_cal;
+            status_details += "right_player: " + std::string(right_cal ? "calibrated" : "not calibrated");
+            if (request->player == "both")
+                status_details += " ";
+        }
+        else if (request->player == "right_player")
+        {
+            response->is_calibrated = false;
+            response->message = "right_player is not active in this configuration";
+            RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
     }
-    RCLCPP_DEBUG(this->get_logger(),
-                 "Calibration status queried: %s",
-                 response->is_calibrated ? "calibrated" : "not calibrated");
+
+    if (request->player == "left_player" || request->player == "both")
+    {
+        if (players_.find("left_player") != players_.end())
+        {
+            bool left_cal = left_is_calibrated_.load();
+            all_calibrated &= left_cal;
+            status_details += "left_player: " + std::string(left_cal ? "calibrated" : "not calibrated");
+        }
+        else if (request->player == "left_player")
+        {
+            response->is_calibrated = false;
+            response->message = "left_player is not active in this configuration";
+            RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+    }
+
+    response->is_calibrated = all_calibrated;
+    response->message = status_details;
+    RCLCPP_DEBUG(
+        this->get_logger(), "Calibration status queried for %s: %s", request->player.c_str(), status_details.c_str());
 }
 
 void ODriveController::is_player_homed_callback(
@@ -337,8 +404,8 @@ void ODriveController::is_player_homed_callback(
             home_y = static_cast<float>(this->get_parameter("left_player_home_y").as_double());
         }
 
-        // Get position tolerance
-        float tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double());
+        // Get position tolerance (slightly increased tolerance to avoid borderline cases)
+        float tolerance = static_cast<float>(this->get_parameter("position_tolerance").as_double()) * 1.1f;
 
         // Get current magnet position from player
         auto player_node = it->second;
@@ -405,6 +472,16 @@ void ODriveController::handle_home_and_calibrate_accepted(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
     const std::string& player_name)
 {
+    // Execute the homing sequence in a separate thread to allow the action server
+    // to return immediately and respond to the goal acceptance request
+    std::thread([this, goal_handle, player_name]() { this->execute_home_and_calibrate(goal_handle, player_name); })
+        .detach();
+}
+
+void ODriveController::execute_home_and_calibrate(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<klask_interfaces::action::HomeAndCalibrate>> goal_handle,
+    const std::string& player_name)
+{
     using HomeAndCalibrate = klask_interfaces::action::HomeAndCalibrate;
     auto result = std::make_shared<HomeAndCalibrate::Result>();
     auto feedback = std::make_shared<HomeAndCalibrate::Feedback>();
@@ -423,13 +500,26 @@ void ODriveController::handle_home_and_calibrate_accepted(
 
     std::vector<std::string> selected_players = {player_name};
 
-    // Reset calibration flag at the start of homing sequence
-    is_calibrated_.store(false);
-    RCLCPP_INFO(this->get_logger(), "Calibration flag reset - starting homing sequence");
+    // Reset calibration flag for this specific player at the start of homing sequence
+    if (player_name == "right_player")
+    {
+        right_is_calibrated_.store(false);
+    }
+    else if (player_name == "left_player")
+    {
+        left_is_calibrated_.store(false);
+    }
+    RCLCPP_INFO(this->get_logger(), "Calibration flag reset for %s - starting homing sequence", player_name.c_str());
 
     // Disable external commands during homing/calibration
+    // Only save the state if we're actually changing it (to avoid race conditions with multiple players)
     bool previously_enabled = external_commands_enabled_.load();
-    set_external_commands_enabled(false);
+    bool we_disabled_commands = false;
+    if (previously_enabled)
+    {
+        set_external_commands_enabled(false);
+        we_disabled_commands = true;
+    }
 
     // Structure to hold player-specific data (matching motor_commander.cpp)
     struct PlayerHomingData
@@ -439,6 +529,8 @@ void ODriveController::handle_home_and_calibrate_accepted(
         std::shared_ptr<OpenLoopController> homing_controller;
         rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr homing_client;
         geometry_msgs::msg::Point final_position;
+        rclcpp::executors::SingleThreadedExecutor::SharedPtr executor;
+        std::unique_ptr<std::thread> spin_thread;
     };
 
     std::vector<PlayerHomingData> players_to_home;
@@ -457,8 +549,14 @@ void ODriveController::handle_home_and_calibrate_accepted(
             player_data.homing_controller =
                 std::make_shared<OpenLoopController>(std::dynamic_pointer_cast<Player>(player_data.player_node));
 
+            // Create an executor for the homing controller and spin it in a separate thread
+            player_data.executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+            player_data.executor->add_node(player_data.homing_controller);
+            player_data.spin_thread =
+                std::make_unique<std::thread>([executor = player_data.executor]() { executor->spin(); });
+
             RCLCPP_INFO(this->get_logger(), "%s homing controller created", player_name.c_str());
-            players_to_home.push_back(player_data);
+            players_to_home.push_back(std::move(player_data));
         }
 
         RCLCPP_INFO(this->get_logger(), "=== Starting Peg Homing Sequence ===");
@@ -487,7 +585,23 @@ void ODriveController::handle_home_and_calibrate_accepted(
                 result->message = "Home and calibrate action cancelled";
                 RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
                 goal_handle->canceled(result);
-                set_external_commands_enabled(previously_enabled);
+                // Only restore external commands if we were the ones who disabled them
+                if (we_disabled_commands)
+                {
+                    set_external_commands_enabled(true);
+                }
+                // Stop executors before returning
+                for (auto& pd : players_to_home)
+                {
+                    if (pd.executor)
+                    {
+                        pd.executor->cancel();
+                    }
+                    if (pd.spin_thread && pd.spin_thread->joinable())
+                    {
+                        pd.spin_thread->join();
+                    }
+                }
                 return;
             }
 
@@ -597,11 +711,12 @@ void ODriveController::handle_home_and_calibrate_accepted(
             }
         }
 
-        // Call calibration with final homed state
-        RCLCPP_INFO(this->get_logger(), "Calling calibration service with homed state...");
+        // Call calibration with final homed state for the specific player
+        RCLCPP_INFO(this->get_logger(), "Calling calibration service for %s...", player_name.c_str());
 
         auto calib_request = std::make_shared<klask_interfaces::srv::CalibrateEncoders::Request>();
         calib_request->state = calibration_state;
+        calib_request->player = player_name; // Specify which player to calibrate
         auto calib_response = std::make_shared<klask_interfaces::srv::CalibrateEncoders::Response>();
 
         calibrate_encoders_callback(calib_request, calib_response);
@@ -621,12 +736,36 @@ void ODriveController::handle_home_and_calibrate_accepted(
         result->success = false;
         result->message = std::string("Home and calibrate failed: ") + e.what();
         RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
-        is_calibrated_.store(false);
+        // Reset calibration flag for this specific player on failure
+        if (player_name == "right_player")
+        {
+            right_is_calibrated_.store(false);
+        }
+        else if (player_name == "left_player")
+        {
+            left_is_calibrated_.store(false);
+        }
         goal_handle->abort(result);
     }
 
-    // Restore external commands state
-    set_external_commands_enabled(previously_enabled);
+    // Stop all executor threads and clean up homing controllers
+    for (auto& player_data : players_to_home)
+    {
+        if (player_data.executor)
+        {
+            player_data.executor->cancel();
+        }
+        if (player_data.spin_thread && player_data.spin_thread->joinable())
+        {
+            player_data.spin_thread->join();
+        }
+    }
+
+    // Restore external commands state only if we were the ones who disabled them
+    if (we_disabled_commands)
+    {
+        set_external_commands_enabled(true);
+    }
 }
 
 void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg,

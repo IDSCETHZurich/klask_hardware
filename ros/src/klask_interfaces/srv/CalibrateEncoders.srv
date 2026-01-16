@@ -1,5 +1,6 @@
 # Service to calibrate encoder positions with camera peg positions from State message
 klask_interfaces/State state  # State message containing peg positions
+string player                 # Player to calibrate: "right_player", "left_player", or "both"
 ---
 bool success                   # True if calibration successful
 string message                 # Status message
