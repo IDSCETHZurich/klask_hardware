@@ -135,6 +135,28 @@ We welcome contributions! Whether you're fixing bugs, adding features, or improv
 
 See our [Contributing Guide](https://IDSCETHZurich.github.io/klask_hardware/contribution/contributing/) for detailed information.
 
+## Maintainers
+
+This project is mostly maintained by:
+
+- [Aswin](https://github.com/akrv) - Lead Researcher
+- [Tobias](https://github.com/MeierTobias) - Student
+
+## Citing
+
+If you use this work in an academic context, please cite the following publication:
+
+- Authors, **"Title"**, 2023. ([PDF](link_to_pdf))
+
+    ```bibtex
+    @article{,
+      title={},
+      author={},
+      journal={},
+      year={2026}
+    }
+    ```
+
 ## License
 
 - ROS2 code and software is licensed under [**AGPL-3.0**](LICENSE-AGPL-3.0)
@@ -148,6 +170,7 @@ See our [Contributing Guide](https://IDSCETHZurich.github.io/klask_hardware/cont
 ## Acknowledgements
 
 - ETH Zurich's **Institute for Dynamic Systems and Control** for project support
+- All students and researchers involved in the KLASK project
 - The ROS2 and open-source robotics community
 - ODrive project for excellent motor control hardware and software
 - All contributors and maintainers who make this project possible
