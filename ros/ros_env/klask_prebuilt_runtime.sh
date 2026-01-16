@@ -75,7 +75,7 @@ cmd_run() {
     xhost +local:root
     
     # Run container with GHCR image
-    docker run -it -d --rm \
+    docker run -it --rm \
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --env="ROS_DOMAIN_ID=0" \
