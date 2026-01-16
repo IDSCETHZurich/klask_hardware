@@ -39,9 +39,9 @@ ODriveController::ODriveController(PlayerSide player_config)
     this->declare_parameter("inter_homing_delay", 500);
 
     // Home position parameters
-    this->declare_parameter("right_player_home_x", 0.26);
+    this->declare_parameter("right_player_home_x", 0.31);
     this->declare_parameter("right_player_home_y", 0.16);
-    this->declare_parameter("left_player_home_x", 0.16);
+    this->declare_parameter("left_player_home_x", 0.11);
     this->declare_parameter("left_player_home_y", 0.16);
     this->declare_parameter("position_tolerance", 0.01);
     this->declare_parameter("homing_velocity", 0.03);
