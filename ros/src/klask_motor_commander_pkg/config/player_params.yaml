@@ -17,17 +17,18 @@
     # === Field Boundaries (meters) ===
     # Playing field boundaries in image coordinates (y=0 is top of image)
     # Format: [left, right, bottom, top]
-    right_player_edge: [0.23, 0.42, 0.32, 0.0] # Right player field boundaries
-    left_player_edge: [0.0, 0.19, 0.32, 0.0] # Left player field boundaries
+    right_player_edge: [0.22, 0.42, 0.32, 0.0] # Right player field boundaries
+    left_player_edge: [0.0, 0.20, 0.32, 0.0] # Left player field boundaries
 
     # === Physical Constants ===
+
     distance_per_revolution: 0.04 # Distance traveled per motor revolution (meters)
-    max_velocity: 0.2 # Maximum allowed peg velocity (m/s)
+    max_velocity: 0.15 # Maximum allowed peg velocity (m/s)
     deceleration_distance: 0.05 # Distance from edge to start deceleration (meters)
     peg_radius: 0.0075 # Physical peg radius (meters)
 
     # === Motion Control Parameters ===
-    min_clearance_factor: 2.0 # Safety factor for minimum clearance (multiplied by peg_radius)
+    min_clearance_factor: 1.8 # Safety factor for minimum clearance (multiplied by peg_radius)
     corner_x_margin: 0.03 # X-axis margin for unreachable corners (meters)
     corner_y_margin: 0.01 # Y-axis margin for unreachable corners (meters)
 
