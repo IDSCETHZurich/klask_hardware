@@ -17,8 +17,8 @@
     # === Field Boundaries (meters) ===
     # Playing field boundaries in image coordinates (y=0 is top of image)
     # Format: [left, right, bottom, top]
-    right_player_edge: [0.22, 0.42, 0.32, 0.0] # Right player field boundaries
-    left_player_edge: [0.0, 0.20, 0.32, 0.0] # Left player field boundaries
+    right_player_edge: [0.22, 0.42, 0.305, 0.005] # Right player field boundaries
+    left_player_edge: [0.0, 0.20, 0.305, 0.005] # Left player field boundaries
 
     # === Physical Constants ===
 
