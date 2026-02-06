@@ -23,8 +23,8 @@
     # === Physical Constants ===
 
     distance_per_revolution: 0.04 # Distance traveled per motor revolution (meters)
-    max_velocity: 0.15 # Maximum allowed peg velocity (m/s)
-    deceleration_distance: 0.05 # Distance from edge to start deceleration (meters)
+    max_velocity: 0.4 # Maximum allowed peg velocity (m/s)
+    deceleration_distance: 0.09 # Distance from edge to start deceleration (meters)
     peg_radius: 0.0075 # Physical peg radius (meters)
 
     # === Motion Control Parameters ===
