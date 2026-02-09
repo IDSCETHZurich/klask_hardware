@@ -50,7 +50,7 @@ fi
 
 TAG="local"
 CONTAINER_NAME="${IMAGE_NAME}_container_${TAG}"
-VIDEO_DEVICE="/dev/video0"
+VIDEO_DEVICE="/dev/video1"
 
 # Colors for output
 RED='\033[0;31m'

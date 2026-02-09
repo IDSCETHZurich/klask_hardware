@@ -7,8 +7,8 @@
 set -e
 
 # Configuration
-GHCR_IMAGE_BASE="ghcr.io/idscethzurich/klask_hardware/runtime"
-DEFAULT_TAG="latest"
+GHCR_IMAGE_BASE="klask_ros_hardware_runtime"
+DEFAULT_TAG="local"
 IMAGE_TAG="${DEFAULT_TAG}"
 CONTAINER_NAME="klask_hardware_runtime_container"
 VIDEO_DEVICE="/dev/video0"
