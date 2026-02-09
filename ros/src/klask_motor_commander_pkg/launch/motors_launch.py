@@ -29,6 +29,7 @@ import os
 
 
 def launch_setup(context, *args, **kwargs):
+    """Setup function to launch nodes based on launch arguments."""
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
     start_commander = LaunchConfiguration("start_commander").perform(context)
@@ -160,6 +161,7 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
+    """Generate the launch description for the klask motor commander system."""
     # Declare launch arguments
     player_arg = DeclareLaunchArgument(
         "player",
