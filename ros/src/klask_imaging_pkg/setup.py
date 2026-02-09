@@ -26,7 +26,7 @@ setup(
     maintainer="root",
     maintainer_email="tobimeier@student.ethz.ch",
     description="The imaging package for Klask robot",
-    license="Apache-2.0",
+    license="AGPL-3.0",
     extras_require={
         "test": [
             "pytest",

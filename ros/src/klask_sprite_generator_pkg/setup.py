@@ -6,7 +6,7 @@ package_name = "klask_sprite_generator_pkg"
 
 setup(
     name=package_name,
-    version="0.0.0",
+    version="0.0.1",
     packages=find_packages(exclude=["test"]),
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
@@ -14,10 +14,10 @@ setup(
     ],
     install_requires=["setuptools"],
     zip_safe=True,
-    maintainer="root",
-    maintainer_email="nisohm@ethz.ch",
-    description="TODO: Package description",
-    license="Apache-2.0",
+    maintainer="Tobias Meier",
+    maintainer_email="tobimeier@ethz.ch",
+    description="The sprite generator package used for the renderer",
+    license="AGPL-3.0",
     extras_require={
         "test": [
             "pytest",

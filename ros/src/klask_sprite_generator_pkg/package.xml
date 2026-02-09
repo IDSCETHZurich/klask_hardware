@@ -5,7 +5,7 @@
   <version>0.0.1</version>
   <description>Package for generating sprites for Klask game</description>
   <maintainer email="tobimeier@ethz.ch">Tobias Meier</maintainer>
-  <license>Apache-2.0</license>
+  <license>AGPL-3.0</license>
 
   <depend>cv_bridge</depend>
   <depend>klask_interfaces</depend>
