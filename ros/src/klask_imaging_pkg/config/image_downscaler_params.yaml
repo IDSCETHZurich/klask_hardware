@@ -1,0 +1,86 @@
+/image_downscaler:
+  ros__parameters:
+    # ============================================
+    # Topic Configuration
+    # ============================================
+
+    input_image_topic: "board_image/compressed" # Source image topic (default: "board_image/compressed")
+    output_image_topic: "board_image_downscaled/compressed" # Downscaled output topic (default: "board_image_downscaled/compressed")
+
+    # ============================================
+    # Downscaling Parameters
+    # ============================================
+
+    enable_downscaling: true # Enable spatial downscaling (default: true). Set to false to pass through at full resolution (color flattening still applies if enabled).
+
+    downscale_method:
+      "exact" # How to determine output size (default: "scale")
+      #   "scale"  - multiply both dimensions by scale_factor
+      #   "width"  - resize to target_width, keep aspect ratio
+      #   "height" - resize to target_height, keep aspect ratio
+      #   "exact"  - resize to target_width x target_height
+      #              21x16, 42x32, 63x48, 84x64, 105x80, 126x96, 147x112, 168x128 are exact divisors of 420mmx320mm
+
+    scale_factor: 0.1 # Used when downscale_method="scale" (0.0–1.0)
+    target_width: 63 # Used by "width" and "exact" methods (pixels)
+    target_height: 48 # Used by "height" and "exact" methods (pixels)
+
+    interpolation:
+      "area" # Interpolation method for resizing (default: "area")
+      #   "nearest"  – Nearest-neighbor (fastest, blocky)
+      #   "linear"   – Bilinear interpolation
+      #   "area"     – Pixel-area relation (best for downscaling)
+      #   "cubic"    – Bicubic interpolation (smoother)
+      #   "lanczos"  – Lanczos over 8×8 neighbourhood (sharpest)
+
+    # ============================================
+    # Color Quantization (k-means)
+    # ============================================
+    # Reduces the image to a fixed palette of N colors.
+    # Slow on large images – works best on already-downscaled frames.
+
+    enable_color_quantization: false # Enable k-means color quantization (default: false)
+    num_colors: 8 # Number of palette colors (default: 8)
+    kmeans_iterations: 10 # Max k-means iterations (default: 10)
+
+    # ============================================
+    # Bit-Depth Reduction (fast color flattening)
+    # ============================================
+    # Zeros out the N least-significant bits per channel.
+    # Much faster than k-means; gives a posterized look.
+    # bits_to_strip=4 → 16 levels per channel (4096 possible colors)
+    # bits_to_strip=5 → 8 levels per channel (512 possible colors)
+
+    enable_bit_strip: false # Enable bit-depth reduction (default: false)
+    bits_to_strip: 4 # Number of LSBs to zero out (1–7) (default: 4)
+
+    # ============================================
+    # Saturation Removal (HSV)
+    # ============================================
+    # Converts the image to HSV, zeros the S channel, and converts back.
+    # Removes color information, producing a grayscale-like image.
+
+    enable_discard_saturation: true # Discard the saturation channel (default: false)
+
+    # ============================================
+    # JPEG Compression
+    # ============================================
+
+    jpeg_quality: 80 # JPEG quality for the output message (1–100) (default: 80)
+
+    # ============================================
+    # Logging / Profiling
+    # ============================================
+
+    log_fps: true # Log throughput periodically (default: true)
+    log_fps_interval: 5.0 # Seconds between FPS log messages (default: 5.0)
+
+    # ============================================
+    # cProfile Profiling
+    # ============================================
+    # When enabled, the node runs cProfile for the specified duration
+    # and then prints the top N most expensive functions.
+
+    enable_profiling: false # Enable cProfile profiling (default: false)
+    profiling_duration: 100.0 # Profiling window in seconds (default: 100.0)
+    profiling_top_functions: 30 # Number of top functions to show in stats (default: 30)

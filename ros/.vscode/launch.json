@@ -44,6 +44,11 @@
             "type": "debugpy",
             "request": "launch",
             "module": "klask_imaging_pkg.camera_node",
+            "args": [
+                "--ros-args",
+                "--params-file",
+                "${workspaceFolder}/src/klask_imaging_pkg/config/camera_node_params.yaml"
+            ],
             "console": "integratedTerminal"
         },
         {
@@ -51,7 +56,49 @@
             "type": "debugpy",
             "request": "launch",
             "module": "klask_imaging_pkg.image_viewer",
+            "args": [
+                "--ros-args",
+                "--params-file",
+                "${workspaceFolder}/src/klask_imaging_pkg/config/image_viewer_params.yaml"
+            ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug image_downscaler (ROS2)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "klask_imaging_pkg.image_downscaler_node",
+            "args": [
+                "--ros-args",
+                "--params-file",
+                "${workspaceFolder}/src/klask_imaging_pkg/config/image_downscaler_params.yaml"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug image_viewer → downscaled (ROS2)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "klask_imaging_pkg.image_viewer",
+            "args": [
+                "--ros-args",
+                "-p",
+                "board_image_topic:=board_image_downscaled/compressed",
+                "-p",
+                "show_fps_overlay:=false"
+            ],
+            "console": "integratedTerminal"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Camera + Downscaler + Viewer",
+            "configurations": [
+                "Debug camera_node (ROS2)",
+                "Debug image_downscaler (ROS2)",
+                "Debug image_viewer → downscaled (ROS2)"
+            ],
+            "stopAll": true
         }
     ]
 }

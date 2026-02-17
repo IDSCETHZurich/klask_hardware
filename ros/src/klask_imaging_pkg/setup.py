@@ -36,6 +36,7 @@ setup(
         "console_scripts": [
             "camera_node = klask_imaging_pkg.camera_node:main",
             "image_viewer = klask_imaging_pkg.image_viewer:main",
+            "image_downscaler = klask_imaging_pkg.image_downscaler_node:main",
         ],
     },
 )
