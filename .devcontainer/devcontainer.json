@@ -8,7 +8,7 @@
         "--env=DISPLAY",
         "--env=QT_X11_NO_MITSHM=1",
         "--env=ROS_DOMAIN_ID=0",
-        "--device=/dev/video1:/dev/video0",
+        "--device=/dev/video0:/dev/video0",
         "--network=host",
         "--cap-add=NET_ADMIN",
         "--cap-add=NET_RAW",
