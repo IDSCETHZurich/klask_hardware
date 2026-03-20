@@ -1,10 +1,8 @@
-"""Setup script for the klask_imaging_pkg package."""
-
 from setuptools import find_packages, setup
 from glob import glob
 import os
 
-package_name = "klask_imaging_pkg"
+package_name = "klask_system_id"
 
 setup(
     name=package_name,
@@ -18,14 +16,11 @@ setup(
         # Include config files
         (os.path.join("share", package_name, "config"), glob("config/*.yaml")),
     ],
-    package_data={
-        package_name: ["data/*.npz"],
-    },
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="Tobias Meier",
     maintainer_email="tobimeier@student.ethz.ch",
-    description="The imaging package for Klask robot",
+    description="The system identification package for Klask robot",
     license="AGPL-3.0",
     extras_require={
         "test": [
@@ -33,10 +28,6 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [
-            "camera_node = klask_imaging_pkg.camera_node:main",
-            "image_viewer = klask_imaging_pkg.image_viewer:main",
-            "image_downscaler = klask_imaging_pkg.image_downscaler_node:main",
-        ],
+        "console_scripts": ["acceleration_test_node = klask_system_id.acceleration_test_node:main"],
     },
 )
