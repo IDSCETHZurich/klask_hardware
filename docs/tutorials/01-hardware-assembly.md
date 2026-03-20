@@ -151,7 +151,7 @@ It consists of the following parts:
 | 4    | Limit Switch      | Würth WS-MITV THT (463093370402) | 4        | [Link](https://www.digikey.ch/de/products/detail/w%C3%BCrth-elektronik/463093370402/10056400) |
 | 5    | Socket Head Screw | M2x12                            | 8        |                                                                                               |
 | 6    | Socket Head Screw | M5x30                            | 8        |                                                                                               |
-| 7    | Countersunk Screw | M3x25                            | 12       |                                                                                               |
+| 7    | Countersunk Screw | M3x14                            | 12       |                                                                                               |
 | 8    | Hex Nut           | M2                               | 8        |                                                                                               |
 | 9    | Hex Nut           | M3                               | 12       |                                                                                               |
 | 10   | Tee Nut           | M5                               | 8        | [Link](https://us.openbuilds.com/tee-nuts-m5-pack/)                                           |
@@ -308,7 +308,7 @@ A summary of all parts needed to build the complete KLASK hardware system is pro
 |      | Socket Head Screw               | M4x20                            | 8 (16)   |                                                                                               |
 |      | Socket Head Screw               | M5x30                            | 8 (16)   |                                                                                               |
 |      | Countersunk Screw               | M2x12                            | 4 (8)    |                                                                                               |
-|      | Countersunk Screw               | M3x25                            | 12 (24)  |                                                                                               |
+|      | Countersunk Screw               | M3x14                            | 12 (24)  |                                                                                               |
 |      | Countersunk Screw               | M5x18                            | 2 (4)    |                                                                                               |
 |      | Hex Nut                         | M2                               | 12 (24)  |                                                                                               |
 |      | Hex Nut                         | M3                               | 12 (24)  |                                                                                               |
