@@ -1,7 +1,8 @@
 """Launch file for the acceleration test system identification experiment.
 
 Launches the motor control system (CAN, ODrive, motor commander with homing),
-camera node, the acceleration test node, and a rosbag recorder.
+camera node, and the acceleration test node. The test node manages rosbag
+recording internally, writing one bag per velocity step to bag_output_dir.
 
 This launch file builds the motor system nodes directly (rather than including
 motors_launch.py) so that max_velocity can be overridden for high-speed tests.
@@ -12,7 +13,6 @@ Example usage:
 """
 
 import os
-from datetime import datetime
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
@@ -25,7 +25,6 @@ from ament_index_python.packages import get_package_share_directory
 def launch_setup(context, *args, **kwargs):
     """Setup function to resolve launch arguments and build node list."""
     player = LaunchConfiguration("player").perform(context)
-    bag_output_dir = LaunchConfiguration("bag_output_dir").perform(context)
     max_velocity = float(LaunchConfiguration("max_velocity").perform(context))
 
     nodes_to_launch = []
@@ -152,25 +151,6 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    # --- Rosbag recording ---
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    bag_output_path = os.path.join(bag_output_dir, f"accel_test_{timestamp}")
-    nodes_to_launch.append(
-        ExecuteProcess(
-            cmd=[
-                "ros2",
-                "bag",
-                "record",
-                "-o",
-                bag_output_path,
-                "/cmd_vel/right_player",
-                "/cmd_vel/left_player",
-                "/board_state",
-            ],
-            output="log",
-        )
-    )
-
     return nodes_to_launch
 
 
@@ -194,12 +174,6 @@ def generate_launch_description():
         description="Path to the acceleration test parameters YAML file",
     )
 
-    bag_output_dir_arg = DeclareLaunchArgument(
-        "bag_output_dir",
-        default_value="acceleration_test_bags",
-        description="Directory for rosbag output files",
-    )
-
     max_velocity_arg = DeclareLaunchArgument(
         "max_velocity",
         default_value="1.0",
@@ -210,7 +184,6 @@ def generate_launch_description():
         [
             player_arg,
             params_file_arg,
-            bag_output_dir_arg,
             max_velocity_arg,
             OpaqueFunction(function=launch_setup),
         ]

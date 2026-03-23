@@ -6,7 +6,10 @@ and actual positions via /board_state for post-processing analysis.
 """
 
 import math
+import os
+import subprocess
 import time
+from datetime import datetime
 from enum import Enum, auto
 
 import rclpy
@@ -49,6 +52,7 @@ class AccelerationTestNode(Node):
         self.declare_parameter("move_to_start_velocity", 0.05)
         self.declare_parameter("homing_poll_interval", 1.0)
         self.declare_parameter("homing_timeout", 60.0)
+        self.declare_parameter("bag_output_dir", "acceleration_test_bags")
 
         # Get parameter values
         self.player = self.get_parameter("player").value
@@ -66,6 +70,7 @@ class AccelerationTestNode(Node):
         self.move_to_start_vel = self.get_parameter("move_to_start_velocity").value
         self.homing_poll_interval = self.get_parameter("homing_poll_interval").value
         self.homing_timeout = self.get_parameter("homing_timeout").value
+        self.bag_output_dir = self.get_parameter("bag_output_dir").value
 
         # Publisher for velocity commands
         cmd_vel_qos = QoSProfile(
@@ -94,6 +99,8 @@ class AccelerationTestNode(Node):
         self.homing_start_time = time.monotonic()
         self.last_homing_poll = 0.0
         self.position_tolerance = 0.01  # 1cm tolerance for move-to-start
+        self._bag_process = None
+        self._bag_running = False
 
         # Create control loop timer
         timer_period = 1.0 / control_rate
@@ -131,6 +138,31 @@ class AccelerationTestNode(Node):
         else:
             pos = self.latest_board_state.right_peg.position
         return (pos.x, pos.y)
+
+    def _start_bag(self, velocity):
+        """Start a new rosbag recording for the given velocity step."""
+        os.makedirs(self.bag_output_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        bag_path = os.path.join(self.bag_output_dir, f"accel_test_{timestamp}_v{velocity:.2f}")
+        self._bag_process = subprocess.Popen(
+            ["ros2", "bag", "record", "-a", "-o", bag_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        self._bag_running = True
+        self.get_logger().info(f"Started bag recording: {bag_path}")
+
+    def _stop_bag(self):
+        """Stop the current rosbag recording."""
+        if self._bag_process is not None:
+            self._bag_process.terminate()
+            try:
+                self._bag_process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self._bag_process.kill()
+            self._bag_process = None
+        self._bag_running = False
+        self.get_logger().info("Stopped bag recording.")
 
     def control_loop_callback(self):
         """Main state machine tick."""
@@ -239,7 +271,8 @@ class AccelerationTestNode(Node):
                 self.current_repetition += 1
 
                 if self.current_repetition >= self.repetitions_per_speed:
-                    # Speed level complete, increment velocity
+                    # Speed level complete, stop bag and increment velocity
+                    self._stop_bag()
                     self.current_repetition = 0
                     self.current_velocity += self.velocity_increment
 
@@ -276,6 +309,8 @@ class AccelerationTestNode(Node):
 
         now = time.monotonic()
         if self.leg_start_time is None:
+            if self.current_leg == 0 and self.current_repetition == 0 and not self._bag_running:
+                self._start_bag(v)
             self.leg_start_time = now
             self.leg_duration = duration
             leg_names = ["+X", "+Y", "diagonal"]
@@ -300,6 +335,7 @@ class AccelerationTestNode(Node):
     def _handle_done(self):
         """Send zero velocity and shut down."""
         self.publish_velocity(0.0, 0.0)
+        self._stop_bag()
         self.control_timer.cancel()
         self.get_logger().info("Acceleration test complete. Shutting down.")
         raise SystemExit
@@ -314,6 +350,7 @@ def main(args=None):
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
+        node._stop_bag()
         node.publish_velocity(0.0, 0.0)
         node.destroy_node()
         rclpy.try_shutdown()

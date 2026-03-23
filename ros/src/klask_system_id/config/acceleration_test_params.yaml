@@ -35,7 +35,7 @@
     # ============================================
 
     settle_time: 1.0 # Pause between legs and repetitions (seconds)
-    control_rate: 100.0 # State machine tick rate (Hz), limited by encoder feedback rate
+    control_rate: 200.0 # State machine tick rate (Hz), limited by encoder feedback rate
     move_to_start_velocity: 0.05 # Velocity for moving to start position (m/s)
 
     # ============================================
@@ -44,3 +44,9 @@
 
     homing_poll_interval: 1.0 # Seconds between homing status checks
     homing_timeout: 60.0 # Maximum seconds to wait for homing to complete
+
+    # ============================================
+    # Recording Configuration
+    # ============================================
+
+    bag_output_dir: "acceleration_test_bags" # Output directory for per-velocity-step rosbag files
