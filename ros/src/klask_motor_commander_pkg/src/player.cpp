@@ -327,13 +327,13 @@ void Player::controller_status_callback_right(const odrive_can::msg::ControllerS
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_ERROR_THROTTLE(this->get_logger(),
-                              *this->get_clock(),
-                              error_throttle_duration_,
-                              "Right motor error detected: 0x%X. Attempting to recover.",
-                              msg->active_errors);
-        // Note: Avoid blocking sleep in callbacks - let the system handle recovery
-        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
+        RCLCPP_FATAL(this->get_logger(),
+                     "Right motor error detected: 0x%X. Shutting down.",
+                     msg->active_errors);
+        if (fatal_error_callback_)
+        {
+            fatal_error_callback_();
+        }
     }
 }
 
@@ -344,12 +344,13 @@ void Player::controller_status_callback_left(const odrive_can::msg::ControllerSt
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_ERROR_THROTTLE(this->get_logger(),
-                              *this->get_clock(),
-                              error_throttle_duration_,
-                              "Left motor error detected: 0x%X. Attempting to recover.",
-                              msg->active_errors);
-        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
+        RCLCPP_FATAL(this->get_logger(),
+                     "Left motor error detected: 0x%X. Shutting down.",
+                     msg->active_errors);
+        if (fatal_error_callback_)
+        {
+            fatal_error_callback_();
+        }
     }
 }
 

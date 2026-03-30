@@ -38,5 +38,5 @@
     initial_motor_state: 8 # Expected motor state (8 = closed loop control)
 
     # === Heartbeat Settings ===
-    heartbeat_topic: "heartbeat"           # Topic name for heartbeat messages
-    heartbeat_frequency_hz: 5.0            # Heartbeat publish rate (Hz)
+    heartbeat_topic: "/motor_commander/heartbeat" # Topic name for heartbeat messages
+    heartbeat_frequency_hz: 5.0 # Heartbeat publish rate (Hz)
