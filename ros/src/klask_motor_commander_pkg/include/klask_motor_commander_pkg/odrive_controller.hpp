@@ -3,6 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <std_msgs/msg/empty.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <klask_interfaces/msg/state.hpp>
 #include <klask_interfaces/srv/calibrate_encoders.hpp>
@@ -147,6 +148,38 @@ private:
 
     /// Action client for left player homing
     rclcpp_action::Client<klask_interfaces::action::HomePeg>::SharedPtr left_player_homing_client_;
+
+    /**
+     * @brief Heartbeat publisher for liveness detection.
+     *
+     * Publishes std_msgs::Empty at a configurable rate (default 5 Hz) on the
+     * "heartbeat" topic with best-effort QoS.
+     *
+     * Subscriber-side usage example:
+     * @code
+     * // Subscribe with matching QoS
+     * heartbeat_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+     *     "heartbeat", rclcpp::QoS(1).best_effort(),
+     *     [this](const std_msgs::msg::Empty::SharedPtr) {
+     *         heartbeat_watchdog_->reset();
+     *     });
+     *
+     * // Watchdog fires if no heartbeat within 1.5s (3x the 200ms period)
+     * heartbeat_watchdog_ = this->create_wall_timer(
+     *     std::chrono::milliseconds(1500),
+     *     [this]() {
+     *         RCLCPP_ERROR(this->get_logger(), "Motor commander heartbeat lost!");
+     *         // Take emergency action here
+     *     });
+     * @endcode
+     */
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr heartbeat_publisher_;
+
+    /// Timer for periodic heartbeat publishing
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+
+    /// Callback for heartbeat timer - publishes heartbeat message
+    void heartbeat_timer_callback();
 
     /// Homing action timeout in seconds
     int homing_action_timeout_;

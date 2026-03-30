@@ -34,6 +34,7 @@ class AccelerationTestNode(Node):
     """Node that runs triangle-pattern acceleration tests at increasing speeds."""
 
     def __init__(self):
+        """Initialize the acceleration test node, declare parameters, and set up publishers/subscribers."""
         super().__init__("acceleration_test_node")
 
         # Declare parameters

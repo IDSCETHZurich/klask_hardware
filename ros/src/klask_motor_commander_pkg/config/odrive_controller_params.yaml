@@ -36,3 +36,7 @@
     # Note: This parameter tracks the expected motor state but does not initialize motors at startup.
     # Motors are initialized to CLOSED_LOOP_CONTROL in klask_motor_commander after executor starts.
     initial_motor_state: 8 # Expected motor state (8 = closed loop control)
+
+    # === Heartbeat Settings ===
+    heartbeat_topic: "heartbeat"           # Topic name for heartbeat messages
+    heartbeat_frequency_hz: 5.0            # Heartbeat publish rate (Hz)
