@@ -327,9 +327,7 @@ void Player::controller_status_callback_right(const odrive_can::msg::ControllerS
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_FATAL(this->get_logger(),
-                     "Right motor error detected: 0x%X. Shutting down.",
-                     msg->active_errors);
+        RCLCPP_FATAL(this->get_logger(), "Right motor error detected: 0x%X. Shutting down.", msg->active_errors);
         if (fatal_error_callback_)
         {
             fatal_error_callback_();
@@ -344,9 +342,7 @@ void Player::controller_status_callback_left(const odrive_can::msg::ControllerSt
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_FATAL(this->get_logger(),
-                     "Left motor error detected: 0x%X. Shutting down.",
-                     msg->active_errors);
+        RCLCPP_FATAL(this->get_logger(), "Left motor error detected: 0x%X. Shutting down.", msg->active_errors);
         if (fatal_error_callback_)
         {
             fatal_error_callback_();
