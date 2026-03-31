@@ -9,14 +9,23 @@ Example usage:
 
 from launch_ros.actions import Node
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 import os
 
 
 def generate_launch_description():
     """Generate the launch description for the klask sprite generator system."""
+    sprite_pkg_share = get_package_share_directory("klask_sprite_generator_pkg")
+
+    params_file_arg = DeclareLaunchArgument(
+        "params_file",
+        default_value=os.path.join(sprite_pkg_share, "config", "sprite_generator_params.yaml"),
+        description="Path to sprite generator parameter file",
+    )
+
     # Get path to motors launch file
     motor_pkg_share = get_package_share_directory("klask_motor_commander_pkg")
     motors_launch_file = os.path.join(motor_pkg_share, "launch", "motors_launch.py")
@@ -37,7 +46,8 @@ def generate_launch_description():
         package="klask_sprite_generator_pkg",
         executable="klask_sprite_generator_node",
         name="sprite_generator_node",
+        parameters=[LaunchConfiguration("params_file")],
         output="screen",
     )
 
-    return LaunchDescription([motors_launch, sprite_generator_node])
+    return LaunchDescription([params_file_arg, motors_launch, sprite_generator_node])
