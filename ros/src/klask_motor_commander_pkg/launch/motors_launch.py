@@ -22,13 +22,16 @@ Example usage:
 
 from launch_ros.actions import Node
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, OpaqueFunction, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 import os
 
 
 def launch_setup(context, *args, **kwargs):
+    """Setup function to launch nodes based on launch arguments."""
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
     start_commander = LaunchConfiguration("start_commander").perform(context)
@@ -121,18 +124,27 @@ def launch_setup(context, *args, **kwargs):
 
     # Motor commander node (optional, controlled by start_commander parameter)
     if start_commander == "true":
+        motor_commander_node = Node(
+            package="klask_motor_commander_pkg",
+            executable="klask_motor_commander",
+            parameters=[
+                player_params_file,
+                open_loop_params_file,
+                odrive_params_file,
+                motor_commander_params_file,
+                {"player": player},  # Pass player selection from launch argument
+            ],
+            output="screen",
+        )
+        nodes_to_launch.append(motor_commander_node)
+
+        # Shut down the entire launch when the motor commander exits
         nodes_to_launch.append(
-            Node(
-                package="klask_motor_commander_pkg",
-                executable="klask_motor_commander",
-                parameters=[
-                    player_params_file,
-                    open_loop_params_file,
-                    odrive_params_file,
-                    motor_commander_params_file,
-                    {"player": player},  # Pass player selection from launch argument
-                ],
-                output="screen",
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=motor_commander_node,
+                    on_exit=[EmitEvent(event=Shutdown())],
+                )
             )
         )
 
@@ -160,6 +172,7 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
+    """Generate the launch description for the klask motor commander system."""
     # Declare launch arguments
     player_arg = DeclareLaunchArgument(
         "player",

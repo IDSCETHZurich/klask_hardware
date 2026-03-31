@@ -1,14 +1,17 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>klask_imaging_pkg</name>
+  <name>klask_system_id</name>
   <version>0.0.1</version>
-  <description>The imaging package for Klask robot</description>
+  <description>The system identification package for Klask robot</description>
   <maintainer email="tobimeier@student.ethz.ch">Tobias Meier</maintainer>
   <license>AGPL-3.0</license>
 
-  <depend>cv_bridge</depend>
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
   <depend>klask_interfaces</depend>
+  <depend>klask_imaging_pkg</depend>
+  <depend>klask_motor_commander_pkg</depend>
 
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

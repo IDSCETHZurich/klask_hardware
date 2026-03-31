@@ -10,6 +10,7 @@
 #include "klask_motor_commander_pkg/player_side.hpp"
 #include <cmath>
 #include <algorithm>
+#include <functional>
 #include <vector>
 
 namespace klask_motor_commander
@@ -99,6 +100,18 @@ public:
      */
     void change_motor_state(const int& des_state);
 
+    /**
+     * @brief Set a callback to be invoked on a fatal motor error.
+     *
+     * The callback is responsible for idling all motors and triggering shutdown.
+     *
+     * @param cb Callable invoked when a fatal motor error is detected.
+     */
+    void set_fatal_error_callback(std::function<void()> cb)
+    {
+        fatal_error_callback_ = std::move(cb);
+    }
+
     // Public state variables
 
     /// Synchronized reference state [encoder_r, encoder_l, cam_x, cam_y]
@@ -187,6 +200,9 @@ private:
     /// Service timeout parameters
     int service_wait_timeout_;
     int max_service_wait_attempts_;
+
+    /// Callback invoked on fatal motor error (set from main to idle all motors and shutdown)
+    std::function<void()> fatal_error_callback_;
 
     // === Private Methods ===
 

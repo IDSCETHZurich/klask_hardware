@@ -21,12 +21,12 @@ Player::Player(PlayerSide side)
 
     // Physical constants
     this->declare_parameter("distance_per_revolution", 0.04);
-    this->declare_parameter("max_velocity", 0.2);
-    this->declare_parameter("deceleration_distance", 0.09);
+    this->declare_parameter("max_velocity", 0.15);
+    this->declare_parameter("deceleration_distance", 0.05);
     this->declare_parameter("peg_radius", 0.0075);
 
     // Motion control
-    this->declare_parameter("min_clearance_factor", 1.5);
+    this->declare_parameter("min_clearance_factor", 1.8);
     this->declare_parameter("corner_x_margin", 0.03);
     this->declare_parameter("corner_y_margin", 0.01);
 
@@ -303,21 +303,21 @@ void Player::deacceleration_profile(float& v_x, float& v_y)
         }
     }
 
-    // Handle unreachable front corners (geometry constraints)
-    const bool near_top = magnet_position[1] >= EDGE[3] - corner_y_margin_;
-    const bool near_bottom = magnet_position[1] <= EDGE[2] + corner_y_margin_;
-    const bool in_corner_y = near_top || near_bottom;
+    // // Handle unreachable front corners (geometry constraints)
+    // const bool near_top = magnet_position[1] >= EDGE[3] - corner_y_margin_;
+    // const bool near_bottom = magnet_position[1] <= EDGE[2] + corner_y_margin_;
+    // const bool in_corner_y = near_top || near_bottom;
 
-    if (side_ == PlayerSide::LEFT_PLAYER && magnet_position[0] >= EDGE[1] - corner_x_margin_ && in_corner_y)
-    {
-        v_x = std::min(0.0f, v_x); // Prevent moving further right
-        v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
-    }
-    else if (side_ == PlayerSide::RIGHT_PLAYER && magnet_position[0] <= EDGE[0] + corner_x_margin_ && in_corner_y)
-    {
-        v_x = std::max(0.0f, v_x); // Prevent moving further left
-        v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
-    }
+    // if (side_ == PlayerSide::LEFT_PLAYER && magnet_position[0] >= EDGE[1] - corner_x_margin_ && in_corner_y)
+    // {
+    //     v_x = std::min(0.0f, v_x); // Prevent moving further right
+    //     v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
+    // }
+    // else if (side_ == PlayerSide::RIGHT_PLAYER && magnet_position[0] <= EDGE[0] + corner_x_margin_ && in_corner_y)
+    // {
+    //     v_x = std::max(0.0f, v_x); // Prevent moving further left
+    //     v_y = near_top ? std::min(v_y, 0.0f) : std::max(v_y, 0.0f);
+    // }
 }
 
 void Player::controller_status_callback_right(const odrive_can::msg::ControllerStatus::SharedPtr msg)
@@ -327,13 +327,11 @@ void Player::controller_status_callback_right(const odrive_can::msg::ControllerS
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_ERROR_THROTTLE(this->get_logger(),
-                              *this->get_clock(),
-                              error_throttle_duration_,
-                              "Right motor error detected: 0x%X. Attempting to recover.",
-                              msg->active_errors);
-        // Note: Avoid blocking sleep in callbacks - let the system handle recovery
-        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
+        RCLCPP_FATAL(this->get_logger(), "Right motor error detected: 0x%X. Shutting down.", msg->active_errors);
+        if (fatal_error_callback_)
+        {
+            fatal_error_callback_();
+        }
     }
 }
 
@@ -344,12 +342,11 @@ void Player::controller_status_callback_left(const odrive_can::msg::ControllerSt
 
     if (msg->active_errors != 0)
     {
-        RCLCPP_ERROR_THROTTLE(this->get_logger(),
-                              *this->get_clock(),
-                              error_throttle_duration_,
-                              "Left motor error detected: 0x%X. Attempting to recover.",
-                              msg->active_errors);
-        set_motor_state(static_cast<int>(ODriveAxisState::IDLE));
+        RCLCPP_FATAL(this->get_logger(), "Left motor error detected: 0x%X. Shutting down.", msg->active_errors);
+        if (fatal_error_callback_)
+        {
+            fatal_error_callback_();
+        }
     }
 }
 

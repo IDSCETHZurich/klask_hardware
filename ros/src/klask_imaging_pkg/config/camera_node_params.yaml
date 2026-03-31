@@ -44,7 +44,7 @@
     # ============================================
 
     flood_threshold:
-      100 # Threshold for board boundary flood fill (default: 120)
+      80 # Threshold for board boundary flood fill (default: 120)
       # Lower values = more sensitive detection
       # Higher values = less sensitive detection
 

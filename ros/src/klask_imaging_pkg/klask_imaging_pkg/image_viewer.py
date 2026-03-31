@@ -49,6 +49,10 @@ class ImageViewer(Node):
         self.declare_parameter("cmd_vel_right_player_topic", "cmd_vel/right_player")
         self.cmd_vel_right_player_topic = str(self.get_parameter("cmd_vel_right_player_topic").value)
 
+        # Enable/disable FPS overlay (default: true)
+        self.declare_parameter("show_fps_overlay", True)
+        self.show_fps_overlay = bool(self.get_parameter("show_fps_overlay").value)
+
         # =============================
         # EU to Pixel Conversion Parameters
         # =============================
@@ -211,7 +215,7 @@ class ImageViewer(Node):
             self._update_fps()
 
             # Draw FPS on image
-            if self.current_fps > 0:
+            if self.show_fps_overlay and (self.current_fps > 0):
                 fps_text = f"FPS: {self.current_fps:.1f}"
                 cv2.putText(
                     cv_image,

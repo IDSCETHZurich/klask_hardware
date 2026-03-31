@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>klask_imaging_pkg</name>
+  <name>klask_sprite_generator_pkg</name>
   <version>0.0.1</version>
-  <description>The imaging package for Klask robot</description>
-  <maintainer email="tobimeier@student.ethz.ch">Tobias Meier</maintainer>
+  <description>Package for generating sprites for Klask game</description>
+  <maintainer email="tobimeier@ethz.ch">Tobias Meier</maintainer>
   <license>AGPL-3.0</license>
 
   <depend>cv_bridge</depend>

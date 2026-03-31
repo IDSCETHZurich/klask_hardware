@@ -1,0 +1,52 @@
+/acceleration_test_node:
+  ros__parameters:
+    # ============================================
+    # Player Configuration
+    # ============================================
+
+    player: "left_player" # Which player to test: "left_player" or "right_player"
+
+    # ============================================
+    # Topic Configuration
+    # ============================================
+
+    cmd_vel_topic: "/cmd_vel/left_player" # Velocity command topic
+    board_state_topic: "/board_state" # Board state topic for position monitoring
+
+    # ============================================
+    # Triangle Geometry
+    # ============================================
+
+    triangle_side_length: 0.04 # Side length of the triangle (meters)
+    start_position_x: 0.05 # X start position within field (meters)
+    start_position_y: 0.08 # Y start position within field (meters)
+
+    # ============================================
+    # Velocity Sweep Configuration
+    # ============================================
+
+    min_velocity: 0.10 # Minimum test velocity (m/s)
+    max_velocity: 1.0 # Maximum test velocity (m/s)
+    velocity_increment: 0.05 # Velocity step between test runs (m/s)
+    repetitions_per_speed: 5 # Number of triangle repetitions at each speed
+
+    # ============================================
+    # Timing Configuration
+    # ============================================
+
+    settle_time: 1.0 # Pause between legs and repetitions (seconds)
+    control_rate: 200.0 # State machine tick rate (Hz), limited by encoder feedback rate
+    move_to_start_velocity: 0.05 # Velocity for moving to start position (m/s)
+
+    # ============================================
+    # Homing Configuration
+    # ============================================
+
+    homing_poll_interval: 1.0 # Seconds between homing status checks
+    homing_timeout: 60.0 # Maximum seconds to wait for homing to complete
+
+    # ============================================
+    # Recording Configuration
+    # ============================================
+
+    bag_output_dir: "acceleration_test_bags" # Output directory for per-velocity-step rosbag files

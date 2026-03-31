@@ -52,6 +52,10 @@ ODriveController::ODriveController(PlayerSide player_config)
     // Initial motor state
     this->declare_parameter("initial_motor_state", 8);
 
+    // Heartbeat parameters
+    this->declare_parameter("heartbeat_topic", "heartbeat");
+    this->declare_parameter("heartbeat_frequency_hz", 5.0);
+
     // Load parameters
     std::string cmd_vel_right_topic = this->get_parameter("cmd_vel_right_player").as_string();
     std::string cmd_vel_left_topic = this->get_parameter("cmd_vel_left_player").as_string();
@@ -186,6 +190,19 @@ ODriveController::ODriveController(PlayerSide player_config)
             sub_options);
         RCLCPP_INFO(this->get_logger(), "Subscribed to %s for left_player", cmd_vel_left_topic.c_str());
     }
+
+    // Create heartbeat publisher with best-effort QoS for periodic liveness signal
+    std::string heartbeat_topic = this->get_parameter("heartbeat_topic").as_string();
+    double heartbeat_freq = this->get_parameter("heartbeat_frequency_hz").as_double();
+    auto heartbeat_qos = rclcpp::QoS(1).best_effort().durability_volatile();
+    heartbeat_publisher_ = this->create_publisher<std_msgs::msg::Empty>(heartbeat_topic, heartbeat_qos);
+
+    auto heartbeat_period = std::chrono::duration<double>(1.0 / heartbeat_freq);
+    heartbeat_timer_ = this->create_wall_timer(std::chrono::duration_cast<std::chrono::nanoseconds>(heartbeat_period),
+                                               std::bind(&ODriveController::heartbeat_timer_callback, this),
+                                               group_);
+    RCLCPP_INFO(
+        this->get_logger(), "Heartbeat publisher created on '%s' at %.1f Hz", heartbeat_topic.c_str(), heartbeat_freq);
 
     RCLCPP_INFO(
         this->get_logger(), "ODriveController initialization complete with %zu active player(s)", players_.size());
@@ -734,6 +751,11 @@ void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist:
     {
         RCLCPP_WARN(this->get_logger(), "Received velocity command for inactive player: %s", player_name.c_str());
     }
+}
+
+void ODriveController::heartbeat_timer_callback()
+{
+    heartbeat_publisher_->publish(std_msgs::msg::Empty());
 }
 
 } // namespace klask_motor_commander

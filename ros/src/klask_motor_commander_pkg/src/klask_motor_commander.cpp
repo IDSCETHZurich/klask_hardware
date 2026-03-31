@@ -93,6 +93,35 @@ int main(int argc, char* argv[])
 
     RCLCPP_INFO(controller_node->get_logger(), "Motor commander system initialized.");
 
+    // Collect player shared_ptrs for the fatal error handler
+    std::vector<Player::SharedPtr> player_list;
+    for (const auto& [player_name, player_node] : all_players)
+    {
+        player_list.push_back(player_node);
+    }
+
+    // Atomic flag ensures shutdown runs only once if multiple motors error simultaneously
+    auto shutting_down = std::make_shared<std::atomic<bool>>(false);
+
+    auto fatal_error_handler = [player_list, shutting_down, &controller_node]()
+    {
+        if (shutting_down->exchange(true))
+        {
+            return;
+        }
+        RCLCPP_FATAL(controller_node->get_logger(), "Motor error detected - idling all motors and shutting down.");
+        for (const auto& player : player_list)
+        {
+            player->change_motor_state(static_cast<int>(ODriveAxisState::IDLE));
+        }
+        rclcpp::shutdown();
+    };
+
+    for (const auto& [player_name, player_node] : all_players)
+    {
+        player_node->set_fatal_error_callback(fatal_error_handler);
+    }
+
     // Spin executor in a separate thread to process callbacks
     std::thread spin_thread([&executor]() { executor.spin(); });
 

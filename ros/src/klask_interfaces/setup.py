@@ -15,6 +15,6 @@ setup(
     maintainer="root",
     maintainer_email="tobimeier@ethz.ch",
     description="Python utilities for klask_interfaces",
-    license="Apache-2.0",
+    license="AGPL-3.0",
     tests_require=["pytest"],
 )
