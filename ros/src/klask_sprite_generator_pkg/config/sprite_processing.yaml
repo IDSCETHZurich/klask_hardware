@@ -14,12 +14,24 @@ segmentation:
 
   ball:
     h_range: [15, 40] # yellow hue in OpenCV HSV (0-179)
-    s_min: 40 # minimum saturation
-    v_min: 120 # minimum value/brightness
+    s_range: [40, 255] # saturation bounds
+    v_range: [120, 255] # value/brightness bounds
+    bg_diff_threshold: 30 # grayscale diff threshold for background subtraction
 
   peg:
-    v_max: 40 # pegs are dark (low V channel)
-    bg_diff_threshold: 15 # grayscale diff threshold for background subtraction
+    h_range: [0, 255]
+    s_range: [0, 255]
+    v_range: [0, 50]
+    hsv_close_kernel: 7 # close kernel size to bridge reflection holes before combining
+    hsv_close_iterations: 3
+    diff_hsv: # HSV filter on the bg_diff image
+      h_range: [0, 255]
+      s_range: [0, 255]
+      v_range: [70, 255]
+    diff_erode_kernel: 3 # erode to shrink shadow fringe
+    diff_erode_iterations: 1
+    diff_close_kernel: 5 # close to fill noise holes in diff mask
+    diff_close_iterations: 2
 
   morphology:
     kernel_size: 3 # elliptical structuring element diameter
@@ -27,8 +39,8 @@ segmentation:
     close_iterations: 2 # gap filling
 
   component:
-    min_area_px: 30
-    max_area_px: 800
+    min_area_px: 100
+    max_area_px: 1200
 
   sprite_padding_px: 3
   alpha_blur_sigma: 0.5 # 0 = hard mask, >0 = anti-aliased (e.g. 0.5)
@@ -39,4 +51,4 @@ process:
   background: true # save the median background image
 
 debug:
-  mode: "show" # "off", "save" (to disk), or "show" (OpenCV window, press key to advance, 'q' to quit)
+  mode: "show" # "off", "save" (to disk), or "show"

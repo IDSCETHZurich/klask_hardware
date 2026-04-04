@@ -52,16 +52,27 @@ class BallSegConfig:
     """Parameters for ball segmentation in HSV color space."""
 
     h_range: Tuple[int, int] = (15, 40)
-    s_min: int = 80
-    v_min: int = 120
+    s_range: Tuple[int, int] = (80, 255)
+    v_range: Tuple[int, int] = (120, 255)
+    bg_diff_threshold: int = 30
 
 
 @dataclass
 class PegSegConfig:
     """Parameters for peg segmentation."""
 
-    v_max: int = 60
-    bg_diff_threshold: int = 25
+    h_range: Tuple[int, int] = (0, 179)
+    s_range: Tuple[int, int] = (0, 255)
+    v_range: Tuple[int, int] = (0, 60)
+    hsv_close_kernel: int = 7
+    hsv_close_iterations: int = 3
+    diff_hsv_h_range: Tuple[int, int] = (0, 179)
+    diff_hsv_s_range: Tuple[int, int] = (15, 255)
+    diff_hsv_v_range: Tuple[int, int] = (20, 255)
+    diff_erode_kernel: int = 3
+    diff_erode_iterations: int = 1
+    diff_close_kernel: int = 5
+    diff_close_iterations: int = 2
 
 
 @dataclass
@@ -174,16 +185,36 @@ def load_config(config_path: Path) -> Config:
     comp_raw = s.get("component", {})
 
     ball_h = ball_raw.get("h_range", [15, 40])
+    ball_s = ball_raw.get("s_range", [ball_raw.get("s_min", 80), 255])
+    ball_v = ball_raw.get("v_range", [ball_raw.get("v_min", 120), 255])
+    peg_h = peg_raw.get("h_range", [0, 179])
+    peg_s = peg_raw.get("s_range", [0, 255])
+    peg_v = peg_raw.get("v_range", [0, peg_raw.get("v_max", 60)])
+    diff_hsv_raw = peg_raw.get("diff_hsv", {})
+    peg_diff_h = diff_hsv_raw.get("h_range", [0, 179])
+    peg_diff_s = diff_hsv_raw.get("s_range", [15, 255])
+    peg_diff_v = diff_hsv_raw.get("v_range", [20, 255])
     seg = SegmentationConfig(
         rough_crop_radius_px=s.get("rough_crop_radius_px", 40),
         ball=BallSegConfig(
             h_range=(ball_h[0], ball_h[1]),
-            s_min=ball_raw.get("s_min", 80),
-            v_min=ball_raw.get("v_min", 120),
+            s_range=(ball_s[0], ball_s[1]),
+            v_range=(ball_v[0], ball_v[1]),
+            bg_diff_threshold=ball_raw.get("bg_diff_threshold", 30),
         ),
         peg=PegSegConfig(
-            v_max=peg_raw.get("v_max", 60),
-            bg_diff_threshold=peg_raw.get("bg_diff_threshold", 25),
+            h_range=(peg_h[0], peg_h[1]),
+            s_range=(peg_s[0], peg_s[1]),
+            v_range=(peg_v[0], peg_v[1]),
+            hsv_close_kernel=peg_raw.get("hsv_close_kernel", 7),
+            hsv_close_iterations=peg_raw.get("hsv_close_iterations", 3),
+            diff_hsv_h_range=(peg_diff_h[0], peg_diff_h[1]),
+            diff_hsv_s_range=(peg_diff_s[0], peg_diff_s[1]),
+            diff_hsv_v_range=(peg_diff_v[0], peg_diff_v[1]),
+            diff_erode_kernel=peg_raw.get("diff_erode_kernel", 3),
+            diff_erode_iterations=peg_raw.get("diff_erode_iterations", 1),
+            diff_close_kernel=peg_raw.get("diff_close_kernel", 5),
+            diff_close_iterations=peg_raw.get("diff_close_iterations", 2),
         ),
         morphology=MorphConfig(
             kernel_size=morph_raw.get("kernel_size", 3),
@@ -262,6 +293,18 @@ def compute_median_background(data_dir: Path, labels: dict) -> np.ndarray:
     return median
 
 
+def draw_cross(image: np.ndarray, cx: int, cy: int, size: int = 5, color: Tuple[int, ...] = (0, 0, 255), thickness: int = 1) -> np.ndarray:
+    """Draw a cross marker on a copy of the image. Works with BGR and BGRA."""
+    out = image.copy()
+    if out.ndim == 2:
+        out = cv2.cvtColor(out, cv2.COLOR_GRAY2BGR)
+    if out.shape[2] == 4:
+        color = (*color, 255)
+    cv2.line(out, (cx - size, cy), (cx + size, cy), color, thickness, cv2.LINE_AA)
+    cv2.line(out, (cx, cy - size), (cx, cy + size), color, thickness, cv2.LINE_AA)
+    return out
+
+
 def rough_crop(image: np.ndarray, center_px: Tuple[int, int], radius: int) -> Tuple[np.ndarray, int, int]:
     """Extract a square region centered on center_px, clamped to image bounds.
 
@@ -280,40 +323,78 @@ def segment_ball(
     crop_bgr: np.ndarray,
     bg_diff: np.ndarray,
     cfg: SegmentationConfig,
-) -> np.ndarray:
-    """Create a binary mask for the ball (yellow object)."""
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Create the ball masks and return combined plus intermediate masks."""
     hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
     h_lo, h_hi = cfg.ball.h_range
+    s_lo, s_hi = cfg.ball.s_range
+    v_lo, v_hi = cfg.ball.v_range
     mask_hsv = cv2.inRange(
         hsv,
-        (h_lo, cfg.ball.s_min, cfg.ball.v_min),
-        (h_hi, 255, 255),
+        (h_lo, s_lo, v_lo),
+        (h_hi, s_hi, v_hi),
     )
 
     # Refine with background diff — reject static yellow-ish artifacts
     diff_gray = cv2.cvtColor(bg_diff, cv2.COLOR_BGR2GRAY)
-    _, diff_mask = cv2.threshold(diff_gray, 30, 255, cv2.THRESH_BINARY)
+    _, diff_mask = cv2.threshold(diff_gray, cfg.ball.bg_diff_threshold, 255, cv2.THRESH_BINARY)
 
     # TODO: it looks like the diff_mask is actually hurting more than helping.
 
-    return mask_hsv  # cv2.bitwise_and(mask_hsv, diff_mask)
+    combined = mask_hsv  # cv2.bitwise_and(mask_hsv, diff_mask)
+    return combined, mask_hsv, diff_mask
 
 
 def segment_peg(
     crop_bgr: np.ndarray,
     bg_diff: np.ndarray,
     cfg: SegmentationConfig,
-) -> np.ndarray:
-    """Create a binary mask for a peg (dark object)."""
-    # Background subtraction: pixels that changed significantly
-    diff_gray = cv2.cvtColor(bg_diff, cv2.COLOR_BGR2GRAY)
-    _, diff_mask = cv2.threshold(diff_gray, cfg.peg.bg_diff_threshold, 255, cv2.THRESH_BINARY)
+) -> Tuple[np.ndarray, dict]:
+    """Create the peg mask and return it plus a dict of debug images."""
+    debug = {}
 
-    # Darkness filter on original crop
+    # --- HSV on the diff image to detect where the scene changed ---
+    diff_hsv = cv2.cvtColor(bg_diff, cv2.COLOR_BGR2HSV)
+    debug["diff_hsv_h"] = diff_hsv[:, :, 0]
+    debug["diff_hsv_s"] = diff_hsv[:, :, 1]
+    debug["diff_hsv_v"] = diff_hsv[:, :, 2]
+
+    dh_lo, dh_hi = cfg.peg.diff_hsv_h_range
+    ds_lo, ds_hi = cfg.peg.diff_hsv_s_range
+    dv_lo, dv_hi = cfg.peg.diff_hsv_v_range
+    diff_mask = cv2.inRange(diff_hsv, (dh_lo, ds_lo, dv_lo), (dh_hi, ds_hi, dv_hi))
+    debug["diff_hsv_mask_raw"] = diff_mask
+
+    # --- Close diff mask to fill noise holes, then erode to shrink shadow ---
+    ck = cfg.peg.diff_close_kernel
+    close_kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ck, ck))
+    diff_mask = cv2.morphologyEx(diff_mask, cv2.MORPH_CLOSE, close_kern, iterations=cfg.peg.diff_close_iterations)
+    debug["diff_closed"] = diff_mask
+
+    ek = cfg.peg.diff_erode_kernel
+    erode_kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ek, ek))
+    diff_mask = cv2.erode(diff_mask, erode_kern, iterations=cfg.peg.diff_erode_iterations)
+    debug["diff_eroded"] = diff_mask
+
+    # --- Darkness filter on original crop ---
     hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
-    dark_mask = cv2.inRange(hsv, (0, 0, 0), (179, 255, cfg.peg.v_max))
+    h_lo, h_hi = cfg.peg.h_range
+    s_lo, s_hi = cfg.peg.s_range
+    v_lo, v_hi = cfg.peg.v_range
+    hsv_mask = cv2.inRange(hsv, (h_lo, s_lo, v_lo), (h_hi, s_hi, v_hi))
+    debug["peg_hsv_mask"] = hsv_mask
 
-    return cv2.bitwise_and(diff_mask, dark_mask)
+    # --- Close the HSV mask to bridge reflection holes, then constrain with diff ---
+    ks = cfg.peg.hsv_close_kernel
+    close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
+    hsv_closed = cv2.morphologyEx(
+        hsv_mask, cv2.MORPH_CLOSE, close_kernel,
+        iterations=cfg.peg.hsv_close_iterations,
+    )
+    debug["peg_hsv_closed"] = hsv_closed
+
+    combined = cv2.bitwise_and(hsv_closed, diff_mask)
+    return combined, debug
 
 
 def morphological_cleanup(mask: np.ndarray, cfg: MorphConfig) -> np.ndarray:
@@ -339,20 +420,38 @@ def select_best_component(
     best_label = -1
     best_dist = float("inf")
     ex, ey = expected_center_in_crop
+    num_components = num_labels - 1  # exclude background
+
+    if num_components == 0:
+        log.warning("  component filter: no components found in mask (mask is empty)")
+        return np.zeros_like(mask)
 
     for label in range(1, num_labels):  # skip background (0)
         area = stats[label, cv2.CC_STAT_AREA]
-        if area < cfg.min_area_px or area > cfg.max_area_px:
-            continue
         cx, cy = centroids[label]
         dist = (cx - ex) ** 2 + (cy - ey) ** 2
+        if area < cfg.min_area_px:
+            log.debug("  component %d: area=%d TOO SMALL (min=%d), center=(%.0f,%.0f) dist=%.0f",
+                       label, area, cfg.min_area_px, cx, cy, dist)
+            continue
+        if area > cfg.max_area_px:
+            log.debug("  component %d: area=%d TOO LARGE (max=%d), center=(%.0f,%.0f) dist=%.0f",
+                       label, area, cfg.max_area_px, cx, cy, dist)
+            continue
+        log.debug("  component %d: area=%d OK, center=(%.0f,%.0f) dist=%.0f",
+                   label, area, cx, cy, dist)
         if dist < best_dist:
             best_dist = dist
             best_label = label
 
     if best_label < 0:
+        areas = [stats[l, cv2.CC_STAT_AREA] for l in range(1, num_labels)]
+        log.warning("  component filter: found %d component(s) but none in area range [%d, %d]. "
+                     "Areas: %s", num_components, cfg.min_area_px, cfg.max_area_px, sorted(areas, reverse=True))
         return np.zeros_like(mask)
 
+    log.debug("  selected component %d: area=%d dist=%.0f", best_label,
+              stats[best_label, cv2.CC_STAT_AREA], best_dist)
     return ((labels_img == best_label) * 255).astype(np.uint8)
 
 
@@ -399,7 +498,7 @@ def save_debug_images(debug_dir: Path, stages: dict) -> None:
         cv2.imwrite(str(path), img)
 
 
-TILE_HEIGHT = 150  # target height for each tile in the combined debug image
+TILE_HEIGHT = 200  # target height for each tile in the combined debug image
 CHECKER_SIZE = 8  # checkerboard square size in pixels
 
 
@@ -414,35 +513,93 @@ def _make_checkerboard(shape: Tuple[int, int]) -> np.ndarray:
     return np.stack([checker, checker, checker], axis=-1)
 
 
-def show_debug_images(title_prefix: str, stages: dict) -> None:
-    """Tile all debug stages into one image and display it in a single window."""
-    tiles = []
-    for name, img in stages.items():
-        tile = img.copy()
+def _render_tile(name: str, img: np.ndarray) -> np.ndarray:
+    """Convert a debug image to a labelled BGR tile of TILE_HEIGHT."""
+    tile = img.copy()
 
-        # Normalise to 3-channel BGR for display
-        if tile.ndim == 2:
-            tile = cv2.cvtColor(tile, cv2.COLOR_GRAY2BGR)
-        elif tile.shape[2] == 4:
-            # Composite against checkerboard so transparency is visible
-            bgr = tile[:, :, :3].astype(np.float32)
-            alpha = tile[:, :, 3:4].astype(np.float32) / 255.0
-            checker = _make_checkerboard(tile.shape[:2])
-            tile = (bgr * alpha + checker * (1.0 - alpha)).astype(np.uint8)
+    # Normalise to 3-channel BGR for display
+    if tile.ndim == 2:
+        tile = cv2.cvtColor(tile, cv2.COLOR_GRAY2BGR)
+    elif tile.shape[2] == 4:
+        # Composite against checkerboard so transparency is visible
+        bgr = tile[:, :, :3].astype(np.float32)
+        alpha = tile[:, :, 3:4].astype(np.float32) / 255.0
+        checker = _make_checkerboard(tile.shape[:2])
+        tile = (bgr * alpha + checker * (1.0 - alpha)).astype(np.uint8)
 
-        # Resize to target height, keep aspect ratio
-        h, w = tile.shape[:2]
-        scale = TILE_HEIGHT / h
-        tile = cv2.resize(tile, (max(1, int(w * scale)), TILE_HEIGHT), interpolation=cv2.INTER_NEAREST)
+    # Resize to target height, keep aspect ratio
+    h, w = tile.shape[:2]
+    scale = TILE_HEIGHT / h
+    tile = cv2.resize(tile, (max(1, int(w * scale)), TILE_HEIGHT), interpolation=cv2.INTER_NEAREST)
 
-        # Add stage label
-        label = name.replace(".png", "")
-        cv2.putText(tile, label, (4, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
+    # Add stage label
+    label = name.replace(".png", "")
+    cv2.putText(tile, label, (4, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
 
-        tiles.append(tile)
+    return tile
 
-    combined = np.hstack(tiles)
-    cv2.imshow(title_prefix, combined)
+
+def show_debug_images(
+    title_prefix: str,
+    stages: dict,
+    row_layout: Optional[List[List[str]]] = None,
+) -> None:
+    """Tile debug stages into rows and display in a single window.
+
+    row_layout: list of rows, each row is a list of key prefixes to match
+    against stage names (substring match). Stages not matched by any row
+    are distributed round-robin across the rows at the end.
+    """
+    if row_layout is None:
+        # Single-row fallback
+        tiles = [_render_tile(n, img) for n, img in stages.items()]
+        combined = np.hstack(tiles) if tiles else np.zeros((TILE_HEIGHT, 200, 3), dtype=np.uint8)
+        cv2.imshow(title_prefix, combined)
+    else:
+        num_rows = len(row_layout)
+        row_tiles: List[List[np.ndarray]] = [[] for _ in range(num_rows)]
+        placed = set()
+
+        # Place stages into their assigned row by substring match
+        for row_idx, prefixes in enumerate(row_layout):
+            for key in stages:
+                if key in placed:
+                    continue
+                for prefix in prefixes:
+                    if prefix in key:
+                        row_tiles[row_idx].append(_render_tile(key, stages[key]))
+                        placed.add(key)
+                        break
+
+        # Distribute remaining stages round-robin
+        row_idx = 0
+        for key in stages:
+            if key in placed:
+                continue
+            row_tiles[row_idx % num_rows].append(_render_tile(key, stages[key]))
+            row_idx += 1
+
+        # Build each row, pad shorter rows to match the widest
+        row_images = []
+        max_width = 0
+        for tiles in row_tiles:
+            if tiles:
+                row_img = np.hstack(tiles)
+            else:
+                row_img = np.zeros((TILE_HEIGHT, 1, 3), dtype=np.uint8)
+            row_images.append(row_img)
+            max_width = max(max_width, row_img.shape[1])
+
+        # Pad rows to equal width and stack vertically
+        padded = []
+        for row_img in row_images:
+            if row_img.shape[1] < max_width:
+                pad = np.zeros((TILE_HEIGHT, max_width - row_img.shape[1], 3), dtype=np.uint8)
+                row_img = np.hstack([row_img, pad])
+            padded.append(row_img)
+
+        combined = np.vstack(padded)
+        cv2.imshow(title_prefix, combined)
 
     # Run input() in a thread so the main thread can keep driving the Qt event loop
     entered = threading.Event()
@@ -496,35 +653,48 @@ def process_single_object(
     radius = seg.rough_crop_radius_px
     crop, crop_ox, crop_oy = rough_crop(image, center_px, radius)
     bg_crop, _, _ = rough_crop(median_bg, center_px, radius)
-    debug_stages["01_rough_crop.png"] = crop
 
     # Expected center within the crop
     local_cx = center_px[0] - crop_ox
     local_cy = center_px[1] - crop_oy
+    debug_stages["crop.png"] = draw_cross(crop, local_cx, local_cy)
 
     # Step 2: Background subtraction
     bg_diff = cv2.absdiff(crop, bg_crop)
-    debug_stages["02_bg_subtracted.png"] = bg_diff
+    debug_stages["bg_diff.png"] = bg_diff
 
-    # Step 3: HSV segmentation
+    # Step 3: HSV of original crop
     hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-    debug_stages["03_hsv_h.png"] = hsv_crop[:, :, 0]
-    debug_stages["03_hsv_s.png"] = hsv_crop[:, :, 1]
-    debug_stages["03_hsv_v.png"] = hsv_crop[:, :, 2]
+    debug_stages["crop_hsv_h.png"] = hsv_crop[:, :, 0]
+    debug_stages["crop_hsv_s.png"] = hsv_crop[:, :, 1]
+    debug_stages["crop_hsv_v.png"] = hsv_crop[:, :, 2]
 
     if object_type == ObjectType.BALL:
-        raw_mask = segment_ball(crop, bg_diff, seg)
+        raw_mask, ball_hsv_mask, ball_diff_mask = segment_ball(crop, bg_diff, seg)
+        debug_stages["ball_hsv_mask.png"] = ball_hsv_mask
+        debug_stages["ball_diff_mask.png"] = ball_diff_mask
     else:
-        raw_mask = segment_peg(crop, bg_diff, seg)
-    debug_stages["04_binary_mask.png"] = raw_mask
+        raw_mask, peg_debug = segment_peg(crop, bg_diff, seg)
+        for key, img in peg_debug.items():
+            debug_stages[f"{key}.png"] = img
+    debug_stages["combined_mask.png"] = raw_mask
+
+    if object_type == ObjectType.BALL:
+        debug_row_layout = None
+    else:
+        debug_row_layout = [
+            ["crop", "crop_hsv_h", "crop_hsv_s", "crop_hsv_v", "peg_hsv_mask", "peg_hsv_closed"],
+            ["bg_diff", "diff_hsv_h", "diff_hsv_s", "diff_hsv_v", "diff_hsv_mask_raw", "diff_closed", "diff_eroded"],
+            ["combined_mask", "morphed", "component", "rgba", "sprite"],
+        ]
 
     # Step 4: Morphological cleanup
     morphed = morphological_cleanup(raw_mask, seg.morphology)
-    debug_stages["05_morphed_mask.png"] = morphed
+    debug_stages["morphed.png"] = morphed
 
     # Step 5: Connected component selection
     component_mask = select_best_component(morphed, (local_cx, local_cy), seg.component)
-    debug_stages["06_component_mask.png"] = component_mask
+    debug_stages["component.png"] = component_mask
 
     if cv2.countNonZero(component_mask) == 0:
         result.failure_reason = "No valid component found after filtering"
@@ -532,13 +702,13 @@ def process_single_object(
         if cfg.debug_mode == DebugMode.SAVE:
             save_debug_images(cfg.output_dir / "debug" / type_dir / name, debug_stages)
         elif cfg.debug_mode == DebugMode.SHOW:
-            show_debug_images(name, debug_stages)
+            show_debug_images(name, debug_stages, debug_row_layout)
         return result
 
     # Step 6: Apply alpha (with optional blur)
     alpha = apply_alpha_blur(component_mask, seg.alpha_blur_sigma)
     rgba = create_rgba(crop, alpha)
-    debug_stages["07_masked_rgba.png"] = rgba
+    debug_stages["rgba.png"] = rgba
 
     # Step 7: Tight crop + offset
     sprite, tight_ox, tight_oy = tight_crop_sprite(rgba, component_mask, seg.sprite_padding_px)
@@ -548,14 +718,13 @@ def process_single_object(
         if cfg.debug_mode == DebugMode.SAVE:
             save_debug_images(cfg.output_dir / "debug" / type_dir / name, debug_stages)
         elif cfg.debug_mode == DebugMode.SHOW:
-            show_debug_images(name, debug_stages)
+            show_debug_images(name, debug_stages, debug_row_layout)
         return result
-
-    debug_stages["08_final_sprite.png"] = sprite
 
     # Offset: from sprite top-left to object center
     offset_x = float(local_cx - tight_ox)
     offset_y = float(local_cy - tight_oy)
+    debug_stages["sprite.png"] = draw_cross(sprite, int(round(offset_x)), int(round(offset_y)))
 
     # Step 8: Save
     cv2.imwrite(str(sprite_path), sprite)
@@ -582,7 +751,7 @@ def process_single_object(
     if cfg.debug_mode == DebugMode.SAVE:
         save_debug_images(cfg.output_dir / "debug" / type_dir / name, debug_stages)
     elif cfg.debug_mode == DebugMode.SHOW:
-        show_debug_images(name, debug_stages)
+        show_debug_images(name, debug_stages, debug_row_layout)
 
     return result
 
