@@ -1,0 +1,2198 @@
+{
+  "summary": {
+    "total": 96,
+    "success": 96,
+    "failed": 0,
+    "by_type": {
+      "left_peg": {
+        "success": 48,
+        "fail": 0
+      },
+      "right_peg": {
+        "success": 48,
+        "fail": 0
+      }
+    }
+  },
+  "config": {
+    "board": {
+      "width_m": 0.42,
+      "height_m": 0.32
+    },
+    "segmentation": {
+      "rough_crop_radius_px": 50,
+      "ball": {
+        "h_range": [
+          15,
+          40
+        ],
+        "s_range": [
+          40,
+          255
+        ],
+        "v_range": [
+          120,
+          255
+        ],
+        "bg_diff_threshold": 30
+      },
+      "peg": {
+        "h_range": [
+          0,
+          255
+        ],
+        "s_range": [
+          0,
+          255
+        ],
+        "v_range": [
+          0,
+          50
+        ],
+        "hsv_close_kernel": 7,
+        "hsv_close_iterations": 3,
+        "diff_hsv_h_range": [
+          0,
+          255
+        ],
+        "diff_hsv_s_range": [
+          0,
+          255
+        ],
+        "diff_hsv_v_range": [
+          70,
+          255
+        ],
+        "diff_erode_kernel": 3,
+        "diff_erode_iterations": 1,
+        "diff_close_kernel": 5,
+        "diff_close_iterations": 2
+      },
+      "morphology": {
+        "kernel_size": 3,
+        "open_iterations": 1,
+        "close_iterations": 2
+      },
+      "component": {
+        "min_area_px": 100,
+        "max_area_px": 1200
+      },
+      "sprite_padding_px": 3,
+      "alpha_blur_sigma": 0.5
+    }
+  },
+  "sprites": [
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000000.png",
+      "position_m": [
+        0.023142355398678625,
+        0.025199927260852576
+      ],
+      "position_px": [
+        36,
+        39
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_000.png",
+      "sprite_size_px": [
+        58,
+        45
+      ],
+      "offset_px": [
+        36.0,
+        25.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000000.png",
+      "position_m": [
+        0.39774666988150686,
+        0.024274283002569556
+      ],
+      "position_px": [
+        617,
+        38
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_001.png",
+      "sprite_size_px": [
+        58,
+        45
+      ],
+      "offset_px": [
+        23.0,
+        25.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000001.png",
+      "position_m": [
+        0.03435971472620243,
+        0.016985768820315265
+      ],
+      "position_px": [
+        53,
+        26
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_002.png",
+      "sprite_size_px": [
+        55,
+        46
+      ],
+      "offset_px": [
+        31.0,
+        25.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000001.png",
+      "position_m": [
+        0.38486494007421607,
+        0.015606876008944896
+      ],
+      "position_px": [
+        597,
+        24
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_003.png",
+      "sprite_size_px": [
+        65,
+        47
+      ],
+      "offset_px": [
+        23.0,
+        24.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000002.png",
+      "position_m": [
+        0.05797546012287864,
+        0.018747910540148252
+      ],
+      "position_px": [
+        90,
+        29
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_004.png",
+      "sprite_size_px": [
+        51,
+        46
+      ],
+      "offset_px": [
+        31.0,
+        26.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000002.png",
+      "position_m": [
+        0.36073619631669374,
+        0.018101010101856625
+      ],
+      "position_px": [
+        560,
+        28
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_005.png",
+      "sprite_size_px": [
+        60,
+        49
+      ],
+      "offset_px": [
+        20.0,
+        28.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000003.png",
+      "position_m": [
+        0.08180571483147114,
+        0.01950415327566663
+      ],
+      "position_px": [
+        127,
+        30
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_006.png",
+      "sprite_size_px": [
+        43,
+        47
+      ],
+      "offset_px": [
+        26.0,
+        27.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000003.png",
+      "position_m": [
+        0.34074572061244995,
+        0.019440636235161735
+      ],
+      "position_px": [
+        529,
+        30
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_007.png",
+      "sprite_size_px": [
+        55,
+        47
+      ],
+      "offset_px": [
+        19.0,
+        27.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000004.png",
+      "position_m": [
+        0.10045758290196347,
+        0.020686868686872528
+      ],
+      "position_px": [
+        156,
+        32
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_008.png",
+      "sprite_size_px": [
+        39,
+        47
+      ],
+      "offset_px": [
+        24.0,
+        29.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000004.png",
+      "position_m": [
+        0.3201526580779219,
+        0.019394658097877004
+      ],
+      "position_px": [
+        497,
+        30
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_009.png",
+      "sprite_size_px": [
+        51,
+        48
+      ],
+      "offset_px": [
+        18.0,
+        28.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000005.png",
+      "position_m": [
+        0.12239235746894643,
+        0.020234034335847455
+      ],
+      "position_px": [
+        190,
+        31
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_010.png",
+      "sprite_size_px": [
+        35,
+        46
+      ],
+      "offset_px": [
+        20.0,
+        28.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000005.png",
+      "position_m": [
+        0.2982515337407603,
+        0.01965203313961365
+      ],
+      "position_px": [
+        463,
+        30
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_011.png",
+      "sprite_size_px": [
+        46,
+        49
+      ],
+      "offset_px": [
+        17.0,
+        29.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000006.png",
+      "position_m": [
+        0.14236196319021086,
+        0.020040404040404095
+      ],
+      "position_px": [
+        221,
+        31
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_012.png",
+      "sprite_size_px": [
+        31,
+        47
+      ],
+      "offset_px": [
+        16.0,
+        30.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000006.png",
+      "position_m": [
+        0.2764839888248493,
+        0.019464270267009164
+      ],
+      "position_px": [
+        429,
+        30
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_013.png",
+      "sprite_size_px": [
+        40,
+        48
+      ],
+      "offset_px": [
+        13.0,
+        30.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000007.png",
+      "position_m": [
+        0.16405281026456545,
+        0.02007376991169626
+      ],
+      "position_px": [
+        255,
+        31
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_014.png",
+      "sprite_size_px": [
+        28,
+        47
+      ],
+      "offset_px": [
+        13.0,
+        30.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000007.png",
+      "position_m": [
+        0.2557364762902787,
+        0.020040403953206574
+      ],
+      "position_px": [
+        397,
+        31
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_015.png",
+      "sprite_size_px": [
+        36,
+        49
+      ],
+      "offset_px": [
+        12.0,
+        31.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000008.png",
+      "position_m": [
+        0.17107509871873,
+        0.07067352155859553
+      ],
+      "position_px": [
+        266,
+        109
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_016.png",
+      "sprite_size_px": [
+        28,
+        33
+      ],
+      "offset_px": [
+        13.0,
+        18.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000008.png",
+      "position_m": [
+        0.2486503067484662,
+        0.07046464646465289
+      ],
+      "position_px": [
+        386,
+        109
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_017.png",
+      "sprite_size_px": [
+        33,
+        37
+      ],
+      "offset_px": [
+        11.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000009.png",
+      "position_m": [
+        0.15524539877300597,
+        0.0775831671955198
+      ],
+      "position_px": [
+        241,
+        120
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_018.png",
+      "sprite_size_px": [
+        29,
+        32
+      ],
+      "offset_px": [
+        14.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000009.png",
+      "position_m": [
+        0.266042944785283,
+        0.07829604682934627
+      ],
+      "position_px": [
+        413,
+        121
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_019.png",
+      "sprite_size_px": [
+        37,
+        35
+      ],
+      "offset_px": [
+        12.0,
+        18.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000010.png",
+      "position_m": [
+        0.1333435582812277,
+        0.07751821861844406
+      ],
+      "position_px": [
+        207,
+        120
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_020.png",
+      "sprite_size_px": [
+        34,
+        32
+      ],
+      "offset_px": [
+        18.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000010.png",
+      "position_m": [
+        0.2874704779470782,
+        0.07757575757572022
+      ],
+      "position_px": [
+        446,
+        120
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_021.png",
+      "sprite_size_px": [
+        41,
+        36
+      ],
+      "offset_px": [
+        11.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000011.png",
+      "position_m": [
+        0.1114417177912572,
+        0.07692929292926953
+      ],
+      "position_px": [
+        173,
+        119
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_022.png",
+      "sprite_size_px": [
+        38,
+        33
+      ],
+      "offset_px": [
+        24.0,
+        18.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000011.png",
+      "position_m": [
+        0.30920245398812185,
+        0.0782222222222308
+      ],
+      "position_px": [
+        480,
+        121
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_023.png",
+      "sprite_size_px": [
+        47,
+        36
+      ],
+      "offset_px": [
+        14.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000012.png",
+      "position_m": [
+        0.08953987090180796,
+        0.07628282828282677
+      ],
+      "position_px": [
+        139,
+        118
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_024.png",
+      "sprite_size_px": [
+        42,
+        33
+      ],
+      "offset_px": [
+        28.0,
+        18.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000012.png",
+      "position_m": [
+        0.32981595092046606,
+        0.07663587045675344
+      ],
+      "position_px": [
+        512,
+        119
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_025.png",
+      "sprite_size_px": [
+        51,
+        37
+      ],
+      "offset_px": [
+        16.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000013.png",
+      "position_m": [
+        0.06865346731207174,
+        0.0758796646492881
+      ],
+      "position_px": [
+        107,
+        117
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_026.png",
+      "sprite_size_px": [
+        47,
+        33
+      ],
+      "offset_px": [
+        31.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000013.png",
+      "position_m": [
+        0.3519497003128886,
+        0.07628282828282824
+      ],
+      "position_px": [
+        546,
+        118
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_027.png",
+      "sprite_size_px": [
+        58,
+        38
+      ],
+      "offset_px": [
+        19.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000014.png",
+      "position_m": [
+        0.04822823734436511,
+        0.07563636363636363
+      ],
+      "position_px": [
+        75,
+        117
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_028.png",
+      "sprite_size_px": [
+        52,
+        33
+      ],
+      "offset_px": [
+        33.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000014.png",
+      "position_m": [
+        0.37233128834377366,
+        0.07563636363636284
+      ],
+      "position_px": [
+        578,
+        117
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_029.png",
+      "sprite_size_px": [
+        63,
+        38
+      ],
+      "offset_px": [
+        21.0,
+        18.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000015.png",
+      "position_m": [
+        0.02455765061045727,
+        0.0760018404977787
+      ],
+      "position_px": [
+        38,
+        118
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_030.png",
+      "sprite_size_px": [
+        60,
+        34
+      ],
+      "offset_px": [
+        37.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000015.png",
+      "position_m": [
+        0.39431690678499337,
+        0.07628282828288224
+      ],
+      "position_px": [
+        612,
+        118
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_031.png",
+      "sprite_size_px": [
+        61,
+        38
+      ],
+      "offset_px": [
+        21.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000016.png",
+      "position_m": [
+        0.01932515337432079,
+        0.12670707070773943
+      ],
+      "position_px": [
+        30,
+        196
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_032.png",
+      "sprite_size_px": [
+        50,
+        30
+      ],
+      "offset_px": [
+        30.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000016.png",
+      "position_m": [
+        0.40067484662569575,
+        0.1267070707082524
+      ],
+      "position_px": [
+        622,
+        196
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_033.png",
+      "sprite_size_px": [
+        49,
+        34
+      ],
+      "offset_px": [
+        19.0,
+        15.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000017.png",
+      "position_m": [
+        0.03412906322321093,
+        0.1344646464646786
+      ],
+      "position_px": [
+        53,
+        208
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_034.png",
+      "sprite_size_px": [
+        56,
+        29
+      ],
+      "offset_px": [
+        36.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000017.png",
+      "position_m": [
+        0.3852147239246383,
+        0.13260845161308774
+      ],
+      "position_px": [
+        598,
+        205
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_035.png",
+      "sprite_size_px": [
+        65,
+        30
+      ],
+      "offset_px": [
+        21.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000018.png",
+      "position_m": [
+        0.05797553286664619,
+        0.13381818181807523
+      ],
+      "position_px": [
+        90,
+        207
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_036.png",
+      "sprite_size_px": [
+        49,
+        29
+      ],
+      "offset_px": [
+        33.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000018.png",
+      "position_m": [
+        0.3628132974630805,
+        0.13317217297561146
+      ],
+      "position_px": [
+        563,
+        206
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_037.png",
+      "sprite_size_px": [
+        60,
+        31
+      ],
+      "offset_px": [
+        20.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000019.png",
+      "position_m": [
+        0.07960554493376168,
+        0.13252525252524383
+      ],
+      "position_px": [
+        124,
+        205
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_038.png",
+      "sprite_size_px": [
+        44,
+        29
+      ],
+      "offset_px": [
+        30.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000019.png",
+      "position_m": [
+        0.3388343558277687,
+        0.13252525252525088
+      ],
+      "position_px": [
+        526,
+        205
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_039.png",
+      "sprite_size_px": [
+        53,
+        31
+      ],
+      "offset_px": [
+        14.0,
+        15.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000020.png",
+      "position_m": [
+        0.10435582822112455,
+        0.13205743026604325
+      ],
+      "position_px": [
+        162,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_040.png",
+      "sprite_size_px": [
+        40,
+        30
+      ],
+      "offset_px": [
+        25.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000020.png",
+      "position_m": [
+        0.31370779430818685,
+        0.1321681077216384
+      ],
+      "position_px": [
+        487,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_041.png",
+      "sprite_size_px": [
+        49,
+        33
+      ],
+      "offset_px": [
+        13.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000021.png",
+      "position_m": [
+        0.12104436043843414,
+        0.13246490189721105
+      ],
+      "position_px": [
+        188,
+        205
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_042.png",
+      "sprite_size_px": [
+        36,
+        29
+      ],
+      "offset_px": [
+        20.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000021.png",
+      "position_m": [
+        0.29760736183794545,
+        0.1320551547409143
+      ],
+      "position_px": [
+        462,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_043.png",
+      "sprite_size_px": [
+        44,
+        34
+      ],
+      "offset_px": [
+        11.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000022.png",
+      "position_m": [
+        0.14493479842962848,
+        0.13188027235336403
+      ],
+      "position_px": [
+        225,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_044.png",
+      "sprite_size_px": [
+        32,
+        29
+      ],
+      "offset_px": [
+        18.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000022.png",
+      "position_m": [
+        0.2750613496918852,
+        0.13193419956552918
+      ],
+      "position_px": [
+        427,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_045.png",
+      "sprite_size_px": [
+        39,
+        29
+      ],
+      "offset_px": [
+        13.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000023.png",
+      "position_m": [
+        0.16377370715651407,
+        0.13252522281468812
+      ],
+      "position_px": [
+        254,
+        205
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_046.png",
+      "sprite_size_px": [
+        29,
+        29
+      ],
+      "offset_px": [
+        13.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000023.png",
+      "position_m": [
+        0.25444785275965603,
+        0.1318787878787808
+      ],
+      "position_px": [
+        395,
+        204
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_047.png",
+      "sprite_size_px": [
+        35,
+        29
+      ],
+      "offset_px": [
+        14.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000024.png",
+      "position_m": [
+        0.17111886294418188,
+        0.18294949089842288
+      ],
+      "position_px": [
+        266,
+        283
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_048.png",
+      "sprite_size_px": [
+        28,
+        33
+      ],
+      "offset_px": [
+        14.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000024.png",
+      "position_m": [
+        0.24835495679329364,
+        0.18265309372302713
+      ],
+      "position_px": [
+        386,
+        283
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_049.png",
+      "sprite_size_px": [
+        34,
+        32
+      ],
+      "offset_px": [
+        14.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000025.png",
+      "position_m": [
+        0.15395705521472652,
+        0.19006066134724453
+      ],
+      "position_px": [
+        239,
+        294
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_050.png",
+      "sprite_size_px": [
+        29,
+        35
+      ],
+      "offset_px": [
+        14.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000025.png",
+      "position_m": [
+        0.2660429447852314,
+        0.19070707070707296
+      ],
+      "position_px": [
+        413,
+        295
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_051.png",
+      "sprite_size_px": [
+        38,
+        34
+      ],
+      "offset_px": [
+        13.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000026.png",
+      "position_m": [
+        0.13235541248281085,
+        0.18830511397302374
+      ],
+      "position_px": [
+        205,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_052.png",
+      "sprite_size_px": [
+        34,
+        35
+      ],
+      "offset_px": [
+        20.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000026.png",
+      "position_m": [
+        0.2879447852762373,
+        0.19006060667744906
+      ],
+      "position_px": [
+        447,
+        294
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_053.png",
+      "sprite_size_px": [
+        42,
+        33
+      ],
+      "offset_px": [
+        13.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000027.png",
+      "position_m": [
+        0.11037285417411853,
+        0.18812121113627564
+      ],
+      "position_px": [
+        171,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_054.png",
+      "sprite_size_px": [
+        38,
+        36
+      ],
+      "offset_px": [
+        23.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000027.png",
+      "position_m": [
+        0.30884556572248,
+        0.188120409740613
+      ],
+      "position_px": [
+        479,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_055.png",
+      "sprite_size_px": [
+        47,
+        34
+      ],
+      "offset_px": [
+        12.0,
+        12.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000028.png",
+      "position_m": [
+        0.09001015572874643,
+        0.18794669981710768
+      ],
+      "position_px": [
+        140,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_056.png",
+      "sprite_size_px": [
+        41,
+        36
+      ],
+      "offset_px": [
+        28.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000028.png",
+      "position_m": [
+        0.3311042944846321,
+        0.18828185642573209
+      ],
+      "position_px": [
+        514,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_057.png",
+      "sprite_size_px": [
+        50,
+        34
+      ],
+      "offset_px": [
+        13.0,
+        13.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000029.png",
+      "position_m": [
+        0.0681632330452392,
+        0.18852267558134478
+      ],
+      "position_px": [
+        106,
+        292
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_058.png",
+      "sprite_size_px": [
+        47,
+        36
+      ],
+      "offset_px": [
+        31.0,
+        15.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000029.png",
+      "position_m": [
+        0.35317917403123666,
+        0.1889413320372136
+      ],
+      "position_px": [
+        548,
+        292
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_059.png",
+      "sprite_size_px": [
+        58,
+        34
+      ],
+      "offset_px": [
+        20.0,
+        15.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000030.png",
+      "position_m": [
+        0.04716232805154887,
+        0.18747474747475548
+      ],
+      "position_px": [
+        73,
+        290
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_060.png",
+      "sprite_size_px": [
+        53,
+        36
+      ],
+      "offset_px": [
+        35.0,
+        14.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000030.png",
+      "position_m": [
+        0.37296417350314276,
+        0.18877525761084382
+      ],
+      "position_px": [
+        579,
+        292
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_061.png",
+      "sprite_size_px": [
+        63,
+        34
+      ],
+      "offset_px": [
+        23.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000031.png",
+      "position_m": [
+        0.026334747643250018,
+        0.18692853072930993
+      ],
+      "position_px": [
+        41,
+        289
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_062.png",
+      "sprite_size_px": [
+        59,
+        39
+      ],
+      "offset_px": [
+        41.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000031.png",
+      "position_m": [
+        0.39358895713463116,
+        0.18812121216103472
+      ],
+      "position_px": [
+        611,
+        291
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_063.png",
+      "sprite_size_px": [
+        62,
+        33
+      ],
+      "offset_px": [
+        21.0,
+        15.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000032.png",
+      "position_m": [
+        0.018138821332724868,
+        0.23789898989907057
+      ],
+      "position_px": [
+        28,
+        368
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_064.png",
+      "sprite_size_px": [
+        49,
+        48
+      ],
+      "offset_px": [
+        28.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000032.png",
+      "position_m": [
+        0.4013190184049084,
+        0.23854545454351703
+      ],
+      "position_px": [
+        623,
+        369
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_065.png",
+      "sprite_size_px": [
+        49,
+        38
+      ],
+      "offset_px": [
+        20.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000033.png",
+      "position_m": [
+        0.03482286651976999,
+        0.24630303030303036
+      ],
+      "position_px": [
+        54,
+        381
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_066.png",
+      "sprite_size_px": [
+        56,
+        50
+      ],
+      "offset_px": [
+        35.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000033.png",
+      "position_m": [
+        0.38360921653241853,
+        0.24727722786489048
+      ],
+      "position_px": [
+        596,
+        383
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_067.png",
+      "sprite_size_px": [
+        64,
+        48
+      ],
+      "offset_px": [
+        24.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000034.png",
+      "position_m": [
+        0.057331288343538456,
+        0.24564353134714645
+      ],
+      "position_px": [
+        89,
+        380
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_068.png",
+      "sprite_size_px": [
+        51,
+        50
+      ],
+      "offset_px": [
+        32.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000034.png",
+      "position_m": [
+        0.36266871165643566,
+        0.24501010100982581
+      ],
+      "position_px": [
+        563,
+        379
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_069.png",
+      "sprite_size_px": [
+        59,
+        48
+      ],
+      "offset_px": [
+        21.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000035.png",
+      "position_m": [
+        0.07858895705529498,
+        0.24436363636362526
+      ],
+      "position_px": [
+        122,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_070.png",
+      "sprite_size_px": [
+        46,
+        49
+      ],
+      "offset_px": [
+        28.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000035.png",
+      "position_m": [
+        0.3413061385095363,
+        0.24436363636363145
+      ],
+      "position_px": [
+        530,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_071.png",
+      "sprite_size_px": [
+        54,
+        48
+      ],
+      "offset_px": [
+        20.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000036.png",
+      "position_m": [
+        0.10177914111351341,
+        0.2443636363586093
+      ],
+      "position_px": [
+        158,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_072.png",
+      "sprite_size_px": [
+        40,
+        49
+      ],
+      "offset_px": [
+        24.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000036.png",
+      "position_m": [
+        0.31822085867533556,
+        0.24424027263607906
+      ],
+      "position_px": [
+        494,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_073.png",
+      "sprite_size_px": [
+        49,
+        48
+      ],
+      "offset_px": [
+        17.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000037.png",
+      "position_m": [
+        0.12174846626082564,
+        0.24371706506082425
+      ],
+      "position_px": [
+        189,
+        377
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_074.png",
+      "sprite_size_px": [
+        35,
+        49
+      ],
+      "offset_px": [
+        21.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000037.png",
+      "position_m": [
+        0.2976073619564709,
+        0.24371717171871746
+      ],
+      "position_px": [
+        462,
+        377
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_075.png",
+      "sprite_size_px": [
+        43,
+        48
+      ],
+      "offset_px": [
+        14.0,
+        17.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000038.png",
+      "position_m": [
+        0.14365030674702975,
+        0.24410874736411856
+      ],
+      "position_px": [
+        223,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_076.png",
+      "sprite_size_px": [
+        31,
+        49
+      ],
+      "offset_px": [
+        17.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000038.png",
+      "position_m": [
+        0.27651861744085726,
+        0.24324054745149343
+      ],
+      "position_px": [
+        429,
+        376
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_077.png",
+      "sprite_size_px": [
+        38,
+        48
+      ],
+      "offset_px": [
+        12.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000039.png",
+      "position_m": [
+        0.1636381338527063,
+        0.244363636363637
+      ],
+      "position_px": [
+        254,
+        378
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_078.png",
+      "sprite_size_px": [
+        27,
+        49
+      ],
+      "offset_px": [
+        13.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000039.png",
+      "position_m": [
+        0.25638036809795217,
+        0.24371717171719237
+      ],
+      "position_px": [
+        398,
+        377
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_079.png",
+      "sprite_size_px": [
+        35,
+        48
+      ],
+      "offset_px": [
+        13.0,
+        16.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000040.png",
+      "position_m": [
+        0.17070552147239085,
+        0.2913794386786871
+      ],
+      "position_px": [
+        265,
+        451
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_080.png",
+      "sprite_size_px": [
+        27,
+        59
+      ],
+      "offset_px": [
+        13.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000040.png",
+      "position_m": [
+        0.25058282208588956,
+        0.2902626262626262
+      ],
+      "position_px": [
+        389,
+        449
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_081.png",
+      "sprite_size_px": [
+        34,
+        59
+      ],
+      "offset_px": [
+        14.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000041.png",
+      "position_m": [
+        0.15358505038957837,
+        0.29608080658096725
+      ],
+      "position_px": [
+        238,
+        458
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_082.png",
+      "sprite_size_px": [
+        30,
+        56
+      ],
+      "offset_px": [
+        14.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000041.png",
+      "position_m": [
+        0.2675998373950042,
+        0.2951021815905431
+      ],
+      "position_px": [
+        415,
+        456
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_083.png",
+      "sprite_size_px": [
+        37,
+        59
+      ],
+      "offset_px": [
+        14.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000042.png",
+      "position_m": [
+        0.13333261875933208,
+        0.2985510457440348
+      ],
+      "position_px": [
+        207,
+        462
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_084.png",
+      "sprite_size_px": [
+        35,
+        54
+      ],
+      "offset_px": [
+        19.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000042.png",
+      "position_m": [
+        0.28849424731023005,
+        0.2968293906523509
+      ],
+      "position_px": [
+        448,
+        459
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_085.png",
+      "sprite_size_px": [
+        42,
+        55
+      ],
+      "offset_px": [
+        17.0,
+        19.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000043.png",
+      "position_m": [
+        0.11144178686409408,
+        0.2986666673249815
+      ],
+      "position_px": [
+        173,
+        462
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_086.png",
+      "sprite_size_px": [
+        39,
+        53
+      ],
+      "offset_px": [
+        22.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000043.png",
+      "position_m": [
+        0.30920245405514196,
+        0.29803232270110047
+      ],
+      "position_px": [
+        480,
+        461
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_087.png",
+      "sprite_size_px": [
+        46,
+        54
+      ],
+      "offset_px": [
+        17.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000044.png",
+      "position_m": [
+        0.08953961351417696,
+        0.2993127086547895
+      ],
+      "position_px": [
+        139,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_088.png",
+      "sprite_size_px": [
+        43,
+        52
+      ],
+      "offset_px": [
+        25.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000044.png",
+      "position_m": [
+        0.3298159509202373,
+        0.29884508798819415
+      ],
+      "position_px": [
+        512,
+        462
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_089.png",
+      "sprite_size_px": [
+        51,
+        54
+      ],
+      "offset_px": [
+        19.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000045.png",
+      "position_m": [
+        0.06892638036806925,
+        0.2993131081490818
+      ],
+      "position_px": [
+        107,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_090.png",
+      "sprite_size_px": [
+        48,
+        53
+      ],
+      "offset_px": [
+        29.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000045.png",
+      "position_m": [
+        0.3516985999100539,
+        0.2992464553546953
+      ],
+      "position_px": [
+        546,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_091.png",
+      "sprite_size_px": [
+        57,
+        53
+      ],
+      "offset_px": [
+        21.0,
+        21.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000046.png",
+      "position_m": [
+        0.0476051469922609,
+        0.29948193784288457
+      ],
+      "position_px": [
+        74,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_092.png",
+      "sprite_size_px": [
+        52,
+        52
+      ],
+      "offset_px": [
+        32.0,
+        20.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000046.png",
+      "position_m": [
+        0.3735100187242193,
+        0.29931774751914686
+      ],
+      "position_px": [
+        580,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_093.png",
+      "sprite_size_px": [
+        60,
+        54
+      ],
+      "offset_px": [
+        22.0,
+        22.0
+      ]
+    },
+    {
+      "object_type": "left_peg",
+      "source_image": "grid/grid_000047.png",
+      "position_m": [
+        0.02484654114054775,
+        0.29996033082155643
+      ],
+      "position_px": [
+        39,
+        464
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/left_peg_094.png",
+      "sprite_size_px": [
+        58,
+        54
+      ],
+      "offset_px": [
+        36.0,
+        23.0
+      ]
+    },
+    {
+      "object_type": "right_peg",
+      "source_image": "grid/grid_000047.png",
+      "position_m": [
+        0.3948824479787033,
+        0.2996053014043831
+      ],
+      "position_px": [
+        613,
+        463
+      ],
+      "success": true,
+      "sprite_path": "sprites/peg/right_peg_095.png",
+      "sprite_size_px": [
+        64,
+        53
+      ],
+      "offset_px": [
+        25.0,
+        21.0
+      ]
+    }
+  ]
+}
