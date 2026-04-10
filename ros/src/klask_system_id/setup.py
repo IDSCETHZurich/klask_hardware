@@ -30,6 +30,9 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": ["acceleration_test_node = klask_system_id.acceleration_test_node:main"],
+        "console_scripts": [
+            "acceleration_test_node = klask_system_id.acceleration_test_node:main",
+            "analyze_acceleration_test = klask_system_id.analyze_acceleration_test:main",
+        ],
     },
 )

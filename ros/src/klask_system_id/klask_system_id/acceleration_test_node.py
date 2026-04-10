@@ -240,7 +240,7 @@ class AccelerationTestNode(Node):
         if distance <= self.position_tolerance:
             self.publish_velocity(0.0, 0.0)
             self.get_logger().info(
-                f"Reached start position ({self.start_x:.3f}, {self.start_y:.3f}). " f"Starting triangle tests."
+                f"Reached start position ({self.start_x:.3f}, {self.start_y:.3f})."
             )
             self.settle_start_time = None
             self.state = TestState.SETTLING
@@ -284,10 +284,8 @@ class AccelerationTestNode(Node):
 
                     self.get_logger().info(f"Increasing velocity to {self.current_velocity:.2f} m/s")
 
-                # Start next triangle
-                self.settle_start_time = None
-                self.leg_start_time = None
-                self.state = TestState.RUNNING_LEG
+                # Drive back to start before next triangle
+                self.state = TestState.MOVING_TO_START
 
     def _handle_running_leg(self):
         """Execute one leg of the triangle pattern."""
