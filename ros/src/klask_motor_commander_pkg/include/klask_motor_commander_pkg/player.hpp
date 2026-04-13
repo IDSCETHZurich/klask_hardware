@@ -8,6 +8,7 @@
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
 #include "klask_motor_commander_pkg/player_side.hpp"
+#include <atomic>
 #include <cmath>
 #include <algorithm>
 #include <functional>
@@ -99,6 +100,28 @@ public:
      * @param des_state Desired motor state.
      */
     void change_motor_state(const int& des_state);
+
+    /**
+     * @brief Enable or disable the boundary deceleration profile.
+     *
+     * When disabled, no velocity clamping near field edges is applied.
+     * Enabled by default.
+     *
+     * @param enabled True to apply deceleration near boundaries, false to skip it.
+     */
+    void set_deceleration_enabled(bool enabled)
+    {
+        deceleration_enabled_.store(enabled);
+    }
+
+    /**
+     * @brief Check whether boundary deceleration is currently enabled.
+     * @return true if enabled, false otherwise.
+     */
+    bool get_deceleration_enabled() const
+    {
+        return deceleration_enabled_.load();
+    }
 
     /**
      * @brief Set a callback to be invoked on a fatal motor error.
@@ -200,6 +223,9 @@ private:
     /// Service timeout parameters
     int service_wait_timeout_;
     int max_service_wait_attempts_;
+
+    /// Whether boundary deceleration profile is active
+    std::atomic<bool> deceleration_enabled_;
 
     /// Callback invoked on fatal motor error (set from main to idle all motors and shutdown)
     std::function<void()> fatal_error_callback_;

@@ -13,6 +13,7 @@ Player::Player(PlayerSide side)
     , EDGE(4, 0.0f)
     , callback_count(0)
     , last_time(this->now())
+    , deceleration_enabled_(true)
 {
     const char* side_name = this->get_name();
     RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", side_name);
@@ -178,8 +179,8 @@ void Player::send_commands(float v_x, float v_y)
     v_x = std::clamp(v_x, -max_velocity_, max_velocity_);
     v_y = std::clamp(v_y, -max_velocity_, max_velocity_);
 
-    // Apply deceleration profile near boundaries if calibrated
-    if (!synchronized_state.empty())
+    // Apply deceleration profile near boundaries if calibrated and enabled
+    if (deceleration_enabled_.load() && !synchronized_state.empty())
     {
         deacceleration_profile(v_x, v_y);
     }

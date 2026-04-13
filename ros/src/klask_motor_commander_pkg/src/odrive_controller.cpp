@@ -46,6 +46,9 @@ ODriveController::ODriveController(PlayerSide player_config)
     this->declare_parameter("position_tolerance", 0.01);
     this->declare_parameter("homing_velocity", 0.03);
 
+    // Boundary deceleration service name
+    this->declare_parameter("set_boundary_deceleration_service", "set_boundary_deceleration");
+
     // QoS settings
     this->declare_parameter("cmd_vel_qos_depth", 1);
 
@@ -152,6 +155,13 @@ ODriveController::ODriveController(PlayerSide player_config)
         is_player_homed_service,
         std::bind(&ODriveController::is_player_homed_callback, this, std::placeholders::_1, std::placeholders::_2));
     RCLCPP_INFO(this->get_logger(), "Created service: %s", is_player_homed_service.c_str());
+
+    std::string boundary_decel_service = this->get_parameter("set_boundary_deceleration_service").as_string();
+    set_boundary_deceleration_service_ = this->create_service<std_srvs::srv::SetBool>(
+        boundary_decel_service,
+        std::bind(
+            &ODriveController::set_boundary_deceleration_callback, this, std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Created service: %s", boundary_decel_service.c_str());
 
     // Create action clients for homing
     if (players_.find("right_player") != players_.end())
@@ -723,6 +733,21 @@ void ODriveController::execute_home_and_calibrate(
     {
         set_external_commands_enabled(true);
     }
+}
+
+void ODriveController::set_boundary_deceleration_callback(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+    for (const auto& [player_name, player_node] : players_)
+    {
+        player_node->set_deceleration_enabled(request->data);
+    }
+
+    response->success = true;
+    response->message =
+        std::string("Boundary deceleration ") + (request->data ? "enabled" : "disabled") + " for all active players";
+    RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
 }
 
 void ODriveController::player_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg,
