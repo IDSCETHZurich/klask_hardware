@@ -33,6 +33,7 @@ setup(
         "console_scripts": [
             "acceleration_test_node = klask_system_id.acceleration_test_node:main",
             "analyze_acceleration_test = klask_system_id.analyze_acceleration_test:main",
+            "velocity_profile_node = klask_system_id.velocity_profile_node:main",
         ],
     },
 )

@@ -1,0 +1,87 @@
+/velocity_profile_node:
+  ros__parameters:
+    # ============================================
+    # General Configuration
+    # ============================================
+
+    player: "left_player" # "both", "left_player", or "right_player"
+    pattern: "all" # "all", "x_direction", "y_direction", "diagonal_top", "diagonal_bottom", "circle"
+    runs_per_pattern: 6 # Number of rosbag runs per pattern
+    run_duration: 30.0 # Duration of each run (seconds)
+    control_rate: 200.0 # State machine tick rate (Hz)
+
+    # ============================================
+    # Topic Configuration
+    # ============================================
+
+    cmd_vel_right_topic: "/cmd_vel/right_player"
+    cmd_vel_left_topic: "/cmd_vel/left_player"
+    board_state_topic: "/board_state"
+
+    # ============================================
+    # Velocity Configuration
+    # ============================================
+
+    v_min: 0.05 # Min velocity for per-cycle randomization (m/s)
+    v_max: 0.2 # Max velocity for per-cycle randomization (m/s)
+
+    # ============================================
+    # Circle Pattern Configuration
+    # ============================================
+
+    circle_radius: 0.01 # Circle radius (meters)
+    circle_period: 1.0 # Circle period (seconds)
+
+    # ============================================
+    # Motion Configuration
+    # ============================================
+
+    settle_time: 1.0 # Pause between actions (seconds)
+    move_to_home_velocity: 0.05 # Speed for returning to home position (m/s)
+    position_tolerance: 0.01 # Tolerance for home position check (meters)
+    boundary_margin: 0.015 # Margin from field edges for bounce reversal (meters)
+    drift_margin: 0.03 # Cross-axis drift tolerance before abort (meters)
+
+    # ============================================
+    # Field Boundaries (meters)
+    # ============================================
+
+    right_player_x_min: 0.22
+    right_player_x_max: 0.42
+    right_player_y_min: 0.005
+    right_player_y_max: 0.305
+
+    left_player_x_min: 0.0
+    left_player_x_max: 0.20
+    left_player_y_min: 0.005
+    left_player_y_max: 0.305
+
+    # ============================================
+    # Home Positions (meters)
+    # ============================================
+
+    right_player_home_x: 0.31
+    right_player_home_y: 0.16
+    left_player_home_x: 0.11
+    left_player_home_y: 0.16
+
+    # ============================================
+    # Stall Detection
+    # ============================================
+
+    stall_threshold: 30 # Consecutive ticks of near-zero velocity to declare stall
+    stall_vel_command_threshold: 0.001 # Min commanded speed to check stall (m/s)
+    stall_vel_measured_threshold: 0.003 # Below this measured speed = "not moving" (m/s)
+
+    # ============================================
+    # Homing Configuration
+    # ============================================
+
+    homing_poll_interval: 1.0 # Seconds between homing status checks
+    homing_timeout: 60.0 # Max seconds to wait for homing
+
+    # ============================================
+    # Recording Configuration
+    # ============================================
+
+    bag_output_dir: "vel_profile_bags" # Output directory for rosbag files
