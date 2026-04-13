@@ -11,7 +11,7 @@ import re
 import sys
 
 import matplotlib
-matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import butter, sosfiltfilt, welch
@@ -23,6 +23,8 @@ from geometry_msgs.msg import Twist
 from klask_interfaces.msg import State
 from odrive_can.msg import ControlMessage, ControllerStatus, ODriveStatus
 from std_msgs.msg import Float32MultiArray
+
+matplotlib.use("Agg")
 
 
 # Topics to read (skip images, rosout, parameter_events, heartbeat, etc.)
@@ -77,9 +79,7 @@ def read_bag(bag_path):
     """Read a ROS2 bag and return extracted data as dict of numpy arrays."""
     reader = rosbag2_py.SequentialReader()
     storage_options = rosbag2_py.StorageOptions(uri=bag_path, storage_id="sqlite3")
-    converter_options = rosbag2_py.ConverterOptions(
-        input_serialization_format="cdr", output_serialization_format="cdr"
-    )
+    converter_options = rosbag2_py.ConverterOptions(input_serialization_format="cdr", output_serialization_format="cdr")
     reader.open(storage_options, converter_options)
 
     # Filter to only topics of interest
@@ -90,22 +90,36 @@ def read_bag(bag_path):
         "board_state": {"t": [], "px": [], "py": [], "vx": [], "vy": []},
         "cmd_vel": {"t": [], "vx": [], "vy": []},
         "odrive2_status": {
-            "t": [], "bus_voltage": [], "bus_current": [],
-            "fet_temperature": [], "motor_temperature": [],
+            "t": [],
+            "bus_voltage": [],
+            "bus_current": [],
+            "fet_temperature": [],
+            "motor_temperature": [],
         },
         "odrive3_status": {
-            "t": [], "bus_voltage": [], "bus_current": [],
-            "fet_temperature": [], "motor_temperature": [],
+            "t": [],
+            "bus_voltage": [],
+            "bus_current": [],
+            "fet_temperature": [],
+            "motor_temperature": [],
         },
         "odrive2_ctrl": {
-            "t": [], "pos_estimate": [], "vel_estimate": [],
-            "torque_target": [], "torque_estimate": [],
-            "iq_setpoint": [], "iq_measured": [],
+            "t": [],
+            "pos_estimate": [],
+            "vel_estimate": [],
+            "torque_target": [],
+            "torque_estimate": [],
+            "iq_setpoint": [],
+            "iq_measured": [],
         },
         "odrive3_ctrl": {
-            "t": [], "pos_estimate": [], "vel_estimate": [],
-            "torque_target": [], "torque_estimate": [],
-            "iq_setpoint": [], "iq_measured": [],
+            "t": [],
+            "pos_estimate": [],
+            "vel_estimate": [],
+            "torque_target": [],
+            "torque_estimate": [],
+            "iq_setpoint": [],
+            "iq_measured": [],
         },
         "odrive2_cmd": {"t": [], "input_pos": [], "input_vel": [], "input_torque": []},
         "odrive3_cmd": {"t": [], "input_pos": [], "input_vel": [], "input_torque": []},
@@ -210,6 +224,7 @@ def make_time_relative(data):
 # High-pass filter noise estimation
 # ---------------------------------------------------------------------------
 
+
 def compute_noise_metrics(signal, fs, cutoff_hz=5.0, order=4):
     """Apply Butterworth high-pass filter and compute noise statistics."""
     if len(signal) < 20 or fs <= 0:
@@ -239,23 +254,34 @@ def compute_noise_metrics(signal, fs, cutoff_hz=5.0, order=4):
 # Plotting functions
 # ---------------------------------------------------------------------------
 
+
 def plot_velocity_tracking(data, velocity):
     """Figure 1: Commanded vs actual velocity."""
     fig, (ax_x, ax_y) = plt.subplots(2, 1, sharex=True, figsize=(14, 7))
     fig.suptitle(f"Velocity Tracking  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    ax_x.plot(data["cmd_vel"]["t"], data["cmd_vel"]["vx"],
-              label="Commanded vx", color="C0", alpha=0.8, linewidth=1)
-    ax_x.plot(data["board_state"]["t"], data["board_state"]["vx"],
-              label="Actual vx (left peg)", color="C1", alpha=0.8, linewidth=1)
+    ax_x.plot(data["cmd_vel"]["t"], data["cmd_vel"]["vx"], label="Commanded vx", color="C0", alpha=0.8, linewidth=1)
+    ax_x.plot(
+        data["board_state"]["t"],
+        data["board_state"]["vx"],
+        label="Actual vx (left peg)",
+        color="C1",
+        alpha=0.8,
+        linewidth=1,
+    )
     ax_x.set_ylabel("Velocity X (m/s)")
     ax_x.legend(loc="upper right")
     ax_x.grid(True, alpha=0.3)
 
-    ax_y.plot(data["cmd_vel"]["t"], data["cmd_vel"]["vy"],
-              label="Commanded vy", color="C0", alpha=0.8, linewidth=1)
-    ax_y.plot(data["board_state"]["t"], data["board_state"]["vy"],
-              label="Actual vy (left peg)", color="C1", alpha=0.8, linewidth=1)
+    ax_y.plot(data["cmd_vel"]["t"], data["cmd_vel"]["vy"], label="Commanded vy", color="C0", alpha=0.8, linewidth=1)
+    ax_y.plot(
+        data["board_state"]["t"],
+        data["board_state"]["vy"],
+        label="Actual vy (left peg)",
+        color="C1",
+        alpha=0.8,
+        linewidth=1,
+    )
     ax_y.set_ylabel("Velocity Y (m/s)")
     ax_y.set_xlabel("Time (s)")
     ax_y.legend(loc="upper right")
@@ -302,8 +328,7 @@ def plot_odrive_system(data, velocity):
     fig, (ax_v, ax_i) = plt.subplots(2, 1, sharex=True, figsize=(14, 7))
     fig.suptitle(f"ODrive System Status  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    for label, key, color in [("Axis 2", "odrive2_status", "C0"),
-                               ("Axis 3", "odrive3_status", "C1")]:
+    for label, key, color in [("Axis 2", "odrive2_status", "C0"), ("Axis 3", "odrive3_status", "C1")]:
         d = data[key]
         if len(d["t"]) == 0:
             continue
@@ -328,8 +353,7 @@ def plot_odrive_torque(data, velocity):
     fig, (ax2, ax3) = plt.subplots(2, 1, sharex=True, figsize=(14, 7))
     fig.suptitle(f"ODrive Torque  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    for ax, key, name in [(ax2, "odrive2_ctrl", "Axis 2"),
-                           (ax3, "odrive3_ctrl", "Axis 3")]:
+    for ax, key, name in [(ax2, "odrive2_ctrl", "Axis 2"), (ax3, "odrive3_ctrl", "Axis 3")]:
         d = data[key]
         if len(d["t"]) == 0:
             continue
@@ -349,8 +373,7 @@ def plot_odrive_current(data, velocity):
     fig, (ax2, ax3) = plt.subplots(2, 1, sharex=True, figsize=(14, 7))
     fig.suptitle(f"ODrive Current (Iq)  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    for ax, key, name in [(ax2, "odrive2_ctrl", "Axis 2"),
-                           (ax3, "odrive3_ctrl", "Axis 3")]:
+    for ax, key, name in [(ax2, "odrive2_ctrl", "Axis 2"), (ax3, "odrive3_ctrl", "Axis 3")]:
         d = data[key]
         if len(d["t"]) == 0:
             continue
@@ -370,8 +393,7 @@ def plot_odrive_temperature(data, velocity):
     fig, (ax2, ax3) = plt.subplots(2, 1, sharex=True, figsize=(14, 7))
     fig.suptitle(f"ODrive Temperature  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    for ax, key, name in [(ax2, "odrive2_status", "Axis 2"),
-                           (ax3, "odrive3_status", "Axis 3")]:
+    for ax, key, name in [(ax2, "odrive2_status", "Axis 2"), (ax3, "odrive3_status", "Axis 3")]:
         d = data[key]
         if len(d["t"]) == 0:
             continue
@@ -380,8 +402,7 @@ def plot_odrive_temperature(data, velocity):
         motor_t = d["motor_temperature"]
         valid = np.isfinite(motor_t)
         if np.any(valid):
-            ax.plot(d["t"][valid], motor_t[valid], label="Motor Temp",
-                    color="C1", linewidth=1, alpha=0.8)
+            ax.plot(d["t"][valid], motor_t[valid], label="Motor Temp", color="C1", linewidth=1, alpha=0.8)
         ax.set_ylabel(f"{name} Temperature (C)")
         ax.legend(loc="upper right")
         ax.grid(True, alpha=0.3)
@@ -396,8 +417,7 @@ def plot_motor_commands(data, velocity):
     fig, axes = plt.subplots(3, 2, sharex=True, figsize=(16, 10))
     fig.suptitle(f"Motor Commands  —  v = {velocity:.2f} m/s", fontsize=14)
 
-    for col, key, name in [(0, "odrive2_cmd", "Axis 2"),
-                            (1, "odrive3_cmd", "Axis 3")]:
+    for col, key, name in [(0, "odrive2_cmd", "Axis 2"), (1, "odrive3_cmd", "Axis 3")]:
         d = data[key]
         if len(d["t"]) == 0:
             continue
@@ -454,21 +474,18 @@ def plot_noise_estimation(data, velocity):
         # Time-domain filtered signal
         axes[row, 0].plot(bs["t"], metrics["filtered"], color="C3", linewidth=0.5, alpha=0.8)
         axes[row, 0].set_ylabel(sig_name)
-        axes[row, 0].set_title(f"HPF Signal  (RMS={metrics['rms']:.6f})" if row == 0
-                                else f"RMS={metrics['rms']:.6f}")
+        axes[row, 0].set_title(f"HPF Signal  (RMS={metrics['rms']:.6f})" if row == 0 else f"RMS={metrics['rms']:.6f}")
         axes[row, 0].grid(True, alpha=0.3)
         if row == 3:
             axes[row, 0].set_xlabel("Time (s)")
 
         # Histogram
         axes[row, 1].hist(metrics["filtered"], bins=80, color="C4", alpha=0.7, density=True)
-        axes[row, 1].set_title(f"std={metrics['std']:.6f}" if row > 0 else
-                                f"Distribution  (std={metrics['std']:.6f})")
+        axes[row, 1].set_title(f"std={metrics['std']:.6f}" if row > 0 else f"Distribution  (std={metrics['std']:.6f})")
         axes[row, 1].grid(True, alpha=0.3)
 
         # PSD
-        axes[row, 2].semilogy(metrics["psd_freqs"], metrics["psd_values"],
-                               color="C5", linewidth=1)
+        axes[row, 2].semilogy(metrics["psd_freqs"], metrics["psd_values"], color="C5", linewidth=1)
         axes[row, 2].set_title("PSD" if row == 0 else "")
         axes[row, 2].set_ylabel("Power")
         axes[row, 2].grid(True, alpha=0.3)
@@ -482,6 +499,7 @@ def plot_noise_estimation(data, velocity):
 # ---------------------------------------------------------------------------
 # Summary across all velocities
 # ---------------------------------------------------------------------------
+
 
 def compute_summary_metrics(data, velocity, noise_metrics):
     """Compute summary statistics for a single bag."""
@@ -569,10 +587,8 @@ def plot_summary(all_summaries, output_dir, fmt, dpi):
 
     # (1,0) Mean bus current
     ax = axes[1, 0]
-    ax.plot(vels, [s["odrive2_mean_bus_current"] for s in all_summaries], "o-",
-            label="Axis 2", color="C0")
-    ax.plot(vels, [s["odrive3_mean_bus_current"] for s in all_summaries], "s-",
-            label="Axis 3", color="C1")
+    ax.plot(vels, [s["odrive2_mean_bus_current"] for s in all_summaries], "o-", label="Axis 2", color="C0")
+    ax.plot(vels, [s["odrive3_mean_bus_current"] for s in all_summaries], "s-", label="Axis 3", color="C1")
     ax.set_xlabel("Commanded Velocity (m/s)")
     ax.set_ylabel("Mean Bus Current (A)")
     ax.set_title("Bus Current")
@@ -581,10 +597,8 @@ def plot_summary(all_summaries, output_dir, fmt, dpi):
 
     # (1,1) Mean torque
     ax = axes[1, 1]
-    ax.plot(vels, [s["odrive2_mean_torque"] for s in all_summaries], "o-",
-            label="Axis 2", color="C0")
-    ax.plot(vels, [s["odrive3_mean_torque"] for s in all_summaries], "s-",
-            label="Axis 3", color="C1")
+    ax.plot(vels, [s["odrive2_mean_torque"] for s in all_summaries], "o-", label="Axis 2", color="C0")
+    ax.plot(vels, [s["odrive3_mean_torque"] for s in all_summaries], "s-", label="Axis 3", color="C1")
     ax.set_xlabel("Commanded Velocity (m/s)")
     ax.set_ylabel("Mean |Torque| (Nm)")
     ax.set_title("Motor Torque")
@@ -593,10 +607,8 @@ def plot_summary(all_summaries, output_dir, fmt, dpi):
 
     # (1,2) Max FET temperature
     ax = axes[1, 2]
-    ax.plot(vels, [s["odrive2_max_fet_temp"] for s in all_summaries], "o-",
-            label="Axis 2", color="C0")
-    ax.plot(vels, [s["odrive3_max_fet_temp"] for s in all_summaries], "s-",
-            label="Axis 3", color="C1")
+    ax.plot(vels, [s["odrive2_max_fet_temp"] for s in all_summaries], "o-", label="Axis 2", color="C0")
+    ax.plot(vels, [s["odrive3_max_fet_temp"] for s in all_summaries], "s-", label="Axis 3", color="C1")
     ax.set_xlabel("Commanded Velocity (m/s)")
     ax.set_ylabel("Max FET Temp (C)")
     ax.set_title("FET Temperature")
@@ -614,10 +626,10 @@ def plot_summary(all_summaries, output_dir, fmt, dpi):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Analyze Klask acceleration test bag files"
-    )
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="Analyze Klask acceleration test bag files")
     parser.add_argument(
         "--bag-dir",
         type=str,
@@ -643,9 +655,7 @@ def main():
         action="store_true",
         help="Save only, do not display plots (default when using Agg backend)",
     )
-    parser.add_argument(
-        "--format", type=str, default="png", choices=["png", "pdf", "svg"]
-    )
+    parser.add_argument("--format", type=str, default="png", choices=["png", "pdf", "svg"])
     args = parser.parse_args()
 
     bag_dir = os.path.abspath(args.bag_dir)

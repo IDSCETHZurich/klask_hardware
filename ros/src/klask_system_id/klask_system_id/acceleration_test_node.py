@@ -239,9 +239,7 @@ class AccelerationTestNode(Node):
 
         if distance <= self.position_tolerance:
             self.publish_velocity(0.0, 0.0)
-            self.get_logger().info(
-                f"Reached start position ({self.start_x:.3f}, {self.start_y:.3f})."
-            )
+            self.get_logger().info(f"Reached start position ({self.start_x:.3f}, {self.start_y:.3f}).")
             self.settle_start_time = None
             self.state = TestState.SETTLING
             return

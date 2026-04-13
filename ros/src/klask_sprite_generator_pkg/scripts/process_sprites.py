@@ -293,7 +293,9 @@ def compute_median_background(data_dir: Path, labels: dict) -> np.ndarray:
     return median
 
 
-def draw_cross(image: np.ndarray, cx: int, cy: int, size: int = 5, color: Tuple[int, ...] = (0, 0, 255), thickness: int = 1) -> np.ndarray:
+def draw_cross(
+    image: np.ndarray, cx: int, cy: int, size: int = 5, color: Tuple[int, ...] = (0, 0, 255), thickness: int = 1
+) -> np.ndarray:
     """Draw a cross marker on a copy of the image. Works with BGR and BGRA."""
     out = image.copy()
     if out.ndim == 2:
@@ -388,7 +390,9 @@ def segment_peg(
     ks = cfg.peg.hsv_close_kernel
     close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
     hsv_closed = cv2.morphologyEx(
-        hsv_mask, cv2.MORPH_CLOSE, close_kernel,
+        hsv_mask,
+        cv2.MORPH_CLOSE,
+        close_kernel,
         iterations=cfg.peg.hsv_close_iterations,
     )
     debug["peg_hsv_closed"] = hsv_closed
@@ -431,27 +435,44 @@ def select_best_component(
         cx, cy = centroids[label]
         dist = (cx - ex) ** 2 + (cy - ey) ** 2
         if area < cfg.min_area_px:
-            log.debug("  component %d: area=%d TOO SMALL (min=%d), center=(%.0f,%.0f) dist=%.0f",
-                       label, area, cfg.min_area_px, cx, cy, dist)
+            log.debug(
+                "  component %d: area=%d TOO SMALL (min=%d), center=(%.0f,%.0f) dist=%.0f",
+                label,
+                area,
+                cfg.min_area_px,
+                cx,
+                cy,
+                dist,
+            )
             continue
         if area > cfg.max_area_px:
-            log.debug("  component %d: area=%d TOO LARGE (max=%d), center=(%.0f,%.0f) dist=%.0f",
-                       label, area, cfg.max_area_px, cx, cy, dist)
+            log.debug(
+                "  component %d: area=%d TOO LARGE (max=%d), center=(%.0f,%.0f) dist=%.0f",
+                label,
+                area,
+                cfg.max_area_px,
+                cx,
+                cy,
+                dist,
+            )
             continue
-        log.debug("  component %d: area=%d OK, center=(%.0f,%.0f) dist=%.0f",
-                   label, area, cx, cy, dist)
+        log.debug("  component %d: area=%d OK, center=(%.0f,%.0f) dist=%.0f", label, area, cx, cy, dist)
         if dist < best_dist:
             best_dist = dist
             best_label = label
 
     if best_label < 0:
-        areas = [stats[l, cv2.CC_STAT_AREA] for l in range(1, num_labels)]
-        log.warning("  component filter: found %d component(s) but none in area range [%d, %d]. "
-                     "Areas: %s", num_components, cfg.min_area_px, cfg.max_area_px, sorted(areas, reverse=True))
+        areas = [stats[lb, cv2.CC_STAT_AREA] for lb in range(1, num_labels)]
+        log.warning(
+            "  component filter: found %d component(s) but none in area range [%d, %d]. " "Areas: %s",
+            num_components,
+            cfg.min_area_px,
+            cfg.max_area_px,
+            sorted(areas, reverse=True),
+        )
         return np.zeros_like(mask)
 
-    log.debug("  selected component %d: area=%d dist=%.0f", best_label,
-              stats[best_label, cv2.CC_STAT_AREA], best_dist)
+    log.debug("  selected component %d: area=%d dist=%.0f", best_label, stats[best_label, cv2.CC_STAT_AREA], best_dist)
     return ((labels_img == best_label) * 255).astype(np.uint8)
 
 
