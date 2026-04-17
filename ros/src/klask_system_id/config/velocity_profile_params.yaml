@@ -5,10 +5,44 @@
     # ============================================
 
     player: "left_player" # "both", "left_player", or "right_player"
-    pattern: "all" # "all", "x_direction", "y_direction", "diagonal_top", "diagonal_bottom", "circle"
-    runs_per_pattern: 6 # Number of rosbag runs per pattern
-    run_duration: 30.0 # Duration of each run (seconds)
-    control_rate: 200.0 # State machine tick rate (Hz)
+    runs_per_pattern: 10 # Number of rosbag runs per pattern
+    validation_runs_per_pattern: 2 # Extra runs per pattern for validation set
+    run_duration: 15.0 # Duration of each run (seconds)
+    control_rate: 50.0 # State machine tick rate (Hz)
+
+    # ============================================
+    # Pattern Configuration
+    # ============================================
+    # Each pattern has a name, type, and 4 parameter values.
+    #   line:   [min_x, min_y, max_x, max_y]
+    #   circle: [center_x, center_y, radius, 0.0]
+    # pattern_params is a flat array: 4 values per pattern, concatenated.
+
+    pattern_names: [ "x_line", "y_line", "diag_line_tl_br", "diag_line_bl_tr", "small_circle" ]
+    pattern_types: [ "line", "line", "line", "line", "circle" ]
+    pattern_params:
+      [
+        0.10,
+        0.16,
+        0.14,
+        0.16, # x_line:       horizontal sweep at y=0.16
+        0.11,
+        0.07,
+        0.11,
+        0.25, # y_line:       vertical sweep at x=0.11
+        0.04,
+        0.07,
+        0.12,
+        0.25, # diag_line:    diagonal sweep corner-to-corner
+        0.14,
+        0.07,
+        0.02,
+        0.25, # diag_line:    diagonal sweep corner-to-corner
+        0.11,
+        0.16,
+        0.03,
+        0.0,
+      ] # small_circle: r=0.03 around (0.11, 0.16)
 
     # ============================================
     # Topic Configuration
@@ -22,15 +56,9 @@
     # Velocity Configuration
     # ============================================
 
-    v_min: 0.05 # Min velocity for per-cycle randomization (m/s)
-    v_max: 0.2 # Max velocity for per-cycle randomization (m/s)
-
-    # ============================================
-    # Circle Pattern Configuration
-    # ============================================
-
-    circle_radius: 0.01 # Circle radius (meters)
-    circle_period: 1.0 # Circle period (seconds)
+    v_min: 0.05 # Min velocity magnitude (m/s).
+    v_max: 0.5 # Max velocity magnitude (m/s). Also sets the motor_commander max_velocity clamp.
+    velocity_mode: "linear" # "random" = uniform sample, "linear" = evenly spaced steps from v_min to v_max
 
     # ============================================
     # Motion Configuration
@@ -38,23 +66,8 @@
 
     settle_time: 1.0 # Pause between actions (seconds)
     move_to_home_velocity: 0.05 # Speed for returning to home position (m/s)
-    position_tolerance: 0.01 # Tolerance for home position check (meters)
-    boundary_margin: 0.015 # Margin from field edges for bounce reversal (meters)
-    drift_margin: 0.03 # Cross-axis drift tolerance before abort (meters)
-
-    # ============================================
-    # Field Boundaries (meters)
-    # ============================================
-
-    right_player_x_min: 0.22
-    right_player_x_max: 0.42
-    right_player_y_min: 0.005
-    right_player_y_max: 0.305
-
-    left_player_x_min: 0.0
-    left_player_x_max: 0.20
-    left_player_y_min: 0.005
-    left_player_y_max: 0.305
+    position_tolerance: 0.01 # Tolerance for endpoint/home position checks (meters)
+    circle_correction_gain: 60.0 # Proportional gain for radial correction on circle patterns
 
     # ============================================
     # Home Positions (meters)
@@ -64,14 +77,6 @@
     right_player_home_y: 0.16
     left_player_home_x: 0.11
     left_player_home_y: 0.16
-
-    # ============================================
-    # Stall Detection
-    # ============================================
-
-    stall_threshold: 30 # Consecutive ticks of near-zero velocity to declare stall
-    stall_vel_command_threshold: 0.001 # Min commanded speed to check stall (m/s)
-    stall_vel_measured_threshold: 0.003 # Below this measured speed = "not moving" (m/s)
 
     # ============================================
     # Homing Configuration
@@ -84,4 +89,4 @@
     # Recording Configuration
     # ============================================
 
-    bag_output_dir: "vel_profile_bags" # Output directory for rosbag files
+    bag_output_dir: "vel_profile_bags" # Output directory for rosbag files. Bags are written to <bag_output_dir>/train/ and <bag_output_dir>/validation/ subfolders.

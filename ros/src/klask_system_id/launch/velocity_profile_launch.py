@@ -14,6 +14,7 @@ Example usage:
 
 import os
 
+import yaml
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -25,7 +26,10 @@ from ament_index_python.packages import get_package_share_directory
 def launch_setup(context, *args, **kwargs):
     """Setup function to resolve launch arguments and build node list."""
     player = LaunchConfiguration("player").perform(context)
-    max_velocity = float(LaunchConfiguration("max_velocity").perform(context))
+    params_file_path = LaunchConfiguration("params_file").perform(context)
+    with open(params_file_path) as f:
+        profile_params = yaml.safe_load(f)
+    max_velocity = float(profile_params["/velocity_profile_node"]["ros__parameters"]["v_max"])
 
     nodes_to_launch = []
 
@@ -174,17 +178,10 @@ def generate_launch_description():
         description="Path to the velocity profile parameters YAML file",
     )
 
-    max_velocity_arg = DeclareLaunchArgument(
-        "max_velocity",
-        default_value="0.3",
-        description="Override max_velocity for the motor commander (m/s)",
-    )
-
     return LaunchDescription(
         [
             player_arg,
             params_file_arg,
-            max_velocity_arg,
             OpaqueFunction(function=launch_setup),
         ]
     )

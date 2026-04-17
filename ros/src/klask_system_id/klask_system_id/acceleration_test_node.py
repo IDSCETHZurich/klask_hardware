@@ -18,6 +18,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from geometry_msgs.msg import Twist
 from klask_interfaces.msg import State
 from klask_interfaces.srv import IsPlayerHomed
+from std_srvs.srv import SetBool
 
 
 class TestState(Enum):
@@ -89,6 +90,10 @@ class AccelerationTestNode(Node):
         self.homing_client = self.create_client(IsPlayerHomed, "is_player_homed")
         self._homing_future = None
 
+        # Service client for disabling boundary deceleration (raw cmd_vel)
+        self.decel_client = self.create_client(SetBool, "set_boundary_deceleration")
+        self._decel_disabled = False
+
         # State machine
         self.state = TestState.WAITING_FOR_HOMING
         self.current_velocity = self.min_velocity
@@ -153,6 +158,35 @@ class AccelerationTestNode(Node):
         self._bag_running = True
         self.get_logger().info(f"Started bag recording: {bag_path}")
 
+    def _disable_boundary_deceleration(self):
+        """Call the set_boundary_deceleration service to disable deceleration."""
+        if not self.decel_client.service_is_ready():
+            self.get_logger().warn(
+                "set_boundary_deceleration service not available, skipping.",
+                throttle_duration_sec=5.0,
+            )
+            return
+        req = SetBool.Request()
+        req.data = False
+        future = self.decel_client.call_async(req)
+        future.add_done_callback(self._decel_service_done)
+
+    def _enable_boundary_deceleration(self):
+        """Call the set_boundary_deceleration service to re-enable deceleration."""
+        if not self.decel_client.service_is_ready():
+            return
+        req = SetBool.Request()
+        req.data = True
+        future = self.decel_client.call_async(req)
+        future.add_done_callback(self._decel_service_done)
+
+    def _decel_service_done(self, future):
+        try:
+            result = future.result()
+            self.get_logger().info(f"Boundary deceleration service: {result.message}")
+        except Exception as e:
+            self.get_logger().warn(f"Boundary deceleration service call failed: {e}")
+
     def _stop_bag(self):
         """Stop the current rosbag recording."""
         if self._bag_process is not None:
@@ -195,8 +229,10 @@ class AccelerationTestNode(Node):
                         self.get_logger().info(
                             f"Player {self.player} is homed "
                             f"(distance: {response.distance:.4f}m). "
-                            f"Moving to start position."
+                            f"Disabling boundary deceleration and moving to start position."
                         )
+                        self._disable_boundary_deceleration()
+                        self._decel_disabled = True
                         self.state = TestState.MOVING_TO_START
                     else:
                         self.get_logger().info(f"Waiting for homing... " f"distance: {response.distance:.4f}m")
@@ -333,6 +369,10 @@ class AccelerationTestNode(Node):
         """Send zero velocity and shut down."""
         self.publish_velocity(0.0, 0.0)
         self._stop_bag()
+        if self._decel_disabled:
+            self.get_logger().info("Re-enabling boundary deceleration.")
+            self._enable_boundary_deceleration()
+            self._decel_disabled = False
         self.control_timer.cancel()
         self.get_logger().info("Acceleration test complete. Shutting down.")
         raise SystemExit
@@ -349,6 +389,8 @@ def main(args=None):
     finally:
         node._stop_bag()
         node.publish_velocity(0.0, 0.0)
+        if node._decel_disabled:
+            node._enable_boundary_deceleration()
         node.destroy_node()
         rclpy.try_shutdown()
 
