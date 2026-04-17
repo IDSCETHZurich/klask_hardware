@@ -22,7 +22,10 @@ namespace klask_motor_commander
  */
 enum class ODriveControlMode : int
 {
-    VELOCITY_CONTROL = 2 ///< Velocity control mode
+    VOLTAGE_CONTROL = 0,  ///< Voltage control mode
+    TORQUE_CONTROL = 1,   ///< Torque control mode
+    VELOCITY_CONTROL = 2, ///< Velocity control mode
+    POSITION_CONTROL = 3  ///< Position control mode
 };
 
 /**
@@ -30,7 +33,15 @@ enum class ODriveControlMode : int
  */
 enum class ODriveInputMode : int
 {
-    VEL_RAMP = 1 ///< Velocity ramp input mode
+    INACTIVE = 0,     ///< Disable controller input
+    PASSTHROUGH = 1,  ///< Pass setpoints directly (used by plain Velocity/Torque/Position Control)
+    VEL_RAMP = 2,     ///< Ramped Velocity Control
+    POS_FILTER = 3,   ///< Filtered Position Control
+    MIX_CHANNELS = 4, ///< Mix RC channels (not implemented)
+    TRAP_TRAJ = 5,    ///< Trajectory Control (trapezoidal planner)
+    TORQUE_RAMP = 6,  ///< Ramped Torque Control
+    MIRROR = 7,       ///< Mirror another axis
+    TUNING = 8        ///< Sinusoidal tuning input
 };
 
 /**
