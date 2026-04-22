@@ -37,6 +37,7 @@ def launch_setup(context, *args, **kwargs):
     start_commander = LaunchConfiguration("start_commander").perform(context)
     start_camera = LaunchConfiguration("start_camera").perform(context)
     start_viewer = LaunchConfiguration("start_viewer").perform(context)
+    start_downscaler = LaunchConfiguration("start_downscaler").perform(context)
 
     # Get path to parameter file
     pkg_share = get_package_share_directory("klask_motor_commander_pkg")
@@ -49,6 +50,7 @@ def launch_setup(context, *args, **kwargs):
     imaging_pkg_share = get_package_share_directory("klask_imaging_pkg")
     camera_params_file = os.path.join(imaging_pkg_share, "config", "camera_node_params.yaml")
     image_viewer_params_file = os.path.join(imaging_pkg_share, "config", "image_viewer_params.yaml")
+    downscaler_params_file = os.path.join(imaging_pkg_share, "config", "image_downscaler_params.yaml")
 
     nodes_to_launch = []
 
@@ -60,6 +62,17 @@ def launch_setup(context, *args, **kwargs):
                 executable="camera_node",
                 name="camera_node",
                 parameters=[camera_params_file],
+                output="screen",
+            )
+        )
+
+    if start_downscaler == "true":
+        nodes_to_launch.append(
+            Node(
+                package="klask_imaging_pkg",
+                executable="image_downscaler",
+                name="image_downscaler",
+                parameters=[downscaler_params_file],
                 output="screen",
             )
         )
@@ -198,12 +211,19 @@ def generate_launch_description():
         description='Whether to start the image viewer node: "true" or "false" (default)',
     )
 
+    start_downscaler_arg = DeclareLaunchArgument(
+        "start_downscaler",
+        default_value="false",
+        description='Whether to add the downscaler node: "true" or "false (default)"',
+    )
+
     return LaunchDescription(
         [
             player_arg,
             start_commander_arg,
             start_camera_arg,
             start_viewer_arg,
+            start_downscaler_arg,
             OpaqueFunction(function=launch_setup),
         ]
     )
