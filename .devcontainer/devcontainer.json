@@ -14,11 +14,15 @@
         "--cap-add=NET_RAW",
         "--name=klask_ros_hardware_sdk_container_local"
     ],
+    "containerEnv": {
+        "HISTFILE": "/root/.shell_history/.bash_history"
+    },
     "mounts": [
         "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
         "source=klask_ros_hardware_sdk_build,target=/opt/ros/klask_ws/build,type=volume",
         "source=klask_ros_hardware_sdk_install,target=/opt/ros/klask_ws/install,type=volume",
         "source=klask_ros_hardware_sdk_log,target=/opt/ros/klask_ws/log,type=volume",
+        "source=klask_ros_hardware_sdk_shell_history,target=/root/.shell_history,type=volume",
         "source=${localWorkspaceFolder}/ros/.vscode,target=/opt/ros/klask_ws/.vscode,type=bind",
         "source=${localWorkspaceFolder}/ros/.clang-format,target=/opt/ros/klask_ws/.clang-format,type=bind",
         "source=${localWorkspaceFolder}/ros/.flake8,target=/opt/ros/klask_ws/.flake8,type=bind",
