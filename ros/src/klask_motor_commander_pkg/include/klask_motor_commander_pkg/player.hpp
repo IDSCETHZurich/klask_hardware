@@ -8,6 +8,7 @@
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
 #include "klask_motor_commander_pkg/player_side.hpp"
+#include <atomic>
 #include <cmath>
 #include <algorithm>
 #include <functional>
@@ -21,7 +22,10 @@ namespace klask_motor_commander
  */
 enum class ODriveControlMode : int
 {
-    VELOCITY_CONTROL = 2 ///< Velocity control mode
+    VOLTAGE_CONTROL = 0,  ///< Voltage control mode
+    TORQUE_CONTROL = 1,   ///< Torque control mode
+    VELOCITY_CONTROL = 2, ///< Velocity control mode
+    POSITION_CONTROL = 3  ///< Position control mode
 };
 
 /**
@@ -29,7 +33,15 @@ enum class ODriveControlMode : int
  */
 enum class ODriveInputMode : int
 {
-    VEL_RAMP = 1 ///< Velocity ramp input mode
+    INACTIVE = 0,     ///< Disable controller input
+    PASSTHROUGH = 1,  ///< Pass setpoints directly (used by plain Velocity/Torque/Position Control)
+    VEL_RAMP = 2,     ///< Ramped Velocity Control
+    POS_FILTER = 3,   ///< Filtered Position Control
+    MIX_CHANNELS = 4, ///< Mix RC channels (not implemented)
+    TRAP_TRAJ = 5,    ///< Trajectory Control (trapezoidal planner)
+    TORQUE_RAMP = 6,  ///< Ramped Torque Control
+    MIRROR = 7,       ///< Mirror another axis
+    TUNING = 8        ///< Sinusoidal tuning input
 };
 
 /**
@@ -99,6 +111,28 @@ public:
      * @param des_state Desired motor state.
      */
     void change_motor_state(const int& des_state);
+
+    /**
+     * @brief Enable or disable the boundary deceleration profile.
+     *
+     * When disabled, no velocity clamping near field edges is applied.
+     * Enabled by default.
+     *
+     * @param enabled True to apply deceleration near boundaries, false to skip it.
+     */
+    void set_deceleration_enabled(bool enabled)
+    {
+        deceleration_enabled_.store(enabled);
+    }
+
+    /**
+     * @brief Check whether boundary deceleration is currently enabled.
+     * @return true if enabled, false otherwise.
+     */
+    bool get_deceleration_enabled() const
+    {
+        return deceleration_enabled_.load();
+    }
 
     /**
      * @brief Set a callback to be invoked on a fatal motor error.
@@ -200,6 +234,9 @@ private:
     /// Service timeout parameters
     int service_wait_timeout_;
     int max_service_wait_attempts_;
+
+    /// Whether boundary deceleration profile is active
+    std::atomic<bool> deceleration_enabled_;
 
     /// Callback invoked on fatal motor error (set from main to idle all motors and shutdown)
     std::function<void()> fatal_error_callback_;

@@ -20,6 +20,7 @@ from launch_ros.actions import Node
 
 
 def launch_setup(context, *args, **kwargs):
+    """Setup function to launch teleop node based on player selection."""
     # Get the player parameter value
     player = LaunchConfiguration("player").perform(context)
 
@@ -44,6 +45,7 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
+    """Generate the launch description with declared arguments and setup function."""
     player_arg = DeclareLaunchArgument(
         "player",
         default_value="left",

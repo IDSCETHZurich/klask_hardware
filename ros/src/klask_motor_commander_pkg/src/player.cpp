@@ -13,6 +13,7 @@ Player::Player(PlayerSide side)
     , EDGE(4, 0.0f)
     , callback_count(0)
     , last_time(this->now())
+    , deceleration_enabled_(true)
 {
     const char* side_name = this->get_name();
     RCLCPP_INFO(this->get_logger(), "Initializing Player node: %s", side_name);
@@ -178,8 +179,8 @@ void Player::send_commands(float v_x, float v_y)
     v_x = std::clamp(v_x, -max_velocity_, max_velocity_);
     v_y = std::clamp(v_y, -max_velocity_, max_velocity_);
 
-    // Apply deceleration profile near boundaries if calibrated
-    if (!synchronized_state.empty())
+    // Apply deceleration profile near boundaries if calibrated and enabled
+    if (deceleration_enabled_.load() && !synchronized_state.empty())
     {
         deacceleration_profile(v_x, v_y);
     }
@@ -199,17 +200,17 @@ void Player::send_commands(float v_x, float v_y)
     }
 
     // Convert velocities to motor commands (differential drive)
-    const float meters_to_rotations = 2.0f / distance_per_revolution_;
+    const float meters_per_rotations = 1.0f / distance_per_revolution_;
 
     odrive_can::msg::ControlMessage control_r_msg;
-    control_r_msg.input_vel = sign * (v_x + v_y) * meters_to_rotations;
+    control_r_msg.input_vel = sign * (v_x + v_y) * meters_per_rotations;
     control_r_msg.control_mode = static_cast<int>(ODriveControlMode::VELOCITY_CONTROL);
-    control_r_msg.input_mode = static_cast<int>(ODriveInputMode::VEL_RAMP);
+    control_r_msg.input_mode = static_cast<int>(ODriveInputMode::PASSTHROUGH);
 
     odrive_can::msg::ControlMessage control_l_msg;
-    control_l_msg.input_vel = sign * (v_y - v_x) * meters_to_rotations;
+    control_l_msg.input_vel = sign * (v_y - v_x) * meters_per_rotations;
     control_l_msg.control_mode = static_cast<int>(ODriveControlMode::VELOCITY_CONTROL);
-    control_l_msg.input_mode = static_cast<int>(ODriveInputMode::VEL_RAMP);
+    control_l_msg.input_mode = static_cast<int>(ODriveInputMode::PASSTHROUGH);
 
     motor_right_pub_->publish(control_r_msg);
     motor_left_pub_->publish(control_l_msg);

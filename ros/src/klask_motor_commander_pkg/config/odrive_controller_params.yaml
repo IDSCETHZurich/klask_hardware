@@ -13,6 +13,7 @@
     get_calibration_status_service: "get_calibration_status" # Service for querying calibration status
     is_player_homed_service: "is_player_homed" # Service for checking if player is at home position
     set_motor_state_service: "set_motor_state" # Service for motor state changes
+    set_boundary_deceleration_service: "set_boundary_deceleration" # Service to enable/disable boundary deceleration
 
     # === Action Names ===
     right_player_action_name: "home_peg_right_player" # Action for right player peg homing

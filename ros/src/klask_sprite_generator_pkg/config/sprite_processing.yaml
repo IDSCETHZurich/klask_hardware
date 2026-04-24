@@ -1,0 +1,54 @@
+# Sprite processing configuration
+# Used by scripts/process_sprites.py to extract sprite assets from captured board images.
+
+paths:
+  data_dir: "../data/input" # relative to this config file, or absolute
+  output_dir: "../data/output"
+
+board:
+  width_m: 0.42
+  height_m: 0.32
+
+segmentation:
+  rough_crop_radius_px: 50
+
+  ball:
+    h_range: [15, 40] # yellow hue in OpenCV HSV (0-179)
+    s_range: [40, 255] # saturation bounds
+    v_range: [120, 255] # value/brightness bounds
+    bg_diff_threshold: 30 # grayscale diff threshold for background subtraction
+
+  peg:
+    h_range: [0, 255]
+    s_range: [0, 255]
+    v_range: [0, 50]
+    hsv_close_kernel: 7 # close kernel size to bridge reflection holes before combining
+    hsv_close_iterations: 3
+    diff_hsv: # HSV filter on the bg_diff image
+      h_range: [0, 255]
+      s_range: [0, 255]
+      v_range: [70, 255]
+    diff_erode_kernel: 3 # erode to shrink shadow fringe
+    diff_erode_iterations: 1
+    diff_close_kernel: 5 # close to fill noise holes in diff mask
+    diff_close_iterations: 2
+
+  morphology:
+    kernel_size: 3 # elliptical structuring element diameter
+    open_iterations: 1 # noise removal
+    close_iterations: 2 # gap filling
+
+  component:
+    min_area_px: 100
+    max_area_px: 1200
+
+  sprite_padding_px: 3
+  alpha_blur_sigma: 0.5 # 0 = hard mask, >0 = anti-aliased (e.g. 0.5)
+
+process:
+  peg: true # process left and right peg grid samples
+  ball: false # process ball samples
+  background: true # save the median background image
+
+debug:
+  mode: "show" # "off", "save" (to disk), or "show"

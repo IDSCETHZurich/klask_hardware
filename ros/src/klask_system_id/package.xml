@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>klask_interfaces</depend>
   <depend>klask_imaging_pkg</depend>
   <depend>klask_motor_commander_pkg</depend>

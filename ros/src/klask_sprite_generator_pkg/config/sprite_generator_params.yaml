@@ -1,0 +1,64 @@
+/sprite_generator_node:
+  ros__parameters:
+    board:
+      width_m: 0.42
+      height_m: 0.32
+
+    grid:
+      points_x: 8
+      points_y: 6
+
+      left_half:
+        offset_left_m: 0.02
+        offset_right_m: 0.04
+        offset_top_m: 0.02
+        offset_bottom_m: 0.02
+
+      right_half:
+        offset_left_m: 0.04
+        offset_right_m: 0.02
+        offset_top_m: 0.02
+        offset_bottom_m: 0.02
+
+    motion:
+      homing_velocity_mps: 0.03
+      position_tolerance_m: 0.01
+      goal_timeout_s: 20.0
+      retry_count: 1
+      position_kp: 2.0
+      control_rate_hz: 30.0
+
+    timing:
+      settle_time_s: 0.4
+      frame_freshness_timeout_s: 2.0
+      calibration_timeout_s: 60.0
+      homing_wait_timeout_s: 90.0
+      homing_poll_interval_s: 1.0
+
+    startup:
+      run_home_and_calibrate: false
+
+    topics:
+      board_image_topic: /board_image/compressed
+      board_state_topic: /board_state
+      is_player_homed_service: is_player_homed
+      cmd_vel_left_player: /cmd_vel/left_player
+      cmd_vel_right_player: /cmd_vel/right_player
+      home_and_calibrate_left_action: home_and_calibrate_left_player
+      home_and_calibrate_right_action: home_and_calibrate_right_player
+
+    capture:
+      player: both # left, right, both
+      background_count: 5
+      ball_count: 12
+      ball_region:
+        x_min_m: 0.0
+        x_max_m: 0.42
+        y_min_m: 0.0
+        y_max_m: 0.32
+        margin_m: 0.02
+
+    output:
+      root_dir: sprite_dataset_runs
+      run_name: auto_timestamp
+      overwrite_existing: false

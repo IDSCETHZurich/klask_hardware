@@ -5,7 +5,7 @@
     # ============================================
 
     input_image_topic: "board_image/compressed" # Source image topic (default: "board_image/compressed")
-    output_image_topic: "board_image_downscaled/compressed" # Downscaled output topic (default: "board_image_downscaled/compressed")
+    output_image_topic: "board_image/downscaled/compressed" # Downscaled output topic (default: "board_image_downscaled/compressed")
 
     # ============================================
     # Downscaling Parameters
@@ -13,8 +13,8 @@
 
     enable_downscaling: true # Enable spatial downscaling (default: true). Set to false to pass through at full resolution (color flattening still applies if enabled).
 
-    downscale_method:
-      "exact" # How to determine output size (default: "scale")
+    downscale_method: "exact"
+      # How to determine output size (default: "scale")
       #   "scale"  - multiply both dimensions by scale_factor
       #   "width"  - resize to target_width, keep aspect ratio
       #   "height" - resize to target_height, keep aspect ratio
@@ -22,11 +22,11 @@
       #              21x16, 42x32, 63x48, 84x64, 105x80, 126x96, 147x112, 168x128 are exact divisors of 420mmx320mm
 
     scale_factor: 0.1 # Used when downscale_method="scale" (0.0–1.0)
-    target_width: 63 # Used by "width" and "exact" methods (pixels)
-    target_height: 48 # Used by "height" and "exact" methods (pixels)
+    target_width: 126 # Used by "width" and "exact" methods (pixels)
+    target_height: 96 # Used by "height" and "exact" methods (pixels)
 
-    interpolation:
-      "area" # Interpolation method for resizing (default: "area")
+    interpolation: "area"
+      # Interpolation method for resizing (default: "area")
       #   "nearest"  – Nearest-neighbor (fastest, blocky)
       #   "linear"   – Bilinear interpolation
       #   "area"     – Pixel-area relation (best for downscaling)
@@ -60,13 +60,13 @@
     # Converts the image to HSV, zeros the S channel, and converts back.
     # Removes color information, producing a grayscale-like image.
 
-    enable_discard_saturation: true # Discard the saturation channel (default: false)
+    enable_discard_saturation: false # Discard the saturation channel (default: false)
 
     # ============================================
     # JPEG Compression
     # ============================================
 
-    jpeg_quality: 80 # JPEG quality for the output message (1–100) (default: 80)
+    jpeg_quality: 100 # JPEG quality for the output message (1–100) (default: 80)
 
     # ============================================
     # Logging / Profiling

@@ -14,6 +14,7 @@
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>odrive_can</depend>
+  <depend>std_srvs</depend>
   <depend>klask_interfaces</depend>
 
   <exec_depend>ros2launch</exec_depend>

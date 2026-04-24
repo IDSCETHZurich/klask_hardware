@@ -10,6 +10,7 @@
 #include <klask_interfaces/srv/get_calibration_status.hpp>
 #include <klask_interfaces/srv/is_player_homed.hpp>
 #include <klask_interfaces/srv/set_motor_state.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #include <klask_interfaces/action/home_and_calibrate.hpp>
 #include <klask_interfaces/action/home_peg.hpp>
 #include "klask_motor_commander_pkg/player.hpp"
@@ -127,6 +128,9 @@ private:
 
     /// Service server for checking if player is homed
     rclcpp::Service<klask_interfaces::srv::IsPlayerHomed>::SharedPtr is_player_homed_service_;
+
+    /// Service server for enabling/disabling boundary deceleration
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr set_boundary_deceleration_service_;
 
     /// Subscription for ball and peg state information
     rclcpp::Subscription<klask_interfaces::msg::State>::SharedPtr states_subscriber_;
@@ -265,6 +269,18 @@ private:
      */
     void is_player_homed_callback(const std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Request> request,
                                   std::shared_ptr<klask_interfaces::srv::IsPlayerHomed::Response> response);
+
+    /**
+     * @brief Service callback for enabling/disabling boundary deceleration.
+     *
+     * When data is true, boundary deceleration is enabled (default).
+     * When data is false, boundary deceleration is disabled for all active players.
+     *
+     * @param request Shared pointer to request containing the desired state.
+     * @param response Shared pointer to response with success status.
+     */
+    void set_boundary_deceleration_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                                            std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
     /**
      * @brief Generic callback for player velocity commands.

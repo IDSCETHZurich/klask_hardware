@@ -7,7 +7,7 @@ image_viewer:
     show_state_overlay: true
 
     # Toggle overlay of cmd_vel command vectors on the image
-    show_cmd_vel_overlay: false
+    show_cmd_vel_overlay: true
     cmd_vel_left_player_topic: /cmd_vel/left_player
     cmd_vel_right_player_topic: /cmd_vel/right_player
 
@@ -33,7 +33,7 @@ image_viewer:
 
     # Goal overlay
     goal_radius: 22
-    overlay_goal_color: [140, 255, 0] # BGR
+    overlay_goal_color: [ 140, 255, 0 ] # BGR
     overlay_goal_center_radius: 5
     overlay_goal_circle_thickness: 2
 
@@ -43,24 +43,24 @@ image_viewer:
     overlay_arrow_tip_length: 0.3
 
     # Left peg (BGR)
-    overlay_left_peg_dot_color: [255, 0, 0]
-    overlay_left_peg_arrow_color: [248, 193, 110]
+    overlay_left_peg_dot_color: [ 255, 0, 0 ]
+    overlay_left_peg_arrow_color: [ 248, 193, 110 ]
     overlay_left_peg_velocity_scale: 0.5
 
     # Right peg (BGR)
-    overlay_right_peg_dot_color: [0, 100, 0]
-    overlay_right_peg_arrow_color: [144, 238, 144]
+    overlay_right_peg_dot_color: [ 0, 100, 0 ]
+    overlay_right_peg_arrow_color: [ 144, 238, 144 ]
     overlay_right_peg_velocity_scale: 0.5
 
     # Ball (BGR)
-    overlay_ball_dot_color: [0, 0, 255]
-    overlay_ball_arrow_color: [0, 165, 255]
+    overlay_ball_dot_color: [ 0, 0, 255 ]
+    overlay_ball_arrow_color: [ 0, 165, 255 ]
     overlay_ball_velocity_scale: 0.2
 
     # Cmd_vel overlay (BGR)
-    overlay_cmd_vel_left_arrow_color: [255, 100, 255] # Magenta for left player
+    overlay_cmd_vel_left_arrow_color: [ 255, 100, 255 ] # Magenta for left player
     overlay_cmd_vel_left_velocity_scale: 0.5
-    overlay_cmd_vel_right_arrow_color: [255, 255, 100] # Cyan for right player
+    overlay_cmd_vel_right_arrow_color: [ 255, 255, 100 ] # Cyan for right player
     overlay_cmd_vel_right_velocity_scale: 0.5
     overlay_cmd_vel_arrow_thickness: 3
     overlay_cmd_vel_arrow_tip_length: 0.2
@@ -68,5 +68,5 @@ image_viewer:
     # Status overlay
     overlay_status_font_scale: 0.7
     overlay_status_font_thickness: 2
-    overlay_status_text_color: [0, 255, 255]
+    overlay_status_text_color: [ 0, 255, 255 ]
     overlay_status_margin: 10 # Distance from edge in pixels
