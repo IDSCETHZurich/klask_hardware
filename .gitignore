@@ -76,3 +76,6 @@ CATKIN_IGNORE
 # Common noise
 .DS_Store
 Thumbs.db
+
+# draw.io
+*.drawio.bkp
