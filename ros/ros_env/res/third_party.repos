@@ -3,3 +3,7 @@ repositories:
     type: git
     url: https://github.com/MeierTobias/ros_odrive.git
     version: 1144e236b9589410bef5f5c20ad467ba9490f128
+  vision_opencv:
+    type: git
+    url: https://github.com/ros-perception/vision_opencv.git
+    version: humble
