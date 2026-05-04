@@ -49,6 +49,20 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
+    # --- State estimator node (motor commander needs it for calibration) ---
+    estimator_pkg_share = get_package_share_directory("klask_state_estimator_pkg")
+    estimator_params_file = os.path.join(estimator_pkg_share, "config", "state_estimator_params.yaml")
+    nodes_to_launch.append(
+        Node(
+            package="klask_state_estimator_pkg",
+            executable="state_estimator",
+            name="state_estimator",
+            parameters=[estimator_params_file],
+            output="screen",
+            emulate_tty=True,
+        )
+    )
+
     # --- CAN interface setup ---
     nodes_to_launch.append(ExecuteProcess(cmd=["ip", "link", "set", "can0", "down"], output="screen"))
     nodes_to_launch.append(

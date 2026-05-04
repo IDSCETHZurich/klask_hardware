@@ -18,6 +18,9 @@ Example usage:
 
     # Launch with camera and image viewer:
     ros2 launch klask_motor_commander_pkg motors_launch.py start_camera:=true start_viewer:=true
+
+    # Launch without state estimator:
+    ros2 launch klask_motor_commander_pkg motors_launch.py start_estimator:=false
 """
 
 from launch_ros.actions import Node
@@ -38,6 +41,7 @@ def launch_setup(context, *args, **kwargs):
     start_camera = LaunchConfiguration("start_camera").perform(context)
     start_viewer = LaunchConfiguration("start_viewer").perform(context)
     start_downscaler = LaunchConfiguration("start_downscaler").perform(context)
+    start_estimator = LaunchConfiguration("start_estimator").perform(context)
 
     # Get path to parameter file
     pkg_share = get_package_share_directory("klask_motor_commander_pkg")
@@ -51,6 +55,10 @@ def launch_setup(context, *args, **kwargs):
     camera_params_file = os.path.join(imaging_pkg_share, "config", "camera_node_params.yaml")
     image_viewer_params_file = os.path.join(imaging_pkg_share, "config", "image_viewer_params.yaml")
     downscaler_params_file = os.path.join(imaging_pkg_share, "config", "image_downscaler_params.yaml")
+
+    # Get state estimator package config file
+    estimator_pkg_share = get_package_share_directory("klask_state_estimator_pkg")
+    estimator_params_file = os.path.join(estimator_pkg_share, "config", "state_estimator_params.yaml")
 
     nodes_to_launch = []
 
@@ -74,6 +82,19 @@ def launch_setup(context, *args, **kwargs):
                 name="image_downscaler",
                 parameters=[downscaler_params_file],
                 output="screen",
+            )
+        )
+
+    # State estimator node
+    if start_estimator == "true":
+        nodes_to_launch.append(
+            Node(
+                package="klask_state_estimator_pkg",
+                executable="state_estimator",
+                name="state_estimator",
+                parameters=[estimator_params_file],
+                output="screen",
+                emulate_tty=True,
             )
         )
 
@@ -217,6 +238,12 @@ def generate_launch_description():
         description='Whether to add the downscaler node: "true" or "false (default)"',
     )
 
+    start_estimator_arg = DeclareLaunchArgument(
+        "start_estimator",
+        default_value="true",
+        description='Whether to start the state estimator node: "true" (default) or "false"',
+    )
+
     return LaunchDescription(
         [
             player_arg,
@@ -224,6 +251,7 @@ def generate_launch_description():
             start_camera_arg,
             start_viewer_arg,
             start_downscaler_arg,
+            start_estimator_arg,
             OpaqueFunction(function=launch_setup),
         ]
     )
