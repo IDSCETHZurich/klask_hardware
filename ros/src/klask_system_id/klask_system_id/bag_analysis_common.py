@@ -17,7 +17,6 @@ from klask_interfaces.msg import State
 from odrive_can.msg import ControlMessage, ControllerStatus, ODriveStatus
 from std_msgs.msg import Float32MultiArray
 
-
 TOPICS_OF_INTEREST = [
     "/board_state",
     "/cmd_vel/left_player",

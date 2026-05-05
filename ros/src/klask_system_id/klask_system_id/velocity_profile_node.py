@@ -22,7 +22,6 @@ from klask_interfaces.msg import State
 from klask_interfaces.srv import IsPlayerHomed
 from std_srvs.srv import SetBool
 
-
 PARAMS_PER_PATTERN = 4
 
 

@@ -151,12 +151,13 @@ RUN chmod +x /runtime_entrypoint.sh
 
 WORKDIR $OVERLAY_WS
 
-# Default command: launch motor commander with camera and viewer
-# Usage: docker run <image> [--player left|right|both] [--viewer|--no-viewer]
+# Default command: launch motor commander with camera, viewer and state estimator
+# Usage: docker run <image> [--player left|right|both] [--viewer|--no-viewer] [--estimator|--no-estimator]
 # Examples:
-#   docker run <image>                          # launches with player:=both, start_viewer:=true (defaults)
-#   docker run <image> --player left            # launches with player:=left, start_viewer:=true
-#   docker run <image> --player right --no-viewer   # launches with player:=right, start_viewer:=false
-#   docker run <image> --no-viewer              # launches with player:=both, start_viewer:=false
-#   docker run <image> --viewer --player left   # launches with player:=left, start_viewer:=true
+#   docker run <image>                                # player:=both, start_viewer:=true, start_estimator:=true (defaults)
+#   docker run <image> --player left                  # player:=left, start_viewer:=true, start_estimator:=true
+#   docker run <image> --player right --no-viewer     # player:=right, start_viewer:=false, start_estimator:=true
+#   docker run <image> --no-viewer                    # player:=both, start_viewer:=false, start_estimator:=true
+#   docker run <image> --no-estimator                 # player:=both, start_viewer:=true, start_estimator:=false
+#   docker run <image> --no-viewer --no-estimator     # motors+camera only
 ENTRYPOINT ["/runtime_entrypoint.sh"]

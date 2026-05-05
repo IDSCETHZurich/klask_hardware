@@ -30,7 +30,7 @@ def generate_launch_description():
     motor_pkg_share = get_package_share_directory("klask_motor_commander_pkg")
     motors_launch_file = os.path.join(motor_pkg_share, "launch", "motors_launch.py")
 
-    # Include motors launch file with both players, camera, and viewer enabled
+    # Include motors launch file with both players, camera, viewer, and state estimator enabled
     motors_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(motors_launch_file),
         launch_arguments={
@@ -38,6 +38,7 @@ def generate_launch_description():
             "start_commander": "true",
             "start_camera": "true",
             "start_viewer": "true",
+            "start_estimator": "true",
         }.items(),
     )
 

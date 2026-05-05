@@ -4,6 +4,7 @@ set -e
 # Default values
 PLAYER="both"
 START_VIEWER="true"
+START_ESTIMATOR="true"
 
 # Parse named arguments
 while [[ $# -gt 0 ]]; do
@@ -20,9 +21,17 @@ while [[ $# -gt 0 ]]; do
             START_VIEWER="false"
             shift
             ;;
+        --estimator)
+            START_ESTIMATOR="true"
+            shift
+            ;;
+        --no-estimator)
+            START_ESTIMATOR="false"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--player left|right|both] [--viewer|--no-viewer]"
+            echo "Usage: $0 [--player left|right|both] [--viewer|--no-viewer] [--estimator|--no-estimator]"
             exit 1
             ;;
     esac
@@ -35,4 +44,5 @@ source /ros_entrypoint.sh
 exec ros2 launch klask_motor_commander_pkg motors_launch.py \
     start_camera:=true \
     start_viewer:="$START_VIEWER" \
+    start_estimator:="$START_ESTIMATOR" \
     player:="$PLAYER"
