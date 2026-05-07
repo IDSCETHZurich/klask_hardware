@@ -50,63 +50,42 @@ KLASK is a popular magnetic table game where players control magnetic pegs to hi
 
 This repository contains the hardware and software components required to build and operate the KLASK robotic system. The inference node running the RL agent is hosted in the separated [klask_software](https://github.com/IDSCETHZurich/klask_software) repository.
 
-```mermaid
-flowchart LR
-  subgraph HW["**klask_hardware Repo**"]
-    direction TB
-    HW_HARD["**Hardware**<br/>- CAD files<br/>- Assembly instructions"]
-
-    subgraph HW_CONT["Container"]
-      direction TB
-      HW_SW["**ROS Stack**<br/>- Motor Driver Node<br/>- Camera Node"]
-    end
-
-    HW_HARD --- HW_SW
-  end
-
-  subgraph SW["**klask_software Repo**"]
-    direction TB
-
-    subgraph SW_CONT["Container"]
-      direction TB
-      SE["**State Estimator**"]
-      PLAYER["**Policy Inference Node**"]
-      SE -- State --> PLAYER
-    end
-  end
-
-  HW_SW -- Image --> SE
-  PLAYER -- Action --> HW_SW
-
-  PB[("**Polybox**")]
-  PLAYER -. Weights .- PB
-```
+<img src="docs/res/diagrams/repo_overview.png" alt="KLASK Repo Overview" width="500"/>
 
 ## System Architecture
 
-The system consists of three main ROS2 packages:
+The ROS2 workspace (`ros/src/`) is organized into the following packages and nodes:
 
 ### klask_imaging_pkg (Python)
 
-Vision processing pipeline for real-time board detection:
+- **`camera_node`** — acquires camera frames, detects and rectifies the board, and publishes the rectified board image.
+- **`image_downscaler_node`** — republishes the board image at a reduced resolution and color depth.
+- **`image_viewer`** — displays the rectified board image with debug overlays for ball, pegs, goals, and command velocities.
 
-- Camera acquisition and calibration
-- Board detection and perspective transform
-- Image publishing
-- Image viewer for debugging
+### klask_state_estimator_pkg (Python)
+
+- **`state_estimator_node`** — estimates ball and peg positions and velocities from the rectified board image and publishes the consolidated `State` message.
 
 ### klask_motor_commander_pkg (C++)
 
-Motor control and coordination:
+- **`klask_motor_commander`** — top-level node that hosts the motor stack in a multi-threaded executor.
+- **`ODriveController`** — coordinates both players and exposes the calibration, homing, and motor-state services.
+- **`Player`** — converts `cmd_vel` into per-motor commands using CoreXY kinematics and enforces wall clearance (one instance per side).
+- **`OpenLoopController`** — performs open-loop peg homing via the `HomePeg` action (one instance per side).
 
-- ODrive motor interface with corexy kinematics
-- Player peg synchronization and homing
-- Wall collision avoidance
-- Velocity profiling and feedforward control
+### klask_sprite_generator_pkg (Python)
+
+- **`klask_sprite_generator_node`** — walks both pegs across a configurable grid and captures synchronized images and state snapshots to build a labeled dataset.
+- **`process_sprites`** — offline script that segments captured frames into individual sprite PNGs with metadata for the renderer.
+
+### klask_system_id (Python)
+
+- **`acceleration_test_node`** — drives a player along a triangle pattern at sweeping commanded velocities and records one rosbag per velocity step.
+- **`velocity_profile_node`** — drives line and circle patterns at randomized or stepped speeds and records the resulting trajectories.
 
 ### klask_interfaces
 
-Custom ROS2 messages, services, and actions for system communication
+Custom ROS2 messages, services, and actions shared between all nodes (e.g. `State`, `StampedPolygon`, `CalibrateEncoders`, `HomePeg`, `HomeAndCalibrate`).
 
 ## Hardware Components
 
@@ -148,14 +127,16 @@ This project is mostly maintained by:
 
 If you use this work in an academic context, please cite the following publication:
 
-- Authors, **"Title"**, 2023. ([PDF](link_to_pdf))
+- Aswin Karthik Ramachandran Venkatapathy, Jona Schulz, Maurus Derungs, Carlo Angelini, Tobias Meier, Raffaello D’Andrea, **"KlaskTron: An Open-Source Platform for Physical Adversarial Multi-Agent RL"**, 2026. ([PDF](https://openreview.net/pdf?id=UaLgID9r1i))
 
     ```bibtex
-    @article{,
-      title={},
-      author={},
-      journal={},
-      year={2026}
+    @inproceedings{
+      anonymous2026klasktron,
+      title={KlaskTron: An Open-Source Platform for Physical Adversarial Multi-Agent {RL}},
+      author={Anonymous},
+      booktitle={Robotics: Science and Systems 2026},
+      year={2026},
+      url={https://openreview.net/forum?id=UaLgID9r1i}
     }
     ```
 

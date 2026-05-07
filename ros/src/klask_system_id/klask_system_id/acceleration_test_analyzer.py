@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from klask_system_id.bag_analysis_common import (
+    extract_noise_rms_summary,
     make_time_relative,
     plot_motor_commands,
     plot_noise_estimation,
@@ -73,12 +74,7 @@ def compute_summary_metrics(data, velocity, noise_metrics):
         summary["vel_err_rms_x"] = np.nan
         summary["vel_err_rms_y"] = np.nan
 
-    for sig_name in ["Position X", "Position Y", "Velocity X", "Velocity Y"]:
-        key = f"noise_rms_{sig_name.lower().replace(' ', '_')}"
-        if sig_name in noise_metrics:
-            summary[key] = noise_metrics[sig_name]["rms"]
-        else:
-            summary[key] = np.nan
+    summary.update(extract_noise_rms_summary(noise_metrics))
 
     for axis_key in ["odrive2_ctrl", "odrive3_ctrl"]:
         d = data[axis_key]

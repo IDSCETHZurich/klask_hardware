@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from klask_system_id.bag_analysis_common import (
+    extract_noise_rms_summary,
     make_time_relative,
     plot_motor_commands,
     plot_noise_estimation,
@@ -195,6 +196,44 @@ def plot_error_vs_speed(pattern_name, pattern_runs):
     return fig
 
 
+def plot_noise_vs_speed(pattern_name, pattern_runs):
+    """Per-pattern: state-estimator noise RMS vs commanded speed (HPF-based)."""
+    fig, (ax_pos, ax_vel) = plt.subplots(2, 1, sharex=True, figsize=(10, 9))
+    fig.suptitle(f"State Estimator Noise vs Speed — {pattern_name}", fontsize=14)
+
+    def collect(key):
+        pts = sorted(
+            [(r["speed"], r[key]) for r in pattern_runs if np.isfinite(r.get(key, np.nan))],
+            key=lambda p: p[0],
+        )
+        return zip(*pts) if pts else ((), ())
+
+    s_px, n_px = collect("noise_rms_position_x")
+    s_py, n_py = collect("noise_rms_position_y")
+    s_vx, n_vx = collect("noise_rms_velocity_x")
+    s_vy, n_vy = collect("noise_rms_velocity_y")
+
+    if s_px:
+        ax_pos.plot(s_px, n_px, "o-", color="C0", label="Position X")
+    if s_py:
+        ax_pos.plot(s_py, n_py, "s-", color="C1", label="Position Y")
+    ax_pos.set_ylabel("Position noise RMS (m)")
+    ax_pos.legend()
+    ax_pos.grid(True, alpha=0.3)
+
+    if s_vx:
+        ax_vel.plot(s_vx, n_vx, "o-", color="C0", label="Velocity X")
+    if s_vy:
+        ax_vel.plot(s_vy, n_vy, "s-", color="C1", label="Velocity Y")
+    ax_vel.set_xlabel("Commanded speed (m/s)")
+    ax_vel.set_ylabel("Velocity noise RMS (m/s)")
+    ax_vel.legend()
+    ax_vel.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    return fig
+
+
 def plot_summary_all_patterns(per_pattern_runs):
     """Global figure overlaying total-velocity-error RMS vs speed for all patterns."""
     fig, ax = plt.subplots(1, 1, figsize=(11, 6))
@@ -218,6 +257,46 @@ def plot_summary_all_patterns(per_pattern_runs):
     ax.set_ylabel("Velocity error RMS  √(RMS_x² + RMS_y²)  (m/s)")
     ax.legend()
     ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    return fig
+
+
+def plot_noise_summary_all_patterns(per_pattern_runs):
+    """Cross-pattern: combined noise RMS  √(rms_x² + rms_y²)  vs speed.
+
+    Two stacked subplots — position (m) and velocity (m/s) — one line per pattern.
+    """
+    fig, (ax_pos, ax_vel) = plt.subplots(2, 1, sharex=True, figsize=(11, 9))
+    fig.suptitle("State Estimator Noise vs Speed — All Patterns", fontsize=14)
+
+    def collect(runs, kx, ky):
+        pts = sorted(
+            [
+                (r["speed"], np.hypot(r[kx], r[ky]))
+                for r in runs
+                if np.isfinite(r.get(kx, np.nan)) and np.isfinite(r.get(ky, np.nan))
+            ],
+            key=lambda p: p[0],
+        )
+        return zip(*pts) if pts else ((), ())
+
+    for pattern_name, pattern_runs in sorted(per_pattern_runs.items()):
+        s_p, n_p = collect(pattern_runs, "noise_rms_position_x", "noise_rms_position_y")
+        if s_p:
+            ax_pos.plot(s_p, n_p, "o-", label=pattern_name, linewidth=1.2)
+        s_v, n_v = collect(pattern_runs, "noise_rms_velocity_x", "noise_rms_velocity_y")
+        if s_v:
+            ax_vel.plot(s_v, n_v, "o-", label=pattern_name, linewidth=1.2)
+
+    ax_pos.set_ylabel("Position noise RMS  √(x² + y²)  (m)")
+    ax_pos.legend()
+    ax_pos.grid(True, alpha=0.3)
+
+    ax_vel.set_xlabel("Commanded speed (m/s)")
+    ax_vel.set_ylabel("Velocity noise RMS  √(x² + y²)  (m/s)")
+    ax_vel.legend()
+    ax_vel.grid(True, alpha=0.3)
+
     fig.tight_layout()
     return fig
 
@@ -365,13 +444,20 @@ def main():
             args.dpi,
         )
 
-        noise_fig, _noise_metrics = plot_noise_estimation(data, speed)
+        noise_fig, noise_metrics = plot_noise_estimation(data, speed)
         if noise_fig is not None:
             _save(
                 noise_fig,
                 os.path.join(pattern_dir, f"{prefix}_09_noise_estimation.{fmt}"),
                 args.dpi,
             )
+        else:
+            noise_metrics = {}
+
+        for sig_name in ["Position X", "Position Y", "Velocity X", "Velocity Y"]:
+            if sig_name in noise_metrics:
+                m = noise_metrics[sig_name]
+                print(f"    {sig_name} noise: RMS={m['rms']:.6f}, std={m['std']:.6f}")
 
         rms_x, rms_y = compute_run_metrics(data)
         per_pattern_runs[(bag["split"], bag["pattern"])].append(
@@ -381,6 +467,7 @@ def main():
                 "data": data,
                 "vel_err_rms_x": rms_x,
                 "vel_err_rms_y": rms_y,
+                **extract_noise_rms_summary(noise_metrics),
             }
         )
 
@@ -398,6 +485,11 @@ def main():
             os.path.join(pattern_dir, f"_pattern_error_vs_speed.{args.format}"),
             args.dpi,
         )
+        _save(
+            plot_noise_vs_speed(pattern_name, runs),
+            os.path.join(pattern_dir, f"_pattern_noise_vs_speed.{args.format}"),
+            args.dpi,
+        )
         per_split_patterns[split_name][pattern_name] = runs
 
     for split_name, pattern_runs in per_split_patterns.items():
@@ -409,6 +501,15 @@ def main():
                     output_dir,
                     split_name,
                     f"_summary_all_patterns_error_vs_speed.{args.format}",
+                ),
+                args.dpi,
+            )
+            _save(
+                plot_noise_summary_all_patterns(pattern_runs),
+                os.path.join(
+                    output_dir,
+                    split_name,
+                    f"_summary_all_patterns_noise_vs_speed.{args.format}",
                 ),
                 args.dpi,
             )
