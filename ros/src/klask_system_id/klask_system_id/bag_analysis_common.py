@@ -187,6 +187,18 @@ def make_time_relative(data):
 # ---------------------------------------------------------------------------
 
 
+_NOISE_SUMMARY_SIGNALS = ("Position X", "Position Y", "Velocity X", "Velocity Y")
+
+
+def extract_noise_rms_summary(noise_metrics):
+    """Flatten the noise_metrics dict into noise_rms_<signal> floats (NaN if absent)."""
+    out = {}
+    for sig_name in _NOISE_SUMMARY_SIGNALS:
+        key = f"noise_rms_{sig_name.lower().replace(' ', '_')}"
+        out[key] = noise_metrics[sig_name]["rms"] if sig_name in noise_metrics else np.nan
+    return out
+
+
 def compute_noise_metrics(signal, fs, cutoff_hz=5.0, order=4):
     """Apply Butterworth high-pass filter and compute noise statistics."""
     if len(signal) < 20 or fs <= 0:
