@@ -18,7 +18,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from klask_system_id.bag_analysis_common import (
+from klask_system_id_pkg.bag_analysis_common import (
     extract_noise_rms_summary,
     make_time_relative,
     plot_motor_commands,
