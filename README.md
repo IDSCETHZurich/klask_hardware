@@ -78,7 +78,7 @@ The ROS2 workspace (`ros/src/`) is organized into the following packages and nod
 - **`klask_sprite_generator_node`** — walks both pegs across a configurable grid and captures synchronized images and state snapshots to build a labeled dataset.
 - **`process_sprites`** — offline script that segments captured frames into individual sprite PNGs with metadata for the renderer.
 
-### klask_system_id (Python)
+### klask_system_id_pkg (Python)
 
 - **`acceleration_test_node`** — drives a player along a triangle pattern at sweeping commanded velocities and records one rosbag per velocity step.
 - **`velocity_profile_node`** — drives line and circle patterns at randomized or stepped speeds and records the resulting trajectories.

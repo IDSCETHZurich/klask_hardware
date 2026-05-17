@@ -8,8 +8,8 @@ This launch file builds the motor system nodes directly (rather than including
 motors_launch.py) so that max_velocity can be overridden for the test.
 
 Example usage:
-    ros2 launch klask_system_id velocity_profile_launch.py
-    ros2 launch klask_system_id velocity_profile_launch.py player:=right pattern:=circle
+    ros2 launch klask_system_id_pkg velocity_profile_launch.py
+    ros2 launch klask_system_id_pkg velocity_profile_launch.py player:=right pattern:=circle
 """
 
 import os
@@ -160,7 +160,7 @@ def launch_setup(context, *args, **kwargs):
     # --- Velocity profile node ---
     nodes_to_launch.append(
         Node(
-            package="klask_system_id",
+            package="klask_system_id_pkg",
             executable="velocity_profile_node",
             name="velocity_profile_node",
             output="screen",
@@ -184,7 +184,7 @@ def generate_launch_description():
         "params_file",
         default_value=PathJoinSubstitution(
             [
-                FindPackageShare("klask_system_id"),
+                FindPackageShare("klask_system_id_pkg"),
                 "config",
                 "velocity_profile_params.yaml",
             ]

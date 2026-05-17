@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>klask_system_id</name>
+  <name>klask_system_id_pkg</name>
   <version>0.0.1</version>
   <description>The system identification package for Klask robot</description>
   <maintainer email="tobimeier@student.ethz.ch">Tobias Meier</maintainer>
