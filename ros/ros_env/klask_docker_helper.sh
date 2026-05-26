@@ -85,7 +85,7 @@ print_usage() {
 cmd_build() {
     echo -e "${GREEN}Building ${MODE_DISPLAY} Docker image...${NC}"
 
-    docker build -t "${IMAGE_NAME}:${TAG}" -f "$SCRIPT_DIR/$DOCKERFILE" "$SCRIPT_DIR/.."
+    DOCKER_BUILDKIT=1 docker build -t "${IMAGE_NAME}:${TAG}" -f "$SCRIPT_DIR/$DOCKERFILE" "$SCRIPT_DIR/.."
 
     echo -e "${GREEN}${MODE_DISPLAY} build complete!${NC}"
 }
