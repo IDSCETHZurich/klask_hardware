@@ -53,6 +53,14 @@ class ImageViewer(Node):
         self.declare_parameter("show_fps_overlay", True)
         self.show_fps_overlay = bool(self.get_parameter("show_fps_overlay").value)
 
+        # Rate (Hz) at which the stored frame is rendered and displayed,
+        # decoupled from the camera publish rate
+        self.declare_parameter("display_rate", 10.0)
+        self.display_rate = float(self.get_parameter("display_rate").value)
+        if self.display_rate <= 0.0:
+            self.get_logger().warn("display_rate must be > 0; falling back to 10.0 Hz")
+            self.display_rate = 10.0
+
         # =============================
         # EU to Pixel Conversion Parameters
         # =============================
@@ -158,6 +166,7 @@ class ImageViewer(Node):
         self.state_subscription = self.create_subscription(State, self.board_state_topic, self.state_callback, 10)
 
         self.latest_state: State | None = None
+        self.latest_image_msg: CompressedImage | None = None
 
         # Subscribe to cmd_vel topics
         self.cmd_vel_left_subscription = self.create_subscription(
@@ -187,11 +196,29 @@ class ImageViewer(Node):
         self.fps_frame_count = 0
         self.current_fps = 0.0
 
+        # Timer to render and display the latest stored frame at a fixed rate
+        self.display_timer = self.create_timer(1.0 / self.display_rate, self.display_callback)
+
     def image_callback(self, msg: CompressedImage) -> None:
-        """Handle incoming compressed images."""
+        """Store the latest compressed image and track the incoming frame rate.
+
+        Display happens separately in `display_callback`, driven by a timer at
+        the configured `display_rate`, so reception and rendering are decoupled.
+        """
+        self.latest_image_msg = msg
+        self._update_fps()
+
+    def display_callback(self) -> None:
+        """Render overlays onto the latest stored frame and display it.
+
+        Decodes a fresh frame from the stored compressed message each tick, so
+        overlays never accumulate across renders.
+        """
+        if self.latest_image_msg is None:
+            return
         try:
             # Convert ROS CompressedImage message to OpenCV image
-            cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            cv_image = self.bridge.compressed_imgmsg_to_cv2(self.latest_image_msg, desired_encoding="bgr8")
 
             # Store current image dimensions for EU-to-pixel conversion
             # (image size can vary each frame due to rotation/cropping)
@@ -211,10 +238,7 @@ class ImageViewer(Node):
             if self.show_status_overlay and self.latest_state is not None:
                 self._overlay_status(cv_image, self.latest_state)
 
-            # Update FPS counter
-            self._update_fps()
-
-            # Draw FPS on image
+            # Draw incoming camera FPS on image
             if self.show_fps_overlay and (self.current_fps > 0):
                 fps_text = f"FPS: {self.current_fps:.1f}"
                 cv2.putText(
@@ -233,7 +257,7 @@ class ImageViewer(Node):
             cv2.waitKey(1)
 
         except Exception as e:
-            self.get_logger().error(f"Failed to process image: {e}")
+            self.get_logger().error(f"Failed to display image: {e}")
 
     def _color_param(self, name: str, default_value: tuple[int, int, int]) -> tuple[int, int, int]:
         """Parse color parameter from ROS parameter.

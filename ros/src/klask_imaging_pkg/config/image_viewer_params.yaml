@@ -17,6 +17,10 @@ image_viewer:
     # Toggle fps overlay on the image
     show_fps_overlay: true
 
+    # Rate (Hz) at which the stored frame is rendered and displayed,
+    # decoupled from the camera publish rate
+    display_rate: 10.0
+
     # ============================================
     # EU to Pixel Conversion Parameters
     # ============================================
