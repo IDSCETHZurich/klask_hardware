@@ -111,7 +111,9 @@ cmd_run() {
             --env="DISPLAY" \
             --env="QT_X11_NO_MITSHM=1" \
             --env="ROS_DOMAIN_ID=0" \
+            --env="HISTFILE=/root/.shell_history/.bash_history" \
             --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+            --volume="${CONTAINER_NAME}_shell_history:/root/.shell_history:rw" \
             --device="$VIDEO_DEVICE:/dev/video0" \
             --network=host \
             --cap-add=NET_ADMIN \
@@ -125,6 +127,7 @@ cmd_run() {
             --env="DISPLAY" \
             --env="QT_X11_NO_MITSHM=1" \
             --env="ROS_DOMAIN_ID=0" \
+            --env="HISTFILE=/root/.shell_history/.bash_history" \
             --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
             --volume="$SCRIPT_DIR/../src:/opt/ros/klask_ws/src:rw" \
             --volume="$SCRIPT_DIR/../.vscode:/opt/ros/klask_ws/.vscode:rw" \
@@ -134,6 +137,7 @@ cmd_run() {
             --volume="${CONTAINER_NAME}_build:/opt/ros/klask_ws/build:rw" \
             --volume="${CONTAINER_NAME}_install:/opt/ros/klask_ws/install:rw" \
             --volume="${CONTAINER_NAME}_log:/opt/ros/klask_ws/log:rw" \
+            --volume="${CONTAINER_NAME}_shell_history:/root/.shell_history:rw" \
             --device="$VIDEO_DEVICE:/dev/video0" \
             --network=host \
             --cap-add=NET_ADMIN \
